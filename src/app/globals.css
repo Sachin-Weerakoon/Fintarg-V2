@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import "tailwindcss" source("../");
 
 @theme {
   --font-sans: 'Poppins', 'Noto Sans Sinhala', 'Noto Sans Tamil', system-ui, sans-serif;
@@ -215,10 +215,70 @@ body {
   background: var(--color-surface);
   box-shadow: 0 24px 70px rgba(5,18,40,.22);
 }
+.onboarding-card-wide { max-width: 640px; }
+.onboarding-name-input { min-height: 54px; }
+.onboarding-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 24px;
+}
+.onboarding-choice-card {
+  display: flex;
+  min-width: 0;
+  min-height: 430px;
+  flex-direction: column;
+  padding: 22px 20px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.onboarding-choice-card.selected { border-color: var(--color-primary); }
+.onboarding-choice-card h3 {
+  margin: 4px 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.onboarding-choice-card p {
+  min-height: 42px;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.onboarding-choice-card ul {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 22px;
+  padding: 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.4;
+  list-style: none;
+}
+.onboarding-choice-card li { display: flex; gap: 10px; }
+.onboarding-choice-card li span { color: var(--color-primary); }
+.onboarding-choice-card .btn-primary,
+.onboarding-choice-card .btn-secondary {
+  align-self: flex-start;
+  margin-top: auto;
+  padding-inline: 20px;
+}
+.onboarding-choice-card .btn-secondary { color: var(--color-primary); }
 .onboarding-modes {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .onboarding-card { padding: 24px; }
+  .onboarding-choice-grid { grid-template-columns: 1fr; gap: 12px; }
+  .onboarding-choice-card { min-height: 0; padding: 20px; }
+  .onboarding-choice-card p { min-height: 0; }
+  .onboarding-choice-card ul { margin: 14px 0 18px; }
 }
 .mode-option {
   min-height: 72px;
