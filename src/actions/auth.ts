@@ -8,9 +8,11 @@ import { sendMail } from '@/lib/mailer';
 import { generateResetToken, hashToken } from '@/lib/tokens';
 import { PasswordResetModel } from '@/models/PasswordReset';
 import crypto from 'crypto';
+import { connectToDatabase } from '@/lib/mongodb';
 
 export async function register(data: { name: string; email: string; password: string; workMode: string }) {
   const { name, email, password, workMode } = data;
+  await connectToDatabase();
   try {
     const { userId } = await createUser(email, password, name, workMode as 'salary' | 'business' | 'both');
     const plan: 'basic' | 'business' = workMode === 'salary' ? 'basic' : 'business';
@@ -18,13 +20,17 @@ export async function register(data: { name: string; email: string; password: st
     const { token } = await createSessionFn(userId);
     (await cookies()).set('session', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 30 * 24 * 60 * 60 });
     return { ok: true as const };
-  } catch (e) {
-    return { ok: false as const, error: 'Email already registered' };
+  } catch (error) {
+    if ((error as { code?: number }).code === 11000) {
+      return { ok: false as const, error: 'Email already registered' };
+    }
+    throw error;
   }
 }
 
 export async function login(data: { email: string; password: string }) {
   const { email, password } = data;
+  await connectToDatabase();
   const user = await UserModel.findOne({ email });
   if (!user) return { ok: false as const, error: 'Invalid credentials' };
   if (user.lockedUntil && user.lockedUntil > new Date()) {
@@ -50,6 +56,7 @@ export async function login(data: { email: string; password: string }) {
 export async function logout() {
   const sessionToken = (await cookies()).get('session')?.value;
   if (sessionToken) {
+    await connectToDatabase();
     await deleteSession(sessionToken);
     (await cookies()).delete('session');
   }
@@ -58,6 +65,7 @@ export async function logout() {
 export async function getSessionUser() {
   const sessionToken = (await cookies()).get('session')?.value;
   if (!sessionToken) return null;
+  await connectToDatabase();
   const userId = await validateSession(sessionToken);
   if (!userId) return null;
   const user = await UserModel.findById(userId).lean();
@@ -71,6 +79,7 @@ export async function getSessionUser() {
 }
 
 export async function forgotPassword(email: string) {
+  await connectToDatabase();
   const user = await UserModel.findOne({ email });
   if (!user) return { ok: true as const };
   const token = generateResetToken();
@@ -84,6 +93,7 @@ export async function forgotPassword(email: string) {
 }
 
 export async function resetPassword(token: string, newPassword: string) {
+  await connectToDatabase();
   const tokenHash = hashToken(token);
   const reset = await PasswordResetModel.findOne({ tokenHash, used: false, expiresAt: { $gt: new Date() } });
   if (!reset) return { ok: false as const, error: 'Invalid or expired token' };
