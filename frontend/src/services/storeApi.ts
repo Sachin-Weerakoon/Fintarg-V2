@@ -33,50 +33,54 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
   };
 }
 
-export async function persistStoreAction(action: { type: string; [key: string]: any }): Promise<void> {
-  const send = (path: string, method: string, body?: unknown) => apiClient(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+export async function persistStoreAction(action: { type: string; [key: string]: any }): Promise<string | undefined> {
+  const send = <T = unknown>(path: string, method: string, body?: unknown) => apiClient<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+  const create = async (path: string, body: unknown) => {
+    const result = await send<{ data: { _id: string } }>(path, 'POST', body);
+    return result.data._id;
+  };
   const id = encodeURIComponent(String(action.id || action.entry?.id || ''));
   switch (action.type) {
-    case 'ADD_INCOME': return void await send('/api/backend/records/incomes', 'POST', action.entry);
+    case 'ADD_INCOME': return create('/api/backend/records/incomes', action.entry);
     case 'UPDATE_INCOME': return void await send(`/api/backend/records/incomes/${id}`, 'PATCH', action.entry);
     case 'DELETE_INCOME': return void await send(`/api/backend/records/incomes/${id}`, 'DELETE');
-    case 'ADD_EXPENSE': return void await send('/api/backend/records/expenses', 'POST', action.entry);
+    case 'ADD_EXPENSE': return create('/api/backend/records/expenses', action.entry);
     case 'UPDATE_EXPENSE': return void await send(`/api/backend/records/expenses/${id}`, 'PATCH', action.entry);
     case 'DELETE_EXPENSE': return void await send(`/api/backend/records/expenses/${id}`, 'DELETE');
-    case 'ADD_FINANCE_PAYMENT': return void await send('/api/backend/records/financePayments', 'POST', action.entry);
+    case 'ADD_FINANCE_PAYMENT': return create('/api/backend/records/financePayments', action.entry);
     case 'DELETE_FINANCE_PAYMENT': return void await send(`/api/backend/records/financePayments/${id}`, 'DELETE');
-    case 'ADD_LOAN': return void await send('/api/backend/records/loans', 'POST', { lender: action.entry.lender, amount: action.entry.principal, rate: action.entry.rate, method: action.entry.method, startDate: action.entry.startDate, dueDate: action.entry.dueDate });
+    case 'ADD_LOAN': return create('/api/backend/records/loans', { lender: action.entry.lender, amount: action.entry.principal, rate: action.entry.rate, method: action.entry.method, startDate: action.entry.startDate, dueDate: action.entry.dueDate });
     case 'DELETE_LOAN': return void await send(`/api/backend/records/loans/${id}`, 'DELETE');
     case 'RECORD_LOAN_REPAYMENT': return void await send(`/api/backend/records/loans/${id}/repay`, 'POST', { amount: action.amount });
-    case 'ADD_PAWNED': return void await send('/api/backend/records/pawnedItems', 'POST', action.entry);
+    case 'ADD_PAWNED': return create('/api/backend/records/pawnedItems', action.entry);
     case 'DELETE_PAWNED': return void await send(`/api/backend/records/pawnedItems/${id}`, 'DELETE');
     case 'RECORD_PAWN_PAYMENT': return void await send(`/api/backend/records/pawnedItems/${id}/payment`, 'POST');
-    case 'ADD_GOAL': return void await send('/api/backend/records/goals', 'POST', { name: action.entry.name, dailyAmount: action.entry.dailyAmount, endDate: action.entry.endDate });
+    case 'ADD_GOAL': return create('/api/backend/records/goals', { name: action.entry.name, dailyAmount: action.entry.dailyAmount, endDate: action.entry.endDate });
     case 'UPDATE_GOAL': return void await send(`/api/backend/records/goals/${id}`, 'PATCH', { dailyAmount: action.dailyAmount });
     case 'DELETE_GOAL': return void await send(`/api/backend/records/goals/${id}`, 'DELETE');
     case 'ADD_SAVING_CONTRIBUTION': return void await send(`/api/backend/records/goals/${encodeURIComponent(action.goalId)}/contributions`, 'POST', { amount: action.amount, date: action.date });
     case 'SET_PERSONAL_SPENDING_BUDGET': return void await send('/api/backend/profile/personal-budget', 'PUT', { budget: action.budget });
     case 'UPDATE_PROFILE': return void await send('/api/backend/profile', 'PATCH', action.profile);
-    case 'ADD_LETTER': return void await send('/api/backend/records/letters', 'POST', action.entry);
+    case 'ADD_LETTER': return create('/api/backend/records/letters', action.entry);
     case 'DELETE_LETTER': return void await send(`/api/backend/records/letters/${id}`, 'DELETE');
-    case 'ADD_AGREEMENT': return void await send('/api/backend/records/agreements', 'POST', { ...action.entry, value: action.entry.value });
+    case 'ADD_AGREEMENT': return create('/api/backend/records/agreements', { ...action.entry, value: action.entry.value });
     case 'DELETE_AGREEMENT': return void await send(`/api/backend/records/agreements/${id}`, 'DELETE');
-    case 'ADD_COMPANY': return void await send('/api/backend/records/companies', 'POST', action.entry);
+    case 'ADD_COMPANY': return create('/api/backend/records/companies', action.entry);
     case 'UPDATE_COMPANY': return void await send(`/api/backend/records/companies/${id}`, 'PATCH', action.entry);
     case 'DELETE_COMPANY': return void await send(`/api/backend/records/companies/${id}`, 'DELETE');
-    case 'ADD_BRANCH': return void await send('/api/backend/records/businessBranches', 'POST', action.entry);
+    case 'ADD_BRANCH': return create('/api/backend/records/businessBranches', action.entry);
     case 'UPDATE_BRANCH': return void await send(`/api/backend/records/businessBranches/${id}`, 'PATCH', action.entry);
     case 'DELETE_BRANCH': return void await send(`/api/backend/records/businessBranches/${id}`, 'DELETE');
-    case 'ADD_EMPLOYMENT': return void await send('/api/backend/records/employmentProfiles', 'POST', action.entry);
+    case 'ADD_EMPLOYMENT': return create('/api/backend/records/employmentProfiles', action.entry);
     case 'UPDATE_EMPLOYMENT': return void await send(`/api/backend/records/employmentProfiles/${id}`, 'PATCH', action.entry);
     case 'DELETE_EMPLOYMENT': return void await send(`/api/backend/records/employmentProfiles/${id}`, 'DELETE');
-    case 'ADD_OWNER_DRAW': return void await send('/api/backend/records/ownerDraws', 'POST', action.entry);
+    case 'ADD_OWNER_DRAW': return create('/api/backend/records/ownerDraws', action.entry);
     case 'UPDATE_AGREEMENT': return void await send(`/api/backend/records/agreements/${id}`, 'PATCH', action.updates);
-    case 'ADD_MEDICAL_EXPENSE': return void await send('/api/backend/records/medicalExpenses', 'POST', action.entry);
+    case 'ADD_MEDICAL_EXPENSE': return create('/api/backend/records/medicalExpenses', action.entry);
     case 'DELETE_MEDICAL_EXPENSE': return void await send(`/api/backend/records/medicalExpenses/${id}`, 'DELETE');
-    case 'ADD_DOCUMENT': return void await send('/api/backend/records/documents', 'POST', action.entry);
+    case 'ADD_DOCUMENT': return create('/api/backend/records/documents', action.entry);
     case 'DELETE_DOCUMENT': return void await send(`/api/backend/records/documents/${id}`, 'DELETE');
-    case 'ADD_REMINDER': return void await send('/api/backend/records/reminders', 'POST', action.entry);
+    case 'ADD_REMINDER': return create('/api/backend/records/reminders', action.entry);
     case 'UPDATE_REMINDER': return void await send(`/api/backend/records/reminders/${id}`, 'PATCH', { status: action.status });
     case 'DELETE_REMINDER': return void await send(`/api/backend/records/reminders/${id}`, 'DELETE');
   }

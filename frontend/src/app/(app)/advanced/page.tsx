@@ -711,23 +711,23 @@ function BusinessWorkspace() {
     setBranchId(state.businessBranches.find(item => item.companyId === id)?.id || '');
     window.setTimeout(() => setLoadingCompany(false), 350);
   };
-  const addBusiness = () => {
+  const addBusiness = async () => {
     if (!businessForm.name) return;
-    const id = 'co_' + Date.now();
-    dispatch({ type: 'ADD_COMPANY', entry: { id, ...businessForm, logo: '' } });
-    setCompanyId(id);
+    const localId = 'co_' + Date.now();
+    const serverId = await dispatch({ type: 'ADD_COMPANY', entry: { id: localId, ...businessForm, logo: '' } });
+    setCompanyId(serverId || localId);
     setBranchId('');
     setBusinessForm({ name: '', address: '', contact: '', businessType: '', openingDate: '' });
     setShowBusinessForm(false);
   };
-  const addBranch = () => {
+  const addBranch = async () => {
     if (!companyId || !branchForm.name || Number(branchForm.monthlyTarget) <= 0) return;
     const entry: BusinessBranch = {
       id: 'branch_' + Date.now(), companyId, name: branchForm.name, branchType: branchForm.branchType, location: branchForm.location, openingDate: branchForm.openingDate,
       monthlyTarget: Number(branchForm.monthlyTarget), annualTarget: Number(branchForm.monthlyTarget) * 12, entries: [],
     };
-    dispatch({ type: 'ADD_BRANCH', entry });
-    setBranchId(entry.id);
+    const serverId = await dispatch({ type: 'ADD_BRANCH', entry });
+    setBranchId(serverId || entry.id);
     setBranchForm({ name: '', branchType: '', location: '', openingDate: '', monthlyTarget: '' });
   };
   const monthEntries = branch?.entries.filter(entry => entry.date.startsWith(state.selectedMonth)) || [];
@@ -1081,14 +1081,14 @@ function SalaryWorkspace() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ employer: '', role: '', monthlyGross: '', payday: '25', monthlyDeductions: '', monthlySavingsTarget: '', careerGoal: '' });
 
-  const saveJob = () => {
+  const saveJob = async () => {
     if (!form.employer || Number(form.monthlyGross) <= 0) return;
     const entry: EmploymentProfile = {
       id: 'job_' + Date.now(), employer: form.employer, role: form.role, monthlyGross: Number(form.monthlyGross),
       payday: Number(form.payday), monthlyDeductions: Number(form.monthlyDeductions), monthlySavingsTarget: Number(form.monthlySavingsTarget), careerGoal: form.careerGoal,
     };
-    dispatch({ type: 'ADD_EMPLOYMENT', entry });
-    setSelectedId(entry.id);
+    const serverId = await dispatch({ type: 'ADD_EMPLOYMENT', entry });
+    setSelectedId(serverId || entry.id);
     setShowForm(false);
     setForm({ employer: '', role: '', monthlyGross: '', payday: '25', monthlyDeductions: '', monthlySavingsTarget: '', careerGoal: '' });
   };

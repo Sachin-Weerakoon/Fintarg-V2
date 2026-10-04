@@ -132,6 +132,7 @@ const emptyInitialState: AppState = {
 
 type Action =
   | { type: 'HYDRATE'; data: Partial<AppState> }
+  | { type: 'REPLACE_RECORD_ID'; collection: 'income' | 'expenses' | 'financePayments' | 'loans' | 'pawnedItems' | 'savingsGoals' | 'letters' | 'agreements' | 'companies' | 'businessBranches' | 'employmentProfiles' | 'ownerDraws' | 'medicalExpenses' | 'documents' | 'reminders'; localId: string; serverId: string }
   | { type: 'SET_PAGE'; page: Page }
   | { type: 'SET_PLAN'; plan: 'basic' | 'business'; workMode: WorkMode; name: string }
   | { type: 'SET_SETUP_COMPLETE' }
@@ -180,9 +181,15 @@ type Action =
   | { type: 'ADD_LOAN_FROM_SHORTFALL'; amount: number; month: string }
   | { type: 'SET_MONTH'; month: string };
 
+type PersistedCollection = Extract<Action, { type: 'REPLACE_RECORD_ID' }>['collection'];
+
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'HYDRATE': return { ...state, ...action.data, profile: { ...state.profile, ...action.data.profile } };
+    case 'REPLACE_RECORD_ID': return {
+      ...state,
+      [action.collection]: (state[action.collection] as { id: string }[]).map(record => record.id === action.localId ? { ...record, id: action.serverId } : record),
+    };
     case 'SET_PAGE': return { ...state, currentPage: action.page };
     case 'SET_PLAN': return { ...state, currentPage: 'dashboard', profile: { ...state.profile, plan: action.plan, workMode: action.workMode, name: action.name } };
     case 'SET_SETUP_COMPLETE': return { ...state, setupComplete: true };
@@ -271,7 +278,7 @@ function reducer(state: AppState, action: Action): AppState {
   }
 }
 
-const AppContext = createContext<{ state: AppState; dispatch: React.Dispatch<Action> } | null>(null);
+const AppContext = createContext<{ state: AppState; dispatch: (action: Action) => Promise<string | undefined> } | null>(null);
 
 export function AppProvider({ children, initialProfile = {} }: { children: ReactNode; initialProfile?: Partial<AppState['profile']> }) {
   const [state, reduce] = useReducer(reducer, {
@@ -289,10 +296,24 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
     return () => { cancelled = true; };
   }, []);
 
-  const dispatch: React.Dispatch<Action> = action => {
+  const dispatch = async (action: Action): Promise<string | undefined> => {
     reduce(action);
-    if (action.type !== 'HYDRATE') {
-      void persistStoreAction(action).catch(error => console.error('Unable to save account change', error));
+    if (action.type === 'HYDRATE' || action.type === 'REPLACE_RECORD_ID') return undefined;
+    try {
+      const serverId = await persistStoreAction(action);
+      const collectionByAction: Record<string, PersistedCollection> = {
+        ADD_INCOME: 'income', ADD_EXPENSE: 'expenses', ADD_FINANCE_PAYMENT: 'financePayments', ADD_LOAN: 'loans',
+        ADD_PAWNED: 'pawnedItems', ADD_GOAL: 'savingsGoals', ADD_LETTER: 'letters', ADD_AGREEMENT: 'agreements',
+        ADD_COMPANY: 'companies', ADD_BRANCH: 'businessBranches', ADD_EMPLOYMENT: 'employmentProfiles',
+        ADD_OWNER_DRAW: 'ownerDraws', ADD_MEDICAL_EXPENSE: 'medicalExpenses', ADD_DOCUMENT: 'documents', ADD_REMINDER: 'reminders',
+      };
+      const collection = collectionByAction[action.type];
+      const localId = 'entry' in action && action.entry && 'id' in action.entry ? String(action.entry.id) : undefined;
+      if (serverId && collection && localId) reduce({ type: 'REPLACE_RECORD_ID', collection, localId, serverId });
+      return serverId;
+    } catch (error) {
+      console.error('Unable to save account change', error);
+      return undefined;
     }
   };
 

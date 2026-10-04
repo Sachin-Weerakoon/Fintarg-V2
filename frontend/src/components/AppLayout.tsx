@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { logout } from '@/actions/logout';
 import { AppProvider } from '@/store';
 
 const navItems = [
@@ -46,8 +47,10 @@ function pageTitleOf(pathname: string, tab?: string): string {
 
 export default function AppLayout({ user, children }: { user: { name: string; email: string; plan: string; workMode: string; profile: any }; children: React.ReactNode }) {
   const pathname = usePathname() || '/';
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const primary = user.profile?.themeColor || '#0FA3B1';
   const modeLabel = user.workMode === 'both' ? 'Job + Business' : user.workMode === 'business' ? 'Business' : 'Salary';
   const textSizeClass = `text-size-${user.profile?.textSize || 'medium'}`;
@@ -56,6 +59,17 @@ export default function AppLayout({ user, children }: { user: { name: string; em
   const mobileBottomItems = user.workMode === 'salary' ? salaryBottomItems : businessBottomItems;
   const isMorePage = !mobileBottomItems.some(item => item.page === pathname.replace('/', ''));
   const currentTab = searchParams?.get('tab') || undefined;
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      await logout();
+      router.push('/welcome');
+      router.refresh();
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
   return (
     <AppProvider initialProfile={user.profile || {}}>
@@ -91,6 +105,15 @@ export default function AppLayout({ user, children }: { user: { name: string; em
               <Link href="/settings" className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ background: primary }} title="Settings">
                 {user.name ? user.name[0].toUpperCase() : 'U'}
               </Link>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={signingOut}
+                className="text-sm font-medium px-3 py-2 rounded-lg border transition-colors"
+                style={{ borderColor: 'var(--color-border)', background: 'transparent', color: 'var(--color-text)' }}
+              >
+                {signingOut ? 'Signing out...' : 'Sign out'}
+              </button>
             </div>
           </header>
           <main className="flex-1 overflow-y-auto p-8" style={{ background: 'var(--color-bg)' }}>{children}</main>
@@ -103,6 +126,15 @@ export default function AppLayout({ user, children }: { user: { name: string; em
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }}>{modeLabel}</span>
             <Link href="/settings" className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ background: 'rgba(255,255,255,0.25)' }}>{user.name ? user.name[0].toUpperCase() : 'U'}</Link>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="text-xs font-medium px-2 py-1 rounded-full border"
+              style={{ borderColor: 'rgba(255,255,255,0.2)', color: '#fff', background: 'rgba(255,255,255,0.04)' }}
+            >
+              {signingOut ? '...' : 'Sign out'}
+            </button>
           </div>
         </header>
         <main className="mobile-main flex-1 overflow-y-auto p-4" style={{ background: 'var(--color-bg)' }}>

@@ -17,6 +17,7 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
+    "mongodb-memory-server": "^11.3.0",
     "mongoose": "^8.9.5",
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",

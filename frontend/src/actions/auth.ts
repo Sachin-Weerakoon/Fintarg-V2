@@ -8,10 +8,6 @@ export async function getSessionUser() {
   return result.ok ? result.data : null;
 }
 
-export async function logout() {
-  return backendApi('/api/auth/logout', { method: 'POST' });
-}
-
 export async function register(data: { name: string; email: string; password: string; workMode: string }) {
   return backendApi('/api/auth/register', { method: 'POST', body: JSON.stringify(data) });
 }
