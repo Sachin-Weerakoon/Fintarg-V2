@@ -27,7 +27,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(pinoHttp({ logger }));
 
 app.use('/api/health', healthRoutes);
-app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false }));
+app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: 'draft-7', legacyHeaders: false }));
 app.use('/api/auth/register', ensureDatabase);
 app.use('/api/auth/login', ensureDatabase);
 app.use('/api/auth/forgot-password', ensureDatabase);
@@ -44,3 +44,4 @@ app.use('/api/files', fileRoutes);
 app.use('/api/cron', cronRoutes);
 app.use((_request, response) => response.status(404).json({ error: 'Route not found' }));
 app.use(errorHandler);
+export default app;

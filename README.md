@@ -54,10 +54,10 @@ To run one side only, use `npm run dev:frontend` or `npm run dev:backend`. Verif
 
 ## Backend environment
 
-`MONGODB_URI`, `MONGODB_DB`, `JWT_SECRET`, and `FILE_ENCRYPTION_KEY` belong in `backend/.env` locally and in the backend host’s secret settings in production. `FRONTEND_ORIGIN` configures credentialed CORS. `RESEND_API_KEY` and `MAIL_FROM` enable password reset and email reminders. `CRON_SECRET` protects scheduled endpoints.
+`MONGODB_URI`, `MONGODB_DB`, `JWT_SECRET`, and `FILE_ENCRYPTION_KEY` belong in `backend/.env` locally and in the backend host's secret settings in production. `FRONTEND_ORIGIN` configures credentialed CORS. `RESEND_API_KEY` and `MAIL_FROM` enable password reset and email reminders. `CRON_SECRET` protects scheduled endpoints.
 
 Never commit `.env`, `.env.local`, or production credentials. Rotate any database credential previously pasted into chat before production deployment.
 
 ## Deployment
 
-Deploy the Next.js frontend and Express backend as separate services. Set `BACKEND_API_URL` in the frontend to the backend’s private or HTTPS URL. Configure MongoDB and JWT/file-encryption secrets on the backend host, then set the frontend origin on both services. MongoDB Atlas must allow the backend host’s network egress address.
+Deploy the Next.js frontend and Express backend as separate services. Set `BACKEND_API_URL` in the frontend to the backend's private or HTTPS URL. Configure MongoDB and JWT/file-encryption secrets on the backend host, then set the frontend origin on both services. MongoDB Atlas must allow the backend host's network egress address.
