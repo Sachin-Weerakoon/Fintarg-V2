@@ -1,42 +1,63 @@
 # Fintarg
 
-Fintarg is a personal finance and life-management web app for Sri Lanka. This project is a migration from the Vite prototype into a Next.js app intended for Vercel + MongoDB Atlas deployment.
+Fintarg is a responsive personal-finance and life-management platform for Sri Lankan individuals and small businesses. It uses an Express/Mongoose REST backend and a Next.js App Router frontend.
 
-## Local development
+## Structure
 
-1. Install dependencies:
+```text
+backend/
+  src/
+    config/          Environment, MongoDB, and logger setup
+    controllers/     REST request handlers
+    middleware/      Authentication, validation, DB readiness, errors
+    models/          Mongoose schemas
+    routes/          Auth, profile, records, files, cron, health
+    services/        Auth, record, mail, reset, and file logic
+    utils/           JWT, password hashing, async handler
+    validations/     Zod request schemas
+  .env.example
+  package.json
+frontend/
+  src/
+    app/             Next.js routes, layouts, API proxies
+    actions/         Server actions calling the backend
+    components/      Shared and domain UI
+    context/store    Global application state
+    hooks/           Reusable React hooks
+    lib/             Server API client and finance logic
+    services/        Browser API client
+    types/           API and domain types
+    utils/           Formatting helpers
+  .env.local.example
+  package.json
+```
+
+## Local setup
+
+1. Install all workspace dependencies from the repository root:
+
+   ```powershell
    npm install
-2. Copy the environment template:
-   cp .env.example .env.local
-3. Fill in the required values for MongoDB, app origin, and the encryption key.
-4. Start the app:
+   ```
+
+2. Copy `backend/.env.example` to `backend/.env` and set `MONGODB_URI`, `MONGODB_DB`, and a production-quality `JWT_SECRET`.
+3. Copy `frontend/.env.local.example` to `frontend/.env.local`. Set `BACKEND_API_URL=http://localhost:5000` for local development.
+4. Start both projects from the root:
+
+   ```powershell
    npm run dev
+   ```
 
-## Required environment variables
+   The Next.js frontend runs at `http://localhost:3000`; Express runs at `http://localhost:5000`.
 
-- MONGODB_URI: MongoDB Atlas connection string with the database name in the URL.
-- MONGODB_DB: Database name to use for the app.
-- APP_ORIGIN: Public application URL, typically your Vercel domain.
-- FILE_ENCRYPTION_KEY: 32-byte base64 key used to encrypt uploaded files.
-- CRON_SECRET: Secret used to protect maintenance and reminder cron routes.
-- RESEND_API_KEY: Optional. Enables email sending through Resend.
-- MAIL_FROM: Optional. Sender address for Resend mail.
+To run one side only, use `npm run dev:frontend` or `npm run dev:backend`. Verify with `npm run typecheck`, `npm test`, and `npm run build`.
 
-## Secret generation examples
+## Backend environment
 
-- FILE_ENCRYPTION_KEY: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
-- CRON_SECRET: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
-- APP_ORIGIN: `https://your-domain.vercel.app`
+`MONGODB_URI`, `MONGODB_DB`, `JWT_SECRET`, and `FILE_ENCRYPTION_KEY` belong in `backend/.env` locally and in the backend host’s secret settings in production. `FRONTEND_ORIGIN` configures credentialed CORS. `RESEND_API_KEY` and `MAIL_FROM` enable password reset and email reminders. `CRON_SECRET` protects scheduled endpoints.
+
+Never commit `.env`, `.env.local`, or production credentials. Rotate any database credential previously pasted into chat before production deployment.
 
 ## Deployment
 
-This app is intended to be deployed to Vercel with MongoDB Atlas. The project expects a MongoDB cluster to be configured, the app origin to be set, and the DB indexes initialized once with `npm run db:setup` before using the app.
-
-## Upload limit
-
-Uploads are limited to 4 MB in the app for compatibility with Vercel serverless limits.
-
-## Notes
-
-- The app stores file contents encrypted before saving them to MongoDB.
-- Password reset emails require either Resend credentials or a configured mailer. Without configuration, the app logs a development message and surfaces a friendly failure in production.
+Deploy the Next.js frontend and Express backend as separate services. Set `BACKEND_API_URL` in the frontend to the backend’s private or HTTPS URL. Configure MongoDB and JWT/file-encryption secrets on the backend host, then set the frontend origin on both services. MongoDB Atlas must allow the backend host’s network egress address.

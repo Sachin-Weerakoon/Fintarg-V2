@@ -1,0 +1,46 @@
+import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import express from 'express';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import pinoHttp from 'pino-http';
+import { env } from './config/env';
+import { logger } from './config/logger';
+import { ensureDatabase } from './middleware/ensureDatabase';
+import { errorHandler } from './middleware/errors';
+import { requireAuth } from './middleware/auth';
+import { authRoutes } from './routes/authRoutes';
+import { cronRoutes } from './routes/cronRoutes';
+import { fileRoutes } from './routes/fileRoutes';
+import { healthRoutes } from './routes/healthRoutes';
+import { profileRoutes } from './routes/profileRoutes';
+import { recordRoutes } from './routes/recordRoutes';
+
+export const app = express();
+
+app.disable('x-powered-by');
+app.set('trust proxy', env.NODE_ENV === 'production' ? 1 : false);
+app.use(helmet());
+app.use(cors({ origin: env.FRONTEND_ORIGIN, credentials: true }));
+app.use(cookieParser());
+app.use(express.json({ limit: '1mb' }));
+app.use(pinoHttp({ logger }));
+
+app.use('/api/health', healthRoutes);
+app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false }));
+app.use('/api/auth/register', ensureDatabase);
+app.use('/api/auth/login', ensureDatabase);
+app.use('/api/auth/forgot-password', ensureDatabase);
+app.use('/api/auth/reset-password', ensureDatabase);
+app.use('/api/auth/me', requireAuth, ensureDatabase);
+app.use('/api/profile', ensureDatabase);
+app.use('/api/records', ensureDatabase);
+app.use('/api/files', ensureDatabase);
+app.use('/api/cron', ensureDatabase);
+app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/records', recordRoutes);
+app.use('/api/files', fileRoutes);
+app.use('/api/cron', cronRoutes);
+app.use((_request, response) => response.status(404).json({ error: 'Route not found' }));
+app.use(errorHandler);
