@@ -8,7 +8,7 @@ const EXPENSE_CATS = ['Rent', 'Food', 'Transport', 'Utilities', 'Medical', 'Clot
 
 export default function Financial() {
   const [tab, setTab] = useState<Tab>('expenses');
-  const { state, dispatch } = useApp();
+  const { state } = useApp();
   const [month, setMonth] = useState(state.selectedMonth);
 
   const months = Array.from(new Set(state.expenses.map(e => e.date.slice(0, 7)))).sort().slice(-3);

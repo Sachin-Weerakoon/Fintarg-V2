@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../store';
-import type { Contact, Document } from '../types';
+import type { Document } from '../types';
 
 type Tab = 'appearance' | 'profile' | 'contacts' | 'documents' | 'reminders' | 'plan';
 

@@ -73,7 +73,7 @@ export default function Welcome() {
         return;
       }
       router.push('/');
-    } catch (e) {
+    } catch {
       setError('Network error. Please try again.');
     }
   };

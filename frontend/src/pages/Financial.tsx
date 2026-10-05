@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useApp, formatRs, calcExpensesByCategory } from '../store';
-import type { ExpenseEntry, IncomeEntry, FinancePayment, Loan, PawnedItem } from '../types';
+import type { ExpenseEntry, IncomeEntry, Loan } from '../types';
 
 type Tab = 'income' | 'expenses' | 'finance' | 'loans' | 'pawned';
 
@@ -11,7 +11,7 @@ const MONTH_LABELS: Record<string, string> = { '2026-07': 'Jul 2026', '2026-08':
 
 export default function Financial() {
   const [tab, setTab] = useState<Tab>('expenses');
-  const { state, dispatch } = useApp();
+  const { state } = useApp();
   const [month, setMonth] = useState(state.selectedMonth);
 
   return (
@@ -158,7 +158,6 @@ function ExpensesTab({ month }: { month: string }) {
   monthExp.forEach(e => { byDay[e.date] = (byDay[e.date] || 0) + e.amount; });
   const weeklyTotal = Object.entries(byDay)
     .filter(([d]) => {
-      const day = new Date(d).getDay();
       const dayOfMonth = new Date(d).getDate();
       const now = new Date();
       const weekStart = now.getDate() - now.getDay();

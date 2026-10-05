@@ -22,9 +22,9 @@ describe('Frontend Backend Proxy Integration', () => {
   });
 
   it('forwards cookie, authorization, and custom headers to upstream in proxyBackend', async () => {
-    let capturedHeaders: Headers | null = null;
-    let capturedUrl: URL | null = null;
-    let capturedBody: string | undefined = undefined;
+    let capturedHeaders: Headers | undefined;
+    let capturedUrl: URL | undefined;
+    let capturedBody: string | undefined;
 
     vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (url, init) => {
       capturedUrl = url as URL;
@@ -52,11 +52,13 @@ describe('Frontend Backend Proxy Integration', () => {
     const response = await proxyBackend(request, '/api/records/incomes', { amount: 50000 });
 
     expect(response.status).toBe(200);
-    expect(capturedUrl?.pathname).toBe('/api/records/incomes');
-    expect(capturedHeaders?.get('cookie')).toBe('fintarg_token=existing_token');
-    expect(capturedHeaders?.get('authorization')).toBe('Bearer test_token');
-    expect(capturedHeaders?.get('x-cron-secret')).toBe('secret_123');
-    expect(capturedHeaders?.get('content-type')).toBe('application/json');
+    expect(capturedUrl).toBeDefined();
+    expect(capturedHeaders).toBeDefined();
+    expect((capturedUrl as any)?.pathname).toBe('/api/records/incomes');
+    expect((capturedHeaders as any)?.get('cookie')).toBe('fintarg_token=existing_token');
+    expect((capturedHeaders as any)?.get('authorization')).toBe('Bearer test_token');
+    expect((capturedHeaders as any)?.get('x-cron-secret')).toBe('secret_123');
+    expect((capturedHeaders as any)?.get('content-type')).toBe('application/json');
     expect(capturedBody).toBe(JSON.stringify({ amount: 50000 }));
 
     // Verify Set-Cookie header is forwarded back

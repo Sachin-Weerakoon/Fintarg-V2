@@ -4,7 +4,7 @@ import { useApp, formatRs, calcAnalysis, calcExpensesByCategory } from '../store
 type Workspace = 'personal' | 'combined' | string;
 
 export default function Dashboard() {
-  const { state, dispatch } = useApp();
+  const { state } = useApp();
   const hasSalary = state.profile.workMode !== 'business';
   const hasBusiness = state.profile.workMode !== 'salary';
   const [workspace, setWorkspace] = useState<Workspace>(hasSalary ? 'personal' : state.companies[0]?.id || 'personal');

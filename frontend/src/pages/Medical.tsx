@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { useApp, formatRs } from '../store';
-import type { Reminder } from '../types';
 
 const MEDICAL_TYPES = ['Consultation', 'Pharmacy', 'Lab test', 'Hospital', 'Dental', 'Specialist', 'Other'];
 const MONTHS = ['2026-07', '2026-08', '2026-09'];

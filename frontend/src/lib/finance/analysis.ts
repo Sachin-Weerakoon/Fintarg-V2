@@ -37,7 +37,8 @@ export function calcFinancePaymentsCents(payments: { amountCents: number }[]): n
   return payments.reduce((s, p) => s + p.amountCents, 0);
 }
 
-export function calcLoanInterestCents(loans: { balanceCents: number; ratePercent: number; method: string; startDate: string; dueDate: string }[], month: string): number {
+export function calcLoanInterestCents(loans: { balanceCents: number; ratePercent: number; method: string; startDate: string; dueDate: string }[], _month?: string): number {
+  void _month;
   return loans.reduce((s, l) => {
     if (l.method === 'compound') {
       return s + Math.round(l.balanceCents * (Math.pow(1 + l.ratePercent / 100, 1) - 1));

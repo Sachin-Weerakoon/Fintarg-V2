@@ -100,6 +100,7 @@ function NavigationFlowFrame({ hasBusiness }: { hasBusiness: boolean }) {
 }
 
 function WorkOverview({ onOpen }: { onOpen: (tab: Tab) => void }) {
+  void onOpen;
   const { state } = useApp();
   const salaryNet = state.employmentProfiles.reduce((sum, job) => sum + job.monthlyGross - job.monthlyDeductions, 0);
   const businessRevenue = state.businessBranches.flatMap(branch => branch.entries)
@@ -155,6 +156,7 @@ function WorkOverview({ onOpen }: { onOpen: (tab: Tab) => void }) {
     </div>
   );
 }
+void WorkOverview;
 
 function Metric({ label, value, detail, warning = false }: { label: string; value: string; detail: string; warning?: boolean }) {
   return (
@@ -216,7 +218,6 @@ function BusinessWorkspace() {
   const utilities = monthEntries.filter(entry => entry.type === 'utility').reduce((sum, entry) => sum + entry.amount, 0);
   const otherCosts = monthEntries.filter(entry => entry.type === 'other-cost').reduce((sum, entry) => sum + entry.amount, 0);
   const profit = revenue - utilities - otherCosts;
-  const progress = branch ? Math.min(100, Math.round((revenue / branch.monthlyTarget) * 100)) : 0;
   const projected = revenue * (30 / 28);
   const todayIncome = monthEntries.filter(entry => entry.type === 'revenue' && entry.date === '2026-09-28').reduce((sum, entry) => sum + entry.amount, 0);
   const companySummaries = state.companies.map(company => {
@@ -889,3 +890,4 @@ function CompaniesTab() {
     </div>
   );
 }
+void CompaniesTab;

@@ -13,7 +13,7 @@ export default function Goals() {
 
   const DAYS_IN_MONTH = 30;
   const a = calcAnalysis(state, month);
-  const { freeCash, totalIncome } = a;
+  const { freeCash } = a;
 
   // Personal spending: derived from actual Personal category expenses
   const personalSpent = calcPersonalSpent(state.expenses, month);

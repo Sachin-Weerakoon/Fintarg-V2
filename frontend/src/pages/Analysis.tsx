@@ -1,5 +1,5 @@
 import React from 'react';
-import { useApp, formatRs, calcAnalysis, calcExpensesByCategory, calcMonthlyIncome } from '../store';
+import { useApp, formatRs, calcAnalysis, calcExpensesByCategory } from '../store';
 
 const MONTHS = ['2026-07', '2026-08', '2026-09'];
 const MONTH_LABELS: Record<string, string> = { '2026-07': 'July 2026', '2026-08': 'August 2026', '2026-09': 'September 2026' };

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useApp, formatRs, calcAnalysis, calcExpensesByCategory, calcMonthlyIncome } from '@/store';
+import { useApp, formatRs, calcAnalysis, calcExpensesByCategory } from '@/store';
 import Link from 'next/link';
 
 const MONTHS = ['2026-07', '2026-08', '2026-09'];

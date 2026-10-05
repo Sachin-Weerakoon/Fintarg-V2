@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useApp } from '../store';
-import type { Letter } from '../types';
 
 type Template = 'bank' | 'offer' | 'general';
 

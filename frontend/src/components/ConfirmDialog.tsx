@@ -1,5 +1,4 @@
 'use client';
-import { useState } from 'react';
 
 export default function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
   return (
