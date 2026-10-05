@@ -1,6 +1,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
+import mongoose from 'mongoose';
 import { app } from '../app';
 
 describe('Backend API Integration Tests', () => {
@@ -23,6 +24,8 @@ describe('Backend API Integration Tests', () => {
     await new Promise<void>((resolve) => {
       server.close(() => resolve());
     });
+    await mongoose.disconnect();
+    setTimeout(() => process.exit(0), 100).unref();
   });
 
   describe('Root Endpoints & Content Negotiation', () => {
