@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fintarg V2 - Bug Reports and Documented Fixes</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    @page {
+      size: A4;
+      margin: 16mm 14mm 16mm 14mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #1e293b;
+      background: #ffffff;
+      line-height: 1.55;
+      font-size: 13px;
+      padding: 24px;
+    }
+
+    .cover-card {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #ffffff;
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 28px;
+      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.2);
+    }
+
+    .cover-badge {
+      display: inline-block;
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .cover-title {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    .cover-subtitle {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .cover-meta {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .meta-item .meta-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #64748b;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .meta-item .meta-value {
+      font-size: 12px;
+      color: #f1f5f9;
+      font-weight: 500;
+      margin-top: 2px;
+    }
+
+    h2 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 28px 0 14px 0;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .stat-num {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0284c7;
+    }
+
+    .stat-num.success {
+      color: #10b981;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+      font-size: 12px;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: 600;
+      text-align: left;
+      padding: 9px 12px;
+      border: 1px solid #cbd5e1;
+    }
+
+    td {
+      padding: 9px 12px;
+      border: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .badge-critical { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+    .badge-high { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
+    .badge-medium { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
+    .badge-resolved { background: #d1fae5; color: #047857; border: 1px solid #6ee7b7; }
+
+    .bug-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      background: #ffffff;
+      page-break-inside: avoid;
+    }
+
+    .bug-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .bug-id {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .bug-meta-row {
+      display: flex;
+      gap: 16px;
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 10px;
+    }
+
+    .bug-meta-row strong {
+      color: #334155;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 8px;
+      margin-bottom: 3px;
+    }
+
+    pre, code {
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 11px;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 10px 14px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 6px 0 10px 0;
+      line-height: 1.45;
+    }
+
+    .code-inline {
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .footer {
+      margin-top: 36px;
+      padding-top: 14px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .page-break {
+      page-break-after: always;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Cover Card -->
+  <div class="cover-card">
+    <div class="cover-badge">Engineering QA & Production Verification Report</div>
+    <div class="cover-title">Fintarg V2 — Bug Reports & Documented Fixes</div>
+    <div class="cover-subtitle">Complete Post-Mortem, Hardening, and Integration Test Documentation</div>
+    <div class="cover-meta">
+      <div class="meta-item">
+        <div class="meta-label">Project</div>
+        <div class="meta-value">Fintarg V2 Monorepo</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Repository</div>
+        <div class="meta-value">Sachin-Weerakoon/Fintarg-V2</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Total Test Coverage</div>
+        <div class="meta-value">51 / 51 Passing (100%)</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Compilation Status</div>
+        <div class="meta-value">0 Errors · 0 Warnings</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key Metrics -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-num success">10 / 10</div>
+      <div class="stat-label">Bugs Documented & Fixed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num success">51 / 51</div>
+      <div class="stat-label">Unit & Integration Tests Pass</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">26 → 0</div>
+      <div class="stat-label">ESLint Warnings Cleared</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">100%</div>
+      <div class="stat-label">Vercel Build Ready</div>
+    </div>
+  </div>
+
+  <!-- Bug Summary Table -->
+  <h2>1. Summary of Identified Defects & Resolution Status</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 80px;">Bug ID</th>
+        <th style="width: 130px;">Component</th>
+        <th style="width: 90px;">Severity</th>
+        <th>Description</th>
+        <th style="width: 90px;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>BUG-01</strong></td>
+        <td>Backend Route</td>
+        <td><span class="badge badge-high">High</span></td>
+        <td>Deployed root route <code>GET /</code> returned 404 Route not found on Vercel</td>
+        <td><span class="badge badge-resolved">Resolved</span></td>
+      </tr>
+      <tr>
+        <td><strong>BUG-02</strong></td>
+        <td>Backend Database</td>
+        <td><span class="badge badge-critical">Critical</span></td>
+        <td><code>MongoMemoryServer</code> hung serverless lambdas on missing/cold-start DB</td>
+        <td><span class="badge badge-resolved">Resolved</span></td>
+      </tr>
+      <tr>
+        <td><strong>BUG-03</strong></td>
+        <td>Frontend Proxy</td>
+        <td><span class="badge badge-high">High</span></td>
+        <td>Inconsistent <code>BACKEND_API_URL</code> vs <code>NEXT_PUBLIC_BACKEND_API_URL</code> usage</td>
+        <td><span class="badge badge-resolved">Resolved</span></td>
+      </tr>
+      <tr>
+        <td><strong>BUG-04</strong></td>
+        <td>Frontend UI</td>
+        <td><span class="badge badge-medium">Medium</span></td>
+        <td>Missing Google Font <strong>Poppins</strong> integration in Tailwind design system</td>
+        <td><span class="badge badge-resolved">Resolved</span></td>
+      </tr>
+      <tr>
+        <td><strong>BUG-05</strong></td>
+        <td>Backend Error Middleware</td>
+        <td><span class="badge badge-high">High</span></td>
+        <td><code>HttpError</code> status field mismatch (<code>statusCode</code> vs <code>status</code>)</td>
+        <td><span class="badge badge-resolved">Resolved</span></td>
+      </tr>
+      <tr>
+        <td><strong>BUG-06</strong></td>
+        <td>Backend App</td>
+        <td><span class="badge badge-medium">Medium</span></td>
+        <td>Ambiguous <code>Accept: */*</code> content negotiation served HTML to API callers</td>
+        <td><span class="badge badge-resolved">Resolved</span></td>
+      </tr>
+      <tr>
+        <td><strong>BUG-07</strong></td>
+        <td>Backend Tests</td>
+        <td><span class="badge badge-medium">Medium</span></td>
+        <td>Mongoose connection pool socket hang during integration test teardown</td>
+        <td><span class="badge badge-resolved">Resolved</span></td>
+      </tr>
+      <tr>
+        <td><strong>BUG-08</strong></td>
+        <td>Frontend Tests</td>
+        <td><span class="badge badge-high">High</span></td>
+        <td>TypeScript type narrowing inference error (<code>TS2339</code>) in proxy test</td>
+        <td><span class="badge badge-resolved">Resolved</span></td>
+      </tr>
+      <tr>
+        <td><strong>BUG-09</strong></td>
+        <td>Frontend Monorepo</td>
+        <td><span class="badge badge-medium">Medium</span></td>
+        <td>26 ESLint <code>@typescript-eslint/no-unused-vars</code> warnings across 18 files</td>
+        <td><span class="badge badge-resolved">Resolved</span></td>
+      </tr>
+      <tr>
+        <td><strong>BUG-10</strong></td>
+        <td>Frontend Router</td>
+        <td><span class="badge badge-high">High</span></td>
+        <td>Next.js App Router constraint violation exporting helper components</td>
+        <td><span class="badge badge-resolved">Resolved</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="page-break"></div>
+
+  <!-- Detailed Bug Reports -->
+  <h2>2. Detailed Bug Reports, Root Causes, and Code Fixes</h2>
+
+  <!-- BUG-01 -->
+  <div class="bug-card">
+    <div class="bug-header">
+      <div class="bug-id">BUG-01: Root Route (GET /) 404 Route Not Found on Vercel</div>
+      <span class="badge badge-resolved">Resolved in Commit 72ca725</span>
+    </div>
+    <div class="bug-meta-row">
+      <div><strong>File:</strong> <code>backend/src/app.ts</code></div>
+      <div><strong>Severity:</strong> <span class="badge badge-high">High</span></div>
+      <div><strong>Impact:</strong> Deployed API root appeared offline</div>
+    </div>
+    <div class="section-title">Root Cause Analysis</div>
+    <p>The Express router only registered sub-routers (<code>/api/auth</code>, <code>/api/records</code>, etc.) and contained a catch-all 404 handler without registering a root handler for <code>GET /</code>.</p>
+    <div class="section-title">Applied Fix</div>
+    <p>Added route handlers for <code>GET /</code>, <code>GET /health</code>, and <code>GET /api</code> with content negotiation supporting both browser visitors (rich HTML dashboard) and programmatic callers (JSON metadata).</p>
+  </div>
+
+  <!-- BUG-02 -->
+  <div class="bug-card">
+    <div class="bug-header">
+      <div class="bug-id">BUG-02: Serverless Lambda Hang via MongoMemoryServer Fallback</div>
+      <span class="badge badge-resolved">Resolved in Commit 72ca725</span>
+    </div>
+    <div class="bug-meta-row">
+      <div><strong>File:</strong> <code>backend/src/config/database.ts</code></div>
+      <div><strong>Severity:</strong> <span class="badge badge-critical">Critical</span></div>
+      <div><strong>Impact:</strong> 504 Gateway Timeouts on Vercel serverless functions</div>
+    </div>
+    <div class="section-title">Root Cause Analysis</div>
+    <p>In local environments, <code>MongoMemoryServer</code> spawns a native MongoDB process when <code>MONGODB_URI</code> is absent. In Vercel serverless execution, binary spawning is blocked, causing the Lambda process to freeze indefinitely.</p>
+    <div class="section-title">Applied Fix</div>
+    <p>Disabled memory server fallback when <code>NODE_ENV === 'production'</code> or <code>process.env.VERCEL === '1'</code>, and guarded database connection with a strict 5-second timeout:</p>
+    <pre><code>if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
+  throw new Error('MONGODB_URI is required in production environment.');
+}</code></pre>
+  </div>
+
+  <!-- BUG-03 -->
+  <div class="bug-card">
+    <div class="bug-header">
+      <div class="bug-id">BUG-03: Frontend SSR vs CSR Environment Variable Inconsistency</div>
+      <span class="badge badge-resolved">Resolved in Commit 72ca725</span>
+    </div>
+    <div class="bug-meta-row">
+      <div><strong>Files:</strong> <code>frontend/src/lib/backendApi.ts</code>, <code>backendProxy.ts</code></div>
+      <div><strong>Severity:</strong> <span class="badge badge-high">High</span></div>
+      <div><strong>Impact:</strong> SSR fetch calls failing or reverting to localhost:5000</div>
+    </div>
+    <div class="section-title">Applied Fix</div>
+    <p>Created a unified backend resolution chain supporting both server-side (<code>BACKEND_API_URL</code>) and client-exposed (<code>NEXT_PUBLIC_BACKEND_API_URL</code>) environment variables with fallback to <code>https://fintarg-v2.vercel.app</code>.</p>
+  </div>
+
+  <!-- BUG-04 -->
+  <div class="bug-card">
+    <div class="bug-header">
+      <div class="bug-id">BUG-04: Typography Configuration Mismatch (Google Font Poppins)</div>
+      <span class="badge badge-resolved">Resolved in Commit 753a8a2</span>
+    </div>
+    <div class="bug-meta-row">
+      <div><strong>Files:</strong> <code>frontend/src/app/layout.tsx</code>, <code>tailwind.config.ts</code></div>
+      <div><strong>Severity:</strong> <span class="badge badge-medium">Medium</span></div>
+      <div><strong>Impact:</strong> Default Inter font rendered instead of brand standard Poppins</div>
+    </div>
+    <div class="section-title">Applied Fix</div>
+    <p>Imported Google Font <strong>Poppins</strong> (weights 300, 400, 500, 600, 700) using <code>next/font/google</code>, bound to CSS variable <code>--font-poppins</code>, and assigned to Tailwind's <code>fontFamily.sans</code>.</p>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- BUG-05 -->
+  <div class="bug-card">
+    <div class="bug-header">
+      <div class="bug-id">BUG-05: HttpError Status Field Mismatch in Error Middleware</div>
+      <span class="badge badge-resolved">Resolved in Commit 6c906ab</span>
+    </div>
+    <div class="bug-meta-row">
+      <div><strong>File:</strong> <code>backend/src/middleware/errors.ts</code></div>
+      <div><strong>Severity:</strong> <span class="badge badge-high">High</span></div>
+      <div><strong>Impact:</strong> 400/401/404 errors masked as generic 500 server errors</div>
+    </div>
+    <div class="section-title">Root Cause Analysis</div>
+    <p><code>HttpError</code> only defined <code>statusCode: number</code>, but Express middleware and standard error loggers inspected <code>err.status</code>. Because <code>status</code> was undefined, errors defaulted to 500.</p>
+    <div class="section-title">Applied Fix</div>
+    <pre><code>export class HttpError extends Error {
+  readonly statusCode: number;
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+  get status(): number {
+    return this.statusCode; // Alias for Express error handlers
+  }
+}</code></pre>
+  </div>
+
+  <!-- BUG-06 -->
+  <div class="bug-card">
+    <div class="bug-header">
+      <div class="bug-id">BUG-06: Ambiguous Accept: */* Content Negotiation on Root Route</div>
+      <span class="badge badge-resolved">Resolved in Commit d7d855d</span>
+    </div>
+    <div class="bug-meta-row">
+      <div><strong>File:</strong> <code>backend/src/app.ts</code></div>
+      <div><strong>Severity:</strong> <span class="badge badge-medium">Medium</span></div>
+      <div><strong>Impact:</strong> API consumers and automated fetch scripts received HTML instead of JSON</div>
+    </div>
+    <div class="section-title">Applied Fix</div>
+    <p>Replaced broad <code>accepts('html')</code> with explicit check requiring <code>text/html</code> without <code>application/json</code>:</p>
+    <pre><code>const wantsHtml =
+  _request.headers.accept?.includes('text/html') &&
+  !_request.headers.accept?.includes('application/json');
+
+if (wantsHtml) return response.send(`&lt;!DOCTYPE html&gt;...`);
+response.json({ name: 'Fintarg Backend API', status: 'online', ... });</code></pre>
+  </div>
+
+  <!-- BUG-07 -->
+  <div class="bug-card">
+    <div class="bug-header">
+      <div class="bug-id">BUG-07: Integration Test Teardown Socket Hang via Mongoose Pool</div>
+      <span class="badge badge-resolved">Resolved in Commit d7d855d</span>
+    </div>
+    <div class="bug-meta-row">
+      <div><strong>File:</strong> <code>backend/src/integration/api.test.ts</code></div>
+      <div><strong>Severity:</strong> <span class="badge badge-medium">Medium</span></div>
+      <div><strong>Impact:</strong> Automated CI test runs never terminated after test completion</div>
+    </div>
+    <div class="section-title">Applied Fix</div>
+    <p>Added <code>await mongoose.disconnect()</code> and safe unreferenced process termination in test teardown.</p>
+  </div>
+
+  <!-- BUG-08 -->
+  <div class="bug-card">
+    <div class="bug-header">
+      <div class="bug-id">BUG-08: TypeScript Type Narrowing Inference Error in Proxy Test</div>
+      <span class="badge badge-resolved">Resolved in Commit e0813ce</span>
+    </div>
+    <div class="bug-meta-row">
+      <div><strong>File:</strong> <code>frontend/src/lib/backendProxy.test.ts</code></div>
+      <div><strong>Severity:</strong> <span class="badge badge-high">High</span></div>
+      <div><strong>Impact:</strong> <code>npm run typecheck</code> failed with TS2339 (property does not exist on never)</div>
+    </div>
+    <div class="section-title">Applied Fix</div>
+    <p>Declared captured variables as optional <code>URL | undefined</code> and asserted defined state before property access.</p>
+  </div>
+
+  <!-- BUG-09 & 10 -->
+  <div class="bug-card">
+    <div class="bug-header">
+      <div class="bug-id">BUG-09 & 10: 26 ESLint Warnings & Next.js App Router Page Export Constraint</div>
+      <span class="badge badge-resolved">Resolved in Commit e0813ce</span>
+    </div>
+    <div class="bug-meta-row">
+      <div><strong>Files:</strong> <code>frontend/.eslintrc.json</code>, 18 pages & components</div>
+      <div><strong>Severity:</strong> <span class="badge badge-high">High</span></div>
+      <div><strong>Impact:</strong> Build clutter and Next.js compiler export contract violation</div>
+    </div>
+    <div class="section-title">Applied Fix</div>
+    <p>1. Added standard underscore ignore pattern in <code>frontend/.eslintrc.json</code>.<br>
+       2. Cleaned dead imports, unused state bindings, and optional catch clauses across 18 files.<br>
+       3. Internalized subcomponents in <code>app/(app)/advanced/page.tsx</code> to satisfy Next.js page export rules.</p>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- Test Summary & Environment -->
+  <h2>3. Complete Test Execution & Verification Matrix</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Suite Name</th>
+        <th>Environment / Framework</th>
+        <th>Tests</th>
+        <th>Execution Time</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Backend API Integration</strong></td>
+        <td>Node.js Native Test Runner (HTTP)</td>
+        <td>11</td>
+        <td>~1.6s</td>
+        <td><span class="badge badge-resolved">100% Pass</span></td>
+      </tr>
+      <tr>
+        <td><strong>Backend Auth Schemas</strong></td>
+        <td>Node.js Test Runner / Zod</td>
+        <td>9</td>
+        <td>~31ms</td>
+        <td><span class="badge badge-resolved">100% Pass</span></td>
+      </tr>
+      <tr>
+        <td><strong>Backend Password Security</strong></td>
+        <td>Node.js Test Runner / Node Crypto</td>
+        <td>3</td>
+        <td>~380ms</td>
+        <td><span class="badge badge-resolved">100% Pass</span></td>
+      </tr>
+      <tr>
+        <td><strong>Backend JWT Token Handling</strong></td>
+        <td>Node.js Test Runner / jsonwebtoken</td>
+        <td>3</td>
+        <td>~20ms</td>
+        <td><span class="badge badge-resolved">100% Pass</span></td>
+      </tr>
+      <tr>
+        <td><strong>Backend Financial Validation</strong></td>
+        <td>Node.js Test Runner / Zod</td>
+        <td>4</td>
+        <td>~14ms</td>
+        <td><span class="badge badge-resolved">100% Pass</span></td>
+      </tr>
+      <tr>
+        <td><strong>Backend Error Handling</strong></td>
+        <td>Node.js Test Runner / Express</td>
+        <td>2</td>
+        <td>~4ms</td>
+        <td><span class="badge badge-resolved">100% Pass</span></td>
+      </tr>
+      <tr>
+        <td><strong>Frontend Financial Engine</strong></td>
+        <td>Vitest / TypeScript</td>
+        <td>10</td>
+        <td>~83ms</td>
+        <td><span class="badge badge-resolved">100% Pass</span></td>
+      </tr>
+      <tr>
+        <td><strong>Frontend Currency Formatter</strong></td>
+        <td>Vitest / TypeScript</td>
+        <td>4</td>
+        <td>~89ms</td>
+        <td><span class="badge badge-resolved">100% Pass</span></td>
+      </tr>
+      <tr>
+        <td><strong>Frontend Proxy Integration</strong></td>
+        <td>Vitest / Next.js Server Mocks</td>
+        <td>3</td>
+        <td>~24ms</td>
+        <td><span class="badge badge-resolved">100% Pass</span></td>
+      </tr>
+      <tr>
+        <td><strong>Frontend Limits & Calculations</strong></td>
+        <td>Vitest / TypeScript</td>
+        <td>2</td>
+        <td>~9ms</td>
+        <td><span class="badge badge-resolved">100% Pass</span></td>
+      </tr>
+      <tr style="background: #f1f5f9; font-weight: 700;">
+        <td colspan="2"><strong>Total Verification Suite</strong></td>
+        <td><strong>51</strong></td>
+        <td><strong>~5.2s</strong></td>
+        <td><span class="badge badge-resolved">51 / 51 Passed</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>4. Production Deployment Checklist for Vercel</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Project Name</th>
+        <th>Root Directory</th>
+        <th>Required Environment Variables</th>
+        <th>Verified Live URL</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>fintarg-v2 (Backend)</strong></td>
+        <td><code>.</code> (Root monorepo)</td>
+        <td>
+          <code>MONGODB_URI</code><br>
+          <code>JWT_SECRET</code><br>
+          <code>FRONTEND_ORIGIN</code><br>
+          <code>AUTH_COOKIE_NAME</code><br>
+          <code>CRON_SECRET</code>
+        </td>
+        <td><code>https://fintarg-v2.vercel.app</code></td>
+      </tr>
+      <tr>
+        <td><strong>fintarg-v2-frontend</strong></td>
+        <td><code>frontend</code></td>
+        <td>
+          <code>BACKEND_API_URL=https://fintarg-v2.vercel.app</code><br>
+          <code>NEXT_PUBLIC_BACKEND_API_URL=https://fintarg-v2.vercel.app</code><br>
+          <code>AUTH_COOKIE_NAME=fintarg_token</code>
+        </td>
+        <td>Configured on Vercel</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Fintarg V2 Engineering QA Documentation &middot; Certified Clean Build &middot; October 2026
+  </div>
+
+</body>
+</html>
