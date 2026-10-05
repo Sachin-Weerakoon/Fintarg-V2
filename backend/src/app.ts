@@ -45,7 +45,9 @@ app.get('/', async (_request, response) => {
   }
   const isDbConnected = mongoose.connection.readyState === 1;
 
-  if (_request.accepts('html')) {
+  const wantsHtml = _request.headers.accept?.includes('text/html') && !_request.headers.accept?.includes('application/json');
+
+  if (wantsHtml) {
     return response.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
