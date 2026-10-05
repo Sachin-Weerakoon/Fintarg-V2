@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "build": "npm --prefix frontend run build && npm --prefix backend run build",
-    "dev": "npm --prefix frontend run dev & npm --prefix backend run dev"
+    "dev": "npm --prefix frontend run dev & npm --prefix backend run dev",
+    "test": "npm --prefix backend run test && npm --prefix frontend run test"
   },
   "engines": {
     "node": ">=20"

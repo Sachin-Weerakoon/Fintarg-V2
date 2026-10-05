@@ -7,6 +7,10 @@ export class HttpError extends Error {
     super(message);
     this.name = 'HttpError';
   }
+
+  get status(): number {
+    return this.statusCode;
+  }
 }
 
 export const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
