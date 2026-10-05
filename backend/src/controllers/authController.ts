@@ -10,7 +10,7 @@ function setSessionCookie(response: Parameters<RequestHandler>[1], userId: strin
   response.cookie(env.COOKIE_NAME, createAccessToken(userId), {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict',
     path: '/',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
