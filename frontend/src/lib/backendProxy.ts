@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:5000';
+const backendUrl = process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000';
 
 export async function proxyBackend(request: NextRequest, path: string, body?: unknown) {
   const headers = new Headers();

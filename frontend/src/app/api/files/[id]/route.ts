@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    const upstream = await fetch(new URL(`/api/files/${encodeURIComponent(id)}`, process.env.BACKEND_API_URL || 'http://localhost:5000'), {
+    const backendUrl = process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000';
+    const upstream = await fetch(new URL(`/api/files/${encodeURIComponent(id)}`, backendUrl), {
       headers: { cookie: request.headers.get('cookie') || '' },
       cache: 'no-store',
     });

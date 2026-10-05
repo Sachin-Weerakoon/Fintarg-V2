@@ -14,6 +14,11 @@ async function connectWithFallback(): Promise<typeof mongoose> {
       serverSelectionTimeoutMS: 10000,
     });
   } catch (error) {
+    if (env.NODE_ENV === 'production') {
+      logger.error({ err: error }, 'Failed to connect to MongoDB Atlas in production');
+      throw error;
+    }
+
     const shouldFallback = /ECONNREFUSED|ENOTFOUND|querySrv|MongoNetworkError/i.test(String((error as Error)?.message ?? error));
     if (!shouldFallback) throw error;
 
