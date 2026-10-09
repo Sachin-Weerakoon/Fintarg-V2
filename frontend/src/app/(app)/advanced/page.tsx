@@ -189,17 +189,19 @@ function Letters() {
               ) : (
                 <div
                   className="flex-1 rounded-lg p-6 text-sm whitespace-pre-wrap leading-relaxed"
-                  style={{ background: '#fafafa', border: '1px solid var(--color-border)', color: 'var(--color-text)', minHeight: 360, fontFamily: 'inherit' }}
+                  style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', minHeight: 360, fontFamily: 'inherit' }}
                 >
                   {editing ? editBody : generated}
                 </div>
               )}
             </div>
           ) : (
-            <div className="card flex items-center justify-center" style={{ minHeight: 300 }}>
+            <div className="card flex items-center justify-center p-8" style={{ minHeight: 300 }}>
               <div className="text-center">
-                <div className="text-4xl mb-3">✉</div>
-                <p className="text-sm" style={{ color: 'var(--color-muted)' }}>Fill the form and click "Generate letter"</p>
+                <div className="w-12 h-12 rounded-2xl bg-surface-hover border border-border flex items-center justify-center text-muted mx-auto mb-3">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                </div>
+                <p className="text-sm font-medium" style={{ color: 'var(--color-muted)' }}>Fill the form and click &ldquo;Generate letter&rdquo;</p>
               </div>
             </div>
           )}
@@ -570,31 +572,31 @@ function AdvancedHub({ hasBusiness, onOpen }: { hasBusiness: boolean; onOpen: (t
 
   return (
     <div className="space-y-6">
-      <div className="pb-2 border-b border-slate-200/80 dark:border-slate-800">
-        <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Advanced Features Hub</h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Specialized toolkits for Sri Lankan legal letters, business agreements, medical logs, and enterprise multi-branch operations.</p>
+      <div className="pb-2 border-b border-border">
+        <h2 className="text-xl font-bold tracking-tight text-text">Advanced Features Hub</h2>
+        <p className="text-xs text-muted mt-0.5">Specialized toolkits for Sri Lankan legal letters, business agreements, medical logs, and enterprise multi-branch operations.</p>
       </div>
       <div className="grid sm:grid-cols-2 gap-5">
         {cards.map(card => (
           <button
             key={card.tab}
-            className="card p-6 text-left min-h-44 flex flex-col justify-between border-slate-200/80 dark:border-slate-800 hover:-translate-y-1 hover:shadow-lg hover:border-cyan-500/50 transition-all duration-300 group cursor-pointer relative overflow-hidden"
+            className="card p-6 text-left min-h-44 flex flex-col justify-between border-border hover:-translate-y-1 hover:shadow-card hover:border-primary-500/50 transition-all duration-300 group cursor-pointer relative overflow-hidden"
             onClick={() => onOpen(card.tab)}
           >
             <div className="flex items-center justify-between w-full">
-              <span className="w-12 h-12 rounded-2xl flex items-center justify-center bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 group-hover:scale-105 transition-transform">
+              <span className="w-12 h-12 rounded-2xl flex items-center justify-center bg-primary-tint text-primary-text group-hover:scale-105 transition-transform">
                 <HubIcon type={card.tab} />
               </span>
-              <span className="text-xs font-semibold text-slate-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 flex items-center gap-1 transition-colors">
+              <span className="text-xs font-semibold text-muted group-hover:text-primary-text flex items-center gap-1 transition-colors">
                 <span>Launch</span>
                 <span>→</span>
               </span>
             </div>
             <div className="mt-5">
-              <span className="block font-bold text-base text-slate-900 dark:text-slate-100 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors">
+              <span className="block font-bold text-base text-text group-hover:text-primary-text transition-colors">
                 {card.title}
               </span>
-              <span className="block text-xs mt-1.5 leading-relaxed text-slate-500 dark:text-slate-400">
+              <span className="block text-xs mt-1.5 leading-relaxed text-muted">
                 {card.description}
               </span>
             </div>
@@ -998,12 +1000,29 @@ function BusinessWorkspace() {
               <div className="card">
                 <div className="font-semibold mb-4" style={{ color: 'var(--color-text)' }}>Targets roll-up</div>
                 <div className="goal-tree">
-                  <div><strong>Kasun · Owner target</strong><span>61%</span></div>
-                  <div><strong>{state.companies.find(company => company.id === companyId)?.name} · Business goal</strong><span>58%</span></div>
+                  <div>
+                    <strong>{state.profile?.name ? `${state.profile.name} · Owner target` : 'Owner target'}</strong>
+                    <span className="num">
+                      {state.savingsGoals.length > 0
+                        ? `${Math.min(100, Math.round((state.savingsGoals.reduce((s, g) => s + g.savedAmount, 0) / Math.max(1, state.savingsGoals.reduce((s, g) => s + g.monthlyTarget, 0))) * 100))}%`
+                        : '0%'}
+                    </span>
+                  </div>
+                  <div>
+                    <strong>{state.companies.find(company => company.id === companyId)?.name || 'Business'} · Business goal</strong>
+                    <span className="num">
+                      {companyBranches.length > 0
+                        ? `${Math.min(100, Math.round(
+                            (companyBranches.reduce((s, b) => s + b.entries.filter(e => e.type === 'revenue').reduce((sum, e) => sum + e.amount, 0), 0) /
+                              Math.max(1, companyBranches.reduce((s, b) => s + b.monthlyTarget, 0))) * 100
+                          ))}%`
+                        : '0%'}
+                    </span>
+                  </div>
                   {companyBranches.map(item => {
                     const branchRevenue = item.entries.filter(entry => entry.type === 'revenue').reduce((sum, entry) => sum + entry.amount, 0);
-                    const pct = Math.min(100, Math.round(branchRevenue * 3.9 / item.monthlyTarget * 100));
-                    return <div key={item.id}><strong>{item.name} · Branch target</strong><span>{pct}%</span></div>;
+                    const pct = Math.min(100, Math.round((branchRevenue / Math.max(1, item.monthlyTarget)) * 100));
+                    return <div key={item.id}><strong>{item.name} · Branch target</strong><span className="num">{pct}%</span></div>;
                   })}
                 </div>
               </div>

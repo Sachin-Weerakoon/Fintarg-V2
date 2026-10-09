@@ -1,7 +1,20 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import Link from 'next/link';
 import { useApp, formatRs } from '@/store';
+import { PageContainer } from '@/components/ui/PageContainer';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Badge } from '@/components/ui/Badge';
+import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Icon } from '@/components/ui/Icon';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 const MEDICAL_TYPES = ['Consultation', 'Pharmacy', 'Lab test', 'Hospital', 'Dental', 'Specialist', 'Other'];
 const MONTHS = ['2026-07', '2026-08', '2026-09'];
@@ -12,17 +25,27 @@ export default function MedicalClient() {
   const month = state.selectedMonth;
   const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), type: 'Consultation', amount: '', note: '' });
   const [error, setError] = useState('');
+  const [fileError, setFileError] = useState('');
   const [remForm, setRemForm] = useState({ label: '', dueDate: '', channel: 'email' as 'email' | 'in-app' });
+  const [remError, setRemError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'expenses' | 'documents' | 'reminders'>('expenses');
+  const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
+  const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
 
   const monthExpenses = state.medicalExpenses.filter(m => m.date.startsWith(month));
   const monthTotal = monthExpenses.reduce((s, m) => s + m.amount, 0);
   const allTimeTotal = state.medicalExpenses.reduce((s, m) => s + m.amount, 0);
 
   const submit = () => {
-    if (!form.amount || Number(form.amount) <= 0) { setError('Amount must be greater than zero.'); return; }
-    dispatch({ type: 'ADD_MEDICAL_EXPENSE', entry: { id: 'm_' + Date.now(), date: form.date, type: form.type, amount: Number(form.amount), note: form.note } });
+    if (!form.amount || Number(form.amount) <= 0) {
+      setError('Amount must be greater than zero.');
+      return;
+    }
+    dispatch({
+      type: 'ADD_MEDICAL_EXPENSE',
+      entry: { id: 'm_' + Date.now(), date: form.date, type: form.type, amount: Number(form.amount), note: form.note },
+    });
     setForm({ date: new Date().toISOString().slice(0, 10), type: 'Consultation', amount: '', note: '' });
     setError('');
   };
@@ -30,9 +53,16 @@ export default function MedicalClient() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setFileError('');
     const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowed.includes(file.type)) { alert('Accepted formats: PDF, JPG, PNG, DOCX'); return; }
-    if (file.size > 10 * 1024 * 1024) { alert('File too large. Max 10 MB.'); return; }
+    if (!allowed.includes(file.type)) {
+      setFileError('Accepted formats: PDF, JPG, PNG, DOCX');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setFileError('File too large. Max 10 MB.');
+      return;
+    }
     dispatch({
       type: 'ADD_DOCUMENT',
       entry: {
@@ -48,7 +78,10 @@ export default function MedicalClient() {
   };
 
   const addReminder = () => {
-    if (!remForm.label || !remForm.dueDate) { alert('Label and date required.'); return; }
+    if (!remForm.label || !remForm.dueDate) {
+      setRemError('Label and date are required.');
+      return;
+    }
     dispatch({
       type: 'ADD_REMINDER',
       entry: {
@@ -62,104 +95,162 @@ export default function MedicalClient() {
       },
     });
     setRemForm({ label: '', dueDate: '', channel: 'email' });
+    setRemError('');
   };
 
   const medicalReminders = state.reminders.filter(r => r.type === 'appointment');
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <PageContainer width="narrow">
+      <PageHeader
+        title="Medical Ledger & Appointments"
+        description="Track medical costs, prescription documents, and clinic reminders."
+        actions={
+          <Link href="/advanced">
+            <Button variant="secondary" size="sm" iconLeft={<Icon name="arrow-left" size={14} />}>
+              Advanced Hub
+            </Button>
+          </Link>
+        }
+      />
+
       {/* Sub-tabs */}
-      <div className="flex gap-2 mb-5 no-print">
-        {(['expenses', 'documents', 'reminders'] as const).map(t => (
-          <button key={t} className={`tab-btn${activeTab === t ? ' active' : ''}`} onClick={() => setActiveTab(t)}>
-            {t.charAt(0).toUpperCase() + t.slice(1)}
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs
+        options={[
+          { id: 'expenses', label: 'Expenses' },
+          { id: 'documents', label: 'Documents' },
+          { id: 'reminders', label: 'Reminders' },
+        ]}
+        value={activeTab}
+        onChange={v => setActiveTab(v as any)}
+      />
 
       {activeTab === 'expenses' && (
         <div className="grid md:grid-cols-3 gap-6">
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 space-y-4">
             {/* Month selector */}
-            <div className="flex items-center gap-2 mb-4 no-print">
-              <span className="text-xs" style={{ color: 'var(--color-muted)' }}>Month:</span>
-              {MONTHS.map(m => (
-                <button key={m} onClick={() => dispatch({ type: 'SET_MONTH', month: m })}
-                  className="tab-btn" style={{ padding: '4px 10px', fontSize: 12, minHeight: 28,
-                    background: month === m ? 'var(--color-primary)' : 'transparent',
-                    color: month === m ? '#fff' : 'var(--color-muted)' }}>
-                  {MONTH_LABELS[m]}
-                </button>
-              ))}
+            <div className="flex items-center gap-2 no-print">
+              <span className="text-xs font-semibold text-muted">Month:</span>
+              <SegmentedTabs
+                size="sm"
+                options={MONTHS.map(m => ({ id: m, label: MONTH_LABELS[m] || m }))}
+                value={month}
+                onChange={m => dispatch({ type: 'SET_MONTH', month: m })}
+              />
             </div>
 
             {/* Totals */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="card text-center py-3">
-                <div className="text-xs mb-1" style={{ color: 'var(--color-muted)' }}>This month</div>
-                <div className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>{formatRs(monthTotal)}</div>
-              </div>
-              <div className="card text-center py-3">
-                <div className="text-xs mb-1" style={{ color: 'var(--color-muted)' }}>All time</div>
-                <div className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>{formatRs(allTimeTotal)}</div>
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="text-center p-3">
+                <div className="text-xs text-muted mb-0.5">This month</div>
+                <div className="font-bold text-sm text-text num">{formatRs(monthTotal)}</div>
+              </Card>
+              <Card className="text-center p-3">
+                <div className="text-xs text-muted mb-0.5">All time</div>
+                <div className="font-bold text-sm text-text num">{formatRs(allTimeTotal)}</div>
+              </Card>
             </div>
 
             {/* Expenses table */}
             {state.medicalExpenses.length === 0 ? (
-              <div className="card text-center py-10">
-                <p className="text-sm" style={{ color: 'var(--color-muted)' }}>No medical expenses recorded.</p>
-              </div>
+              <EmptyState
+                icon={<Icon name="heart" size={24} />}
+                title="No medical expenses recorded"
+                helper="Log doctor consultations, lab tests, and pharmacy bills."
+              />
             ) : (
-              <div className="card overflow-hidden p-0">
-                <table className="data-table">
-                  <thead>
-                    <tr><th>Date</th><th>Type</th><th>Note</th><th className="text-right">Amount (Rs.)</th><th /></tr>
-                  </thead>
-                  <tbody>
-                    {state.medicalExpenses.slice().sort((a, b) => b.date.localeCompare(a.date)).map(m => (
-                      <tr key={m.id}>
-                        <td style={{ color: 'var(--color-muted)' }}>{m.date}</td>
-                        <td className="font-medium" style={{ color: 'var(--color-text)' }}>{m.type}</td>
-                        <td style={{ color: 'var(--color-muted)' }}>{m.note}</td>
-                        <td className="text-right font-medium" style={{ color: 'var(--color-text)' }}>{m.amount.toLocaleString()}</td>
-                        <td className="text-center">
-                          <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }}
-                            onClick={() => { if (confirm('Delete?')) dispatch({ type: 'DELETE_MEDICAL_EXPENSE', id: m.id }); }}>✕</button>
-                        </td>
+              <Card className="p-0 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="data-table w-full">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Note</th>
+                        <th className="text-right">Amount</th>
+                        <th className="w-16 text-center">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {state.medicalExpenses
+                        .slice()
+                        .sort((a, b) => b.date.localeCompare(a.date))
+                        .map(m => (
+                          <tr key={m.id}>
+                            <td className="text-muted num">{m.date}</td>
+                            <td className="font-medium text-text">{m.type}</td>
+                            <td className="text-muted">{m.note || '—'}</td>
+                            <td className="text-right font-medium text-text num">{formatRs(m.amount)}</td>
+                            <td className="text-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-danger-text hover:text-danger-text !p-1"
+                                onClick={() => setDeleteExpenseId(m.id)}
+                                aria-label="Delete medical expense"
+                              >
+                                <Icon name="trash" size={14} />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
             )}
           </div>
 
           {/* Add form */}
-          <div className="card h-fit">
-            <div className="font-semibold text-sm mb-4" style={{ color: 'var(--color-text)' }}>Add medical expense</div>
-            {error && <p className="text-xs mb-3" style={{ color: 'var(--color-danger)' }}>{error}</p>}
-            <div className="space-y-3">
-              <div><label className="form-label">Date</label><input className="form-input" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
-              <div>
-                <label className="form-label">Type</label>
-                <select className="form-input" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
-                  {MEDICAL_TYPES.map(t => <option key={t}>{t}</option>)}
-                </select>
-              </div>
-              <div><label className="form-label">Amount (Rs.)</label><input className="form-input" type="number" min="1" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="2,500" /></div>
-              <div><label className="form-label">Note</label><input className="form-input" value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="GP visit" /></div>
-              <button className="btn-primary w-full" onClick={submit}>Save expense</button>
+          <Card className="p-5 h-fit">
+            <h3 className="font-semibold text-sm mb-4 text-text">Add medical expense</h3>
+            <div className="space-y-3.5">
+              <Field id="med-date" label="Date">
+                <Input
+                  type="date"
+                  value={form.date}
+                  onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                />
+              </Field>
+              <Field id="med-type" label="Type">
+                <Select
+                  value={form.type}
+                  onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+                >
+                  {MEDICAL_TYPES.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field id="med-amount" label="Amount (Rs.)" error={error}>
+                <Input
+                  type="number"
+                  min="1"
+                  value={form.amount}
+                  onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                  placeholder="2,500"
+                />
+              </Field>
+              <Field id="med-note" label="Note">
+                <Input
+                  value={form.note}
+                  onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
+                  placeholder="e.g. GP visit, blood panel"
+                />
+              </Field>
+              <Button variant="primary" className="w-full pt-1" onClick={submit}>
+                Save Expense
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
       {activeTab === 'documents' && (
-        <div className="max-w-2xl">
-          <div className="card mb-4">
-            <div className="font-semibold text-sm mb-3" style={{ color: 'var(--color-text)' }}>Upload medical document</div>
-            <p className="text-sm mb-4" style={{ color: 'var(--color-muted)' }}>Store reports, prescriptions, and other medical files securely.</p>
+        <div className="max-w-2xl space-y-4">
+          <Card className="p-5">
+            <h3 className="font-semibold text-sm mb-1 text-text">Upload medical document</h3>
+            <p className="text-xs text-muted mb-4">Store reports, prescriptions, and lab tests securely.</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -167,75 +258,152 @@ export default function MedicalClient() {
               className="hidden"
               onChange={handleFileUpload}
             />
-            <button className="btn-primary mb-2" onClick={() => fileInputRef.current?.click()}>+ Upload document</button>
-            <p className="text-xs" style={{ color: 'var(--color-muted)' }}>Accepted: PDF, JPG, PNG, DOCX · Max 10 MB per file</p>
-          </div>
+            {fileError && <p className="text-xs text-danger-text mb-3">{fileError}</p>}
+            <Button
+              variant="primary"
+              size="sm"
+              iconLeft={<Icon name="upload" size={14} />}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Upload Document
+            </Button>
+            <p className="text-[11px] text-muted mt-2">Accepted: PDF, JPG, PNG, DOCX · Max 10 MB per file</p>
+          </Card>
 
           {/* Medical documents list */}
           {state.documents.filter(d => d.note === 'Medical document').length === 0 ? (
-            <div className="card text-center py-8"><p className="text-sm" style={{ color: 'var(--color-muted)' }}>No medical documents uploaded.</p></div>
+            <EmptyState
+              title="No medical documents uploaded"
+              helper="Securely upload your first clinic report or prescription."
+            />
           ) : (
             <div className="space-y-2">
-              {state.documents.filter(d => d.note === 'Medical document').map(d => (
-                <div key={d.id} className="card flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-sm" style={{ color: 'var(--color-text)' }}>{d.label}</div>
-                    <div className="text-xs" style={{ color: 'var(--color-muted)' }}>{d.fileName} · {d.uploadDate}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="btn-secondary text-xs" style={{ fontSize: 12, padding: '5px 12px' }}>View</button>
-                    <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }}
-                      onClick={() => { if (confirm('Delete document?')) dispatch({ type: 'DELETE_DOCUMENT', id: d.id }); }}>✕</button>
-                  </div>
-                </div>
-              ))}
+              {state.documents
+                .filter(d => d.note === 'Medical document')
+                .map(d => (
+                  <Card key={d.id} className="p-4 flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-sm text-text">{d.label}</div>
+                      <div className="text-xs text-muted mt-0.5">{d.fileName} · {d.uploadDate}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-danger-text hover:text-danger-text !p-1.5"
+                        onClick={() => setDeleteDocId(d.id)}
+                        aria-label="Delete document"
+                      >
+                        <Icon name="trash" size={14} />
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
             </div>
           )}
         </div>
       )}
 
       {activeTab === 'reminders' && (
-        <div className="max-w-2xl">
-          <div className="card mb-4">
-            <div className="font-semibold text-sm mb-4" style={{ color: 'var(--color-text)' }}>Set appointment reminder</div>
+        <div className="max-w-2xl space-y-4">
+          <Card className="p-5">
+            <h3 className="font-semibold text-sm mb-4 text-text">Set appointment reminder</h3>
+            {remError && <p className="text-xs text-danger-text mb-3">{remError}</p>}
             <div className="grid md:grid-cols-3 gap-3">
-              <div><label className="form-label">Appointment / note</label><input className="form-input" value={remForm.label} onChange={e => setRemForm(f => ({ ...f, label: e.target.value }))} placeholder="Doctor appointment" /></div>
-              <div><label className="form-label">Date</label><input className="form-input" type="date" value={remForm.dueDate} onChange={e => setRemForm(f => ({ ...f, dueDate: e.target.value }))} /></div>
-              <div>
-                <label className="form-label">Channel</label>
-                <select className="form-input" value={remForm.channel} onChange={e => setRemForm(f => ({ ...f, channel: e.target.value as 'email' | 'in-app' }))}>
-                  <option value="in-app">In-app</option><option value="email">Email</option>
-                </select>
-              </div>
+              <Field id="rem-label" label="Appointment / Note">
+                <Input
+                  value={remForm.label}
+                  onChange={e => setRemForm(f => ({ ...f, label: e.target.value }))}
+                  placeholder="Doctor appointment"
+                />
+              </Field>
+              <Field id="rem-date" label="Date">
+                <Input
+                  type="date"
+                  value={remForm.dueDate}
+                  onChange={e => setRemForm(f => ({ ...f, dueDate: e.target.value }))}
+                />
+              </Field>
+              <Field id="rem-channel" label="Channel">
+                <Select
+                  value={remForm.channel}
+                  onChange={e => setRemForm(f => ({ ...f, channel: e.target.value as any }))}
+                >
+                  <option value="in-app">In-app</option>
+                  <option value="email">Email</option>
+                </Select>
+              </Field>
             </div>
-            <button className="btn-primary mt-3" onClick={addReminder}>Set reminder</button>
-          </div>
+            <Button variant="primary" size="sm" className="mt-4" onClick={addReminder}>
+              Set Reminder
+            </Button>
+          </Card>
 
           {medicalReminders.length === 0 ? (
-            <div className="card text-center py-8"><p className="text-sm" style={{ color: 'var(--color-muted)' }}>No reminders set.</p></div>
+            <EmptyState
+              title="No reminders set"
+              helper="Add clinical follow-ups or checkup reminders."
+            />
           ) : (
             <div className="space-y-2">
               {medicalReminders.map(r => {
                 const daysAway = Math.round((new Date(r.dueDate).getTime() - Date.now()) / 86400000);
                 return (
-                  <div key={r.id} className="card flex items-center justify-between">
+                  <Card key={r.id} className="p-4 flex items-center justify-between">
                     <div>
-                      <div className="font-medium text-sm" style={{ color: 'var(--color-text)' }}>{r.label}</div>
-                      <div className="text-xs" style={{ color: 'var(--color-muted)' }}>
-                        {r.dueDate} · {r.channel}
-                        {daysAway >= 0 && daysAway <= 7 && <span className="ml-2 badge-warning">In {daysAway}d</span>}
-                        {daysAway < 0 && <span className="ml-2 badge-muted">Past</span>}
+                      <div className="font-medium text-sm text-text">{r.label}</div>
+                      <div className="text-xs text-muted mt-0.5 flex items-center gap-2">
+                        <span className="num">{r.dueDate}</span>
+                        <span>·</span>
+                        <span>{r.channel}</span>
+                        {daysAway >= 0 && daysAway <= 7 && <Badge tone="warning" size="sm">In {daysAway}d</Badge>}
+                        {daysAway < 0 && <Badge tone="neutral" size="sm">Past</Badge>}
                       </div>
                     </div>
-                    <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }}
-                      onClick={() => dispatch({ type: 'DELETE_REMINDER', id: r.id })}>✕</button>
-                  </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-danger-text hover:text-danger-text !p-1.5"
+                      onClick={() => dispatch({ type: 'DELETE_REMINDER', id: r.id })}
+                      aria-label="Delete reminder"
+                    >
+                      <Icon name="trash" size={14} />
+                    </Button>
+                  </Card>
                 );
               })}
             </div>
           )}
         </div>
       )}
-    </div>
+
+      {deleteExpenseId && (
+        <ConfirmDialog
+          title="Delete Medical Expense"
+          message="Are you sure you want to delete this medical expense?"
+          confirmLabel="Delete"
+          tone="danger"
+          onConfirm={() => {
+            dispatch({ type: 'DELETE_MEDICAL_EXPENSE', id: deleteExpenseId });
+            setDeleteExpenseId(null);
+          }}
+          onCancel={() => setDeleteExpenseId(null)}
+        />
+      )}
+
+      {deleteDocId && (
+        <ConfirmDialog
+          title="Delete Document"
+          message="Are you sure you want to delete this medical file?"
+          confirmLabel="Delete"
+          tone="danger"
+          onConfirm={() => {
+            dispatch({ type: 'DELETE_DOCUMENT', id: deleteDocId });
+            setDeleteDocId(null);
+          }}
+          onCancel={() => setDeleteDocId(null)}
+        />
+      )}
+    </PageContainer>
   );
 }
