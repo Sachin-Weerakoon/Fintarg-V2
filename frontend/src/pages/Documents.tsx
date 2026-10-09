@@ -1,25 +1,51 @@
-import React, { useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../store';
 
 export default function Documents() {
   const { state, dispatch } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
-  const upload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const upload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    dispatch({
-      type: 'ADD_DOCUMENT',
-      entry: {
-        id: 'doc_' + Date.now(),
-        type: 'other',
-        label: file.name.replace(/\.[^.]+$/, ''),
-        uploadDate: new Date().toISOString().slice(0, 10),
-        note: 'Personal document',
-        fileName: file.name,
-      },
-    });
-    event.target.value = '';
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error('Maximum file size is 10 MB.');
+      setUploading(true);
+      let fileId: string | undefined;
+      try {
+        const mimeType = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream');
+        const res = await fetch('/api/backend/files', {
+          method: 'POST',
+          headers: { 'content-type': mimeType },
+          body: file,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          fileId = data.id;
+        }
+      } catch {
+        // Fallback to local store entry
+      }
+
+      dispatch({
+        type: 'ADD_DOCUMENT',
+        entry: {
+          id: 'doc_' + Date.now(),
+          type: 'other',
+          label: (file.name.replace(/\.[^.]+$/, '').trim() || 'Document').slice(0, 120),
+          uploadDate: new Date().toISOString().slice(0, 10),
+          note: 'Personal document',
+          fileName: file.name.slice(0, 255),
+          fileId,
+        },
+      });
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Could not upload document');
+    } finally {
+      setUploading(false);
+      event.target.value = '';
+    }
   };
 
   return (
@@ -30,10 +56,10 @@ export default function Documents() {
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Keep personal, bank, and work files in one safe place.</p>
         </div>
         <div className="flex items-center gap-3">
-          <input ref={fileRef} type="file" className="hidden" onChange={upload} />
-          <button className="btn-primary !min-h-[38px] !text-xs font-semibold whitespace-nowrap" onClick={() => fileRef.current?.click()}>
+          <input ref={fileRef} type="file" accept="application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={upload} disabled={uploading} />
+          <button className="btn-primary !min-h-[38px] !text-xs font-semibold whitespace-nowrap disabled:opacity-50" onClick={() => fileRef.current?.click()} disabled={uploading}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <span>Upload Document</span>
+            <span>{uploading ? 'Uploading...' : 'Upload Document'}</span>
           </button>
         </div>
       </div>
