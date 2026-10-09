@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
 import { useApp } from '@/store';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { THEME_COLORS, LIGHT_DEFAULTS, validateCustomOverrides } from '@/lib/theme';
 import type { Document } from '@/types';
 
@@ -380,7 +381,8 @@ const DOC_TYPES: { value: Document['type']; label: string }[] = [
 ];
 
 function DocumentsTab() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, showToast } = useApp();
+  const confirmModal = useConfirm();
   const [form, setForm] = useState({ type: 'cv' as Document['type'], label: '', note: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -388,8 +390,8 @@ function DocumentsTab() {
     const file = e.target.files?.[0];
     if (!file) return;
     const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowed.includes(file.type)) { alert('Accepted: PDF, JPG, PNG, DOCX'); return; }
-    if (file.size > 10 * 1024 * 1024) { alert('Max file size is 10 MB'); return; }
+    if (!allowed.includes(file.type)) { showToast('Accepted: PDF, JPG, PNG, DOCX', 'error'); return; }
+    if (file.size > 10 * 1024 * 1024) { showToast('Max file size is 10 MB', 'error'); return; }
     dispatch({
       type: 'ADD_DOCUMENT',
       entry: {
@@ -423,7 +425,7 @@ function DocumentsTab() {
               </div>
               <div className="flex gap-3">
                 <button className="text-xs" style={{ color: 'var(--color-primary)' }}>View</button>
-                <button onClick={() => { if (confirm('Delete document?')) dispatch({ type: 'DELETE_DOCUMENT', id: d.id }); }} style={{ color: 'var(--color-danger)', fontSize: 12 }}>✕</button>
+                <button onClick={async () => { if (await confirmModal('Delete document?')) dispatch({ type: 'DELETE_DOCUMENT', id: d.id }); }} style={{ color: 'var(--color-danger)', fontSize: 12 }}>✕</button>
               </div>
             </div>
           ))}
@@ -498,7 +500,8 @@ function RemindersTab() {
 }
 
 function PlanTab() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, showToast } = useApp();
+  const confirmModal = useConfirm();
   const labels = { salary: 'Salary', business: 'Business', both: 'Job + Business' };
   const setMode = (workMode: 'salary' | 'business' | 'both') => {
     dispatch({ type: 'UPDATE_PROFILE', profile: { workMode, plan: workMode === 'salary' ? 'basic' : 'business' } });
@@ -523,7 +526,7 @@ function PlanTab() {
       </div>
       <div className="mt-5 pt-5 border-t border-border">
         <div className="font-semibold text-sm mb-2" style={{ color: 'var(--color-danger)' }}>Danger zone</div>
-        <button className="btn-danger text-sm" onClick={() => { if (confirm('Delete your account and all data? This cannot be undone.')) alert('Account deletion requested.'); }}>Delete my account</button>
+        <button className="btn-danger text-sm" onClick={async () => { if (await confirmModal('Delete your account and all data? This cannot be undone.')) showToast('Account deletion requested.', 'info'); }}>Delete my account</button>
       </div>
     </div>
   );

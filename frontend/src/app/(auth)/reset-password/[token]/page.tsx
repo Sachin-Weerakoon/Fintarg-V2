@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
-import { Input } from '@/components/ui/Input';
+import { PasswordField } from '@/components/ui/PasswordField';
 
 export default function ResetPassword({ params }: { params: Promise<{ token: string }> }) {
   const [password, setPassword] = useState('');
@@ -53,8 +53,7 @@ export default function ResetPassword({ params }: { params: Promise<{ token: str
         <h2 className="text-2xl font-bold tracking-tight text-text mb-2">Set a new password</h2>
         <form onSubmit={submit} className="space-y-4 mt-6">
           <Field id="password" label="New password" error={error}>
-            <Input
-              type="password"
+            <PasswordField
               value={password}
               onChange={e => setPassword(e.target.value)}
               minLength={8}

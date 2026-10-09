@@ -25,6 +25,9 @@ const notoTamil = Noto_Sans_Tamil({
   display: 'swap',
 });
 
+import { ToastProvider } from '@/components/ui/ToastProvider';
+import { ConfirmProvider } from '@/components/ui/ConfirmProvider';
+
 export const metadata: Metadata = {
   title: 'Fintarg',
   description: 'Personal finance and life management for Sri Lanka',
@@ -35,7 +38,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${poppins.variable} ${notoSinhala.variable} ${notoTamil.variable}`}>
       <body className="font-sans">
-        {children}
+        <ToastProvider>
+          <ConfirmProvider>
+            {children}
+          </ConfirmProvider>
+        </ToastProvider>
       </body>
     </html>
   );

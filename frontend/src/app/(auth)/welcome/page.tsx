@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { PasswordField } from '@/components/ui/PasswordField';
 import { Icon } from '@/components/ui/Icon';
 
 type WorkMode = 'salary' | 'business' | 'both';
@@ -260,9 +261,8 @@ export default function Welcome() {
                       </a>
                     )}
                   </div>
-                  <Input
+                  <PasswordField
                     id="signup-password"
-                    type="password"
                     autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
                     placeholder="At least 8 characters"
                     value={form.password}

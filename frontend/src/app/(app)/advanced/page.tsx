@@ -2,12 +2,14 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useRef } from 'react';
 import { useApp, formatRs } from '@/store';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import type { Agreement, BusinessBranch, EmploymentProfile } from '@/types';
 
 type Tab = 'hub' | 'businesses' | 'salary' | 'letters' | 'medical' | 'agreements';
 
 function Letters() {
   const { state, dispatch } = useApp();
+  const confirmModal = useConfirm();
   const { profile } = state;
   const isBusiness = profile.plan === 'business';
 
@@ -149,7 +151,7 @@ function Letters() {
                       <div className="text-xs" style={{ color: 'var(--color-muted)' }}>{l.date} · {l.addressedTo || '—'}</div>
                     </div>
                     <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }}
-                      onClick={() => { if (confirm('Delete letter?')) dispatch({ type: 'DELETE_LETTER', id: l.id }); }}>✕</button>
+                      onClick={async () => { if (await confirmModal('Delete this letter?')) dispatch({ type: 'DELETE_LETTER', id: l.id }); }}>✕</button>
                   </div>
                 ))}
               </div>
@@ -288,7 +290,8 @@ ${name}`;
 }
 
 function Medical() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, showToast } = useApp();
+  const confirmModal = useConfirm();
   const month = state.selectedMonth;
   const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), type: 'Consultation', amount: '', note: '' });
   const [error, setError] = useState('');
@@ -311,8 +314,8 @@ function Medical() {
     const file = e.target.files?.[0];
     if (!file) return;
     const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowed.includes(file.type)) { alert('Accepted formats: PDF, JPG, PNG, DOCX'); return; }
-    if (file.size > 10 * 1024 * 1024) { alert('File too large. Max 10 MB.'); return; }
+    if (!allowed.includes(file.type)) { showToast('Accepted formats: PDF, JPG, PNG, DOCX', 'error'); return; }
+    if (file.size > 10 * 1024 * 1024) { showToast('File too large. Max 10 MB.', 'error'); return; }
     dispatch({
       type: 'ADD_DOCUMENT',
       entry: {
@@ -328,7 +331,7 @@ function Medical() {
   };
 
   const addReminder = () => {
-    if (!remForm.label || !remForm.dueDate) { alert('Label and date required.'); return; }
+    if (!remForm.label || !remForm.dueDate) { showToast('Label and date required.', 'error'); return; }
     dispatch({
       type: 'ADD_REMINDER',
       entry: {
@@ -405,7 +408,7 @@ function Medical() {
                         <td className="text-right font-medium" style={{ color: 'var(--color-text)' }}>{m.amount.toLocaleString()}</td>
                         <td className="text-center">
                           <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }}
-                            onClick={() => { if (confirm('Delete?')) dispatch({ type: 'DELETE_MEDICAL_EXPENSE', id: m.id }); }}>✕</button>
+                            onClick={async () => { if (await confirmModal('Delete this medical expense?')) dispatch({ type: 'DELETE_MEDICAL_EXPENSE', id: m.id }); }}>✕</button>
                         </td>
                       </tr>
                     ))}
@@ -465,7 +468,7 @@ function Medical() {
                   <div className="flex gap-2">
                     <button className="btn-secondary text-xs" style={{ fontSize: 12, padding: '5px 12px' }}>View</button>
                     <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }}
-                      onClick={() => { if (confirm('Delete document?')) dispatch({ type: 'DELETE_DOCUMENT', id: d.id }); }}>✕</button>
+                      onClick={async () => { if (await confirmModal('Delete this document?')) dispatch({ type: 'DELETE_DOCUMENT', id: d.id }); }}>✕</button>
                   </div>
                 </div>
               ))}
@@ -1177,7 +1180,8 @@ function SalaryWorkspace() {
 }
 
 function AgreementsTab() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, showToast } = useApp();
+  const confirmModal = useConfirm();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...BLANK_FORM });
   const [search, setSearch] = useState('');
@@ -1202,7 +1206,7 @@ function AgreementsTab() {
   };
 
   const submit = () => {
-    if (!form.title || !form.otherParty) { alert('Title and other party required.'); return; }
+    if (!form.title || !form.otherParty) { showToast('Title and other party required.', 'error'); return; }
     dispatch({
       type: 'ADD_AGREEMENT',
       entry: { id: 'ag_' + Date.now(), ...form, value: Number(form.value) || 0 },
@@ -1217,7 +1221,7 @@ function AgreementsTab() {
   };
 
   const saveEdit = () => {
-    if (!editForm.title || !editForm.otherParty) { alert('Title and other party required.'); return; }
+    if (!editForm.title || !editForm.otherParty) { showToast('Title and other party required.', 'error'); return; }
     dispatch({ type: 'UPDATE_AGREEMENT', id: editingId!, updates: { ...editForm, value: Number(editForm.value) || 0 } });
     setEditingId(null);
   };
@@ -1347,7 +1351,7 @@ function AgreementsTab() {
                     )}
                     <button className="btn-ghost text-xs" onClick={() => startEdit(a)}>✎ Edit</button>
                     <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }}
-                      onClick={() => { if (confirm('Delete this agreement?')) dispatch({ type: 'DELETE_AGREEMENT', id: a.id }); }}>✕</button>
+                      onClick={async () => { if (await confirmModal('Delete this agreement?')) dispatch({ type: 'DELETE_AGREEMENT', id: a.id }); }}>✕</button>
                   </div>
                 </div>
               )}
@@ -1360,13 +1364,14 @@ function AgreementsTab() {
 }
 
 function CompaniesTab() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, showToast } = useApp();
+  const confirmModal = useConfirm();
   const [form, setForm] = useState({ name: '', address: '', contact: '', logo: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: '', address: '', contact: '' });
 
   const submit = () => {
-    if (!form.name) { alert('Company name required.'); return; }
+    if (!form.name) { showToast('Company name required.', 'error'); return; }
     dispatch({ type: 'ADD_COMPANY', entry: { id: 'co_' + Date.now(), ...form } });
     setForm({ name: '', address: '', contact: '', logo: '' });
   };
@@ -1402,7 +1407,7 @@ function CompaniesTab() {
                     </div>
                     <div className="flex gap-2 shrink-0">
                       <button className="btn-ghost text-xs" onClick={() => { setEditingId(c.id); setEditForm({ name: c.name, address: c.address, contact: c.contact }); }}>✎</button>
-                      <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }} onClick={() => { if (confirm('Delete company?')) dispatch({ type: 'DELETE_COMPANY', id: c.id }); }}>✕</button>
+                      <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }} onClick={async () => { if (await confirmModal('Delete company?')) dispatch({ type: 'DELETE_COMPANY', id: c.id }); }}>✕</button>
                     </div>
                   </div>
                 )}

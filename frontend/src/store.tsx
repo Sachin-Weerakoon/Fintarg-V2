@@ -4,6 +4,7 @@ import type {
   AppState, Page, IncomeEntry, ExpenseEntry, FinancePayment, Loan, PawnedItem,
   SavingsGoal, Letter, Agreement, Company, MedicalExpense, Document, Reminder,
   BusinessBranch, EmploymentProfile, WorkMode, OwnerDraw,
+  BankAccount, Card, Transaction,
 } from './types';
 
 const SEP_2026 = '2026-09';
@@ -51,6 +52,9 @@ const initialState: AppState = {
     { id: 'fp1', lender: "People's Bank", amount: 25000, dueDay: 10, monthsRemaining: 18 },
   ],
   loans: [],
+  bankAccounts: [],
+  cards: [],
+  transactions: [],
   pawnedItems: [
     { id: 'p1', description: 'Gold chain (22g)', amountReceived: 85000, interestRate: 2, nextDue: '2026-10-05', redemptionDate: '2027-01-05' },
   ],
@@ -125,14 +129,14 @@ const emptyInitialState: AppState = {
   currentPage: 'dashboard',
   selectedMonth: new Date().toISOString().slice(0, 7),
   profile: { ...initialState.profile, name: '', email: '' },
-  income: [], expenses: [], financePayments: [], loans: [], pawnedItems: [], savingsGoals: [],
+  income: [], expenses: [], financePayments: [], loans: [], bankAccounts: [], cards: [], transactions: [], pawnedItems: [], savingsGoals: [],
   personalSpendingBudget: 0, letters: [], agreements: [], companies: [], businessBranches: [],
   employmentProfiles: [], ownerDraws: [], medicalExpenses: [], documents: [], reminders: [],
 };
 
 type Action =
   | { type: 'HYDRATE'; data: Partial<AppState> }
-  | { type: 'REPLACE_RECORD_ID'; collection: 'income' | 'expenses' | 'financePayments' | 'loans' | 'pawnedItems' | 'savingsGoals' | 'letters' | 'agreements' | 'companies' | 'businessBranches' | 'employmentProfiles' | 'ownerDraws' | 'medicalExpenses' | 'documents' | 'reminders'; localId: string; serverId: string }
+  | { type: 'REPLACE_RECORD_ID'; collection: 'income' | 'expenses' | 'financePayments' | 'loans' | 'bankAccounts' | 'cards' | 'transactions' | 'pawnedItems' | 'savingsGoals' | 'letters' | 'agreements' | 'companies' | 'businessBranches' | 'employmentProfiles' | 'ownerDraws' | 'medicalExpenses' | 'documents' | 'reminders'; localId: string; serverId: string }
   | { type: 'SET_PAGE'; page: Page }
   | { type: 'SET_PLAN'; plan: 'basic' | 'business'; workMode: WorkMode; name: string }
   | { type: 'SET_SETUP_COMPLETE' }
@@ -145,7 +149,16 @@ type Action =
   | { type: 'DELETE_EXPENSE'; id: string }
   | { type: 'ADD_FINANCE_PAYMENT'; entry: FinancePayment }
   | { type: 'DELETE_FINANCE_PAYMENT'; id: string }
+  | { type: 'ADD_BANK_ACCOUNT'; entry: BankAccount }
+  | { type: 'UPDATE_BANK_ACCOUNT'; entry: BankAccount }
+  | { type: 'DELETE_BANK_ACCOUNT'; id: string }
+  | { type: 'ADD_CARD'; entry: Card }
+  | { type: 'UPDATE_CARD'; entry: Card }
+  | { type: 'DELETE_CARD'; id: string }
+  | { type: 'ADD_TRANSACTION'; entry: Transaction }
+  | { type: 'DELETE_TRANSACTION'; id: string }
   | { type: 'ADD_LOAN'; entry: Loan }
+  | { type: 'UPDATE_LOAN'; entry: Loan }
   | { type: 'RECORD_LOAN_REPAYMENT'; id: string; amount: number }
   | { type: 'DELETE_LOAN'; id: string }
   | { type: 'ADD_PAWNED'; entry: PawnedItem }
@@ -204,7 +217,16 @@ function reducer(state: AppState, action: Action): AppState {
     case 'DELETE_EXPENSE': return { ...state, expenses: state.expenses.filter(e => e.id !== action.id) };
     case 'ADD_FINANCE_PAYMENT': return { ...state, financePayments: [...state.financePayments, action.entry] };
     case 'DELETE_FINANCE_PAYMENT': return { ...state, financePayments: state.financePayments.filter(f => f.id !== action.id) };
+    case 'ADD_BANK_ACCOUNT': return { ...state, bankAccounts: [...state.bankAccounts, action.entry] };
+    case 'UPDATE_BANK_ACCOUNT': return { ...state, bankAccounts: state.bankAccounts.map(b => b.id === action.entry.id ? action.entry : b) };
+    case 'DELETE_BANK_ACCOUNT': return { ...state, bankAccounts: state.bankAccounts.filter(b => b.id !== action.id) };
+    case 'ADD_CARD': return { ...state, cards: [...state.cards, action.entry] };
+    case 'UPDATE_CARD': return { ...state, cards: state.cards.map(c => c.id === action.entry.id ? action.entry : c) };
+    case 'DELETE_CARD': return { ...state, cards: state.cards.filter(c => c.id !== action.id) };
+    case 'ADD_TRANSACTION': return { ...state, transactions: [action.entry, ...state.transactions] };
+    case 'DELETE_TRANSACTION': return { ...state, transactions: state.transactions.filter(t => t.id !== action.id) };
     case 'ADD_LOAN': return { ...state, loans: [...state.loans, action.entry] };
+    case 'UPDATE_LOAN': return { ...state, loans: state.loans.map(l => l.id === action.entry.id ? action.entry : l) };
     case 'RECORD_LOAN_REPAYMENT': return {
       ...state,
       loans: state.loans.map(l => l.id === action.id ? { ...l, balance: Math.max(0, l.balance - action.amount) } : l),
@@ -322,6 +344,7 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
       const serverId = await persistStoreAction(action);
       const collectionByAction: Record<string, PersistedCollection> = {
         ADD_INCOME: 'income', ADD_EXPENSE: 'expenses', ADD_FINANCE_PAYMENT: 'financePayments', ADD_LOAN: 'loans',
+        ADD_BANK_ACCOUNT: 'bankAccounts', ADD_CARD: 'cards', ADD_TRANSACTION: 'transactions',
         ADD_PAWNED: 'pawnedItems', ADD_GOAL: 'savingsGoals', ADD_LETTER: 'letters', ADD_AGREEMENT: 'agreements',
         ADD_COMPANY: 'companies', ADD_BRANCH: 'businessBranches', ADD_EMPLOYMENT: 'employmentProfiles',
         ADD_OWNER_DRAW: 'ownerDraws', ADD_MEDICAL_EXPENSE: 'medicalExpenses', ADD_DOCUMENT: 'documents', ADD_REMINDER: 'reminders',
