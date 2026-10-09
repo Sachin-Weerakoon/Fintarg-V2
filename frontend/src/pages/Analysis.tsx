@@ -42,14 +42,32 @@ export default function Analysis() {
   const exportPDF = () => window.print();
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Month selector */}
-      <div className="flex items-center gap-3 mb-6 no-print">
-        <button onClick={() => prevMonth && dispatch({ type: 'SET_MONTH', month: prevMonth })} disabled={!prevMonth}
-          className="text-xl px-2" style={{ color: prevMonth ? 'var(--color-primary)' : 'var(--color-muted)' }}>‹</button>
-        <span className="font-semibold text-base" style={{ color: 'var(--color-text)' }}>{MONTH_LABELS[month] || month}</span>
-        <button onClick={() => nextMonth && dispatch({ type: 'SET_MONTH', month: nextMonth })} disabled={!nextMonth}
-          className="text-xl px-2" style={{ color: nextMonth ? 'var(--color-primary)' : 'var(--color-muted)' }}>›</button>
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Month selector & Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-slate-800 no-print">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Financial Analysis</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Deep-dive breakdown into burn rate, categories, and forecast trends.</p>
+        </div>
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-200/60 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800">
+          <button
+            onClick={() => prevMonth && dispatch({ type: 'SET_MONTH', month: prevMonth })}
+            disabled={!prevMonth}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900 disabled:opacity-30 disabled:pointer-events-none transition-all shadow-none hover:shadow-sm"
+            title="Previous month"
+          >
+            ←
+          </button>
+          <span className="px-3 text-xs font-bold text-slate-900 dark:text-slate-100">{MONTH_LABELS[month] || month}</span>
+          <button
+            onClick={() => nextMonth && dispatch({ type: 'SET_MONTH', month: nextMonth })}
+            disabled={!nextMonth}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900 disabled:opacity-30 disabled:pointer-events-none transition-all shadow-none hover:shadow-sm"
+            title="Next month"
+          >
+            →
+          </button>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-5">

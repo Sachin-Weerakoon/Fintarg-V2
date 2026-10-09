@@ -66,7 +66,6 @@ function AdvancedHub({ hasBusiness, onOpen }: { hasBusiness: boolean; onOpen: (t
           </button>
         ))}
       </div>
-      <NavigationFlowFrame hasBusiness={hasBusiness} />
     </div>
   );
 }
@@ -77,26 +76,6 @@ function HubIcon({ type }: { type: Tab }) {
   if (type === 'medical') return <svg {...common}><path d="M12 20s-7-4.2-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.8-7 10-7 10Z" /><path d="M9 12h6M12 9v6" /></svg>;
   if (type === 'agreements') return <svg {...common}><path d="M7 3h8l3 3v15H7z" /><path d="M15 3v4h4M10 11h5M10 15h5" /></svg>;
   return <svg {...common}><path d="M4 21V8l8-4 8 4v13" /><path d="M8 21v-6h8v6M8 10h.01M12 10h.01M16 10h.01" /></svg>;
-}
-
-function NavigationFlowFrame({ hasBusiness }: { hasBusiness: boolean }) {
-  return (
-    <div className="card mt-6">
-      <div className="font-semibold" style={{ color: 'var(--color-text)' }}>Navigation update</div>
-      <p className="text-sm mt-1 mb-5" style={{ color: 'var(--color-muted)' }}>Letters and Medical now live inside Advanced Features.</p>
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="nav-flow before">
-          <span className="badge-muted">Before</span>
-          <p>Home → Financial → Analysis → Goals → Documents → Letters → Medical → Advanced → Settings</p>
-        </div>
-        <div className="nav-flow after">
-          <span className="badge-success">✓ After</span>
-          <p>Home → Financial → Analysis → Goals → Documents → Advanced Features → Settings</p>
-          <small>{hasBusiness ? 'Mobile: Advanced Features is in the bottom bar.' : 'Mobile: Advanced Features is inside More.'}</small>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function WorkOverview({ onOpen }: { onOpen: (tab: Tab) => void }) {

@@ -15,32 +15,41 @@ export default function Financial() {
   const [month, setMonth] = useState(state.selectedMonth);
 
   return (
-    <div className="max-w-5xl mx-auto">
-      {/* Month selector */}
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>Month:</span>
-        <div className="flex gap-1">
-          {MONTHS.map(m => (
-            <button
-              key={m}
-              onClick={() => setMonth(m)}
-              className="tab-btn"
-              style={{
-                padding: '4px 12px', fontSize: 12, minHeight: 32,
-                background: month === m ? 'var(--color-primary)' : 'transparent',
-                color: month === m ? '#fff' : 'var(--color-muted)',
-              }}
-            >
-              {MONTH_LABELS[m]}
-            </button>
-          ))}
+    <div className="max-w-5xl mx-auto space-y-6">
+      {/* Top Controls Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Financial Ledger</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Track your cashflow, recurring bills, loans, and assets.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Month:</span>
+          <div className="inline-flex p-1 rounded-xl bg-slate-200/60 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800">
+            {MONTHS.map(m => (
+              <button
+                key={m}
+                onClick={() => setMonth(m)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  month === m
+                    ? 'bg-white dark:bg-slate-900 text-cyan-600 dark:text-cyan-400 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                {MONTH_LABELS[m]}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-2 mb-6">
+      <div className="flex flex-wrap gap-2 p-1.5 rounded-2xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 w-fit">
         {(['income', 'expenses', 'finance', 'loans', 'pawned'] as Tab[]).map(t => (
-          <button key={t} className={`tab-btn${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
+          <button
+            key={t}
+            className={`tab-btn !py-2 !px-4 !text-xs font-semibold rounded-xl${tab === t ? ' active' : ''}`}
+            onClick={() => setTab(t)}
+          >
             {t === 'finance' ? 'Finance payments' : t === 'pawned' ? 'Pawned items' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}

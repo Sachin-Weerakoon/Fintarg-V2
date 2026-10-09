@@ -104,43 +104,58 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <aside
           className="flex-shrink-0 flex flex-col"
           style={{
-            width: 192, minHeight: '100vh',
-            background: 'var(--color-primary-dark)',
+            width: 240, minHeight: '100vh',
+            background: 'linear-gradient(180deg, #0e1c33 0%, #081120 100%)',
             position: 'sticky', top: 0, height: '100vh', overflowY: 'auto',
-            borderRight: '1px solid rgba(255,255,255,0.06)',
+            borderRight: '1px solid rgba(255,255,255,0.07)',
           }}
         >
           <div className="px-5 py-6">
-            <div className="text-white font-bold text-base leading-tight tracking-tight">Fintarg</div>
-            <div className="mt-1 text-xs font-medium" style={{ color: 'rgba(255,255,255,0.4)', letterSpacing: '0.03em' }}>
-              {modeLabel}
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-base shadow-md" style={{ background: `linear-gradient(135deg, ${primary}, #0891b2)` }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              </div>
+              <div>
+                <div className="text-white font-bold text-lg leading-tight tracking-tight flex items-center gap-2">
+                  <span>Fintarg</span>
+                  <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded text-cyan-300 bg-cyan-950/70 border border-cyan-800/60">v2</span>
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>{modeLabel}</span>
+                </div>
+              </div>
             </div>
           </div>
-          <nav className="flex-1 px-3 pb-4 flex flex-col gap-0.5">
+          <nav className="flex-1 px-3 pb-4 flex flex-col gap-1">
             {visibleNav.map(item => (
               <button
                 key={item.page}
                 onClick={() => go(item.page)}
                 className={`sidebar-link${currentPage === item.page ? ' active' : ''}`}
               >
-                {item.label}
+                <span className="sidebar-icon"><NavIcon page={item.page} /></span>
+                <span>{item.label}</span>
               </button>
             ))}
           </nav>
-          <div className="px-5 pb-5">
+          <div className="px-4 pb-5 pt-3 border-t border-white/5">
             <div
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
-              style={{ background: 'rgba(255,255,255,0.08)' }}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] transition-colors"
             >
               <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                style={{ background: primary }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-sm flex-shrink-0"
+                style={{ background: `linear-gradient(135deg, ${primary}, #0284c7)` }}
               >
                 {profile.name ? profile.name[0].toUpperCase() : 'U'}
               </div>
-              <div className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                {profile.name || 'User'}
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-white truncate">{profile.name || 'User'}</div>
+                <div className="text-[11px] text-slate-400 truncate">{modeLabel}</div>
               </div>
+              <button onClick={() => go('settings')} className="text-slate-400 hover:text-white transition-colors" title="Settings">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
             </div>
           </div>
         </aside>
@@ -148,23 +163,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0">
           <header
-            className="flex items-center justify-between px-8 py-4 sticky top-0 z-10"
-            style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', backdropFilter: 'blur(8px)' }}
+            className="flex items-center justify-between px-8 py-4 sticky top-0 z-10 backdrop-blur-md bg-opacity-90"
+            style={{ background: 'color-mix(in srgb, var(--color-surface) 92%, transparent)', borderBottom: '1px solid var(--color-border)' }}
           >
-            <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
-              {pageTitleOf(currentPage)}
-            </h1>
+            <div>
+              <div className="text-xs uppercase tracking-wider font-semibold" style={{ color: 'var(--color-muted)' }}>Workspace · {modeLabel}</div>
+              <h1 className="text-xl font-bold tracking-tight mt-0.5" style={{ color: 'var(--color-text)' }}>
+                {pageTitleOf(currentPage)}
+              </h1>
+            </div>
             <div className="flex items-center gap-3">
               <span
-                className="text-xs font-semibold px-3 py-1 rounded-full"
-                style={{ background: tint, color: primary }}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full border"
+                style={{ background: tint, borderColor: 'color-mix(in srgb, var(--color-primary) 30%, transparent)', color: primary }}
               >
                 {modeLabel}
               </span>
               <button
                 onClick={() => go('settings')}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                style={{ background: primary }}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm transition-transform hover:scale-105"
+                style={{ background: `linear-gradient(135deg, ${primary}, #0284c7)` }}
                 title="Settings"
               >
                 {profile.name ? profile.name[0].toUpperCase() : 'U'}

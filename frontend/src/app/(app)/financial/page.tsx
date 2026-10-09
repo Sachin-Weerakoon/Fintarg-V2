@@ -14,20 +14,41 @@ export default function Financial() {
   const months = Array.from(new Set(state.expenses.map(e => e.date.slice(0, 7)))).sort().slice(-3);
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>Month:</span>
-        <div className="flex gap-1">
-          {months.map(m => (
-            <button key={m} onClick={() => setMonth(m)} className="tab-btn" style={{ padding: '4px 12px', fontSize: 12, minHeight: 32, background: month === m ? 'var(--color-primary)' : 'transparent', color: month === m ? '#fff' : 'var(--color-muted)' }}>
-              {m}
-            </button>
-          ))}
+    <div className="max-w-5xl mx-auto space-y-6">
+      {/* Top Controls Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Financial Ledger</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Track your cashflow, recurring bills, loans, and assets.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Month:</span>
+          <div className="inline-flex p-1 rounded-xl bg-slate-200/60 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800">
+            {months.map(m => (
+              <button
+                key={m}
+                onClick={() => setMonth(m)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  month === m
+                    ? 'bg-white dark:bg-slate-900 text-cyan-600 dark:text-cyan-400 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-      <div className="flex flex-wrap gap-2 mb-6">
+
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2 p-1.5 rounded-2xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 w-fit">
         {(['income', 'expenses', 'finance', 'loans', 'pawned'] as Tab[]).map(t => (
-          <button key={t} className={`tab-btn${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
+          <button
+            key={t}
+            className={`tab-btn !py-2 !px-4 !text-xs font-semibold rounded-xl${tab === t ? ' active' : ''}`}
+            onClick={() => setTab(t)}
+          >
             {t === 'finance' ? 'Finance payments' : t === 'pawned' ? 'Pawned items' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
@@ -42,7 +63,15 @@ export default function Financial() {
 }
 
 function EmptyState({ title, description }: { title: string; description: string }) {
-  return <div className="text-center py-8"><div className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>{title}</div><div className="text-xs mt-1" style={{ color: 'var(--color-muted)' }}>{description}</div></div>;
+  return (
+    <div className="text-center py-10 px-4 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+      <div className="w-10 h-10 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mb-2">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </div>
+      <div className="font-semibold text-sm text-slate-800 dark:text-slate-200">{title}</div>
+      <div className="text-xs mt-1 text-slate-500 dark:text-slate-400 max-w-xs mx-auto">{description}</div>
+    </div>
+  );
 }
 
 function IncomeTab({ month }: { month: string }) {

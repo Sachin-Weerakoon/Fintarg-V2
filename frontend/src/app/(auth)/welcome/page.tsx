@@ -79,27 +79,51 @@ export default function Welcome() {
   };
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'var(--color-primary-dark)' }}>
-      <section className="hidden md:flex flex-col justify-between px-16 py-12 flex-1" style={{ color: '#fff' }}>
-        <div className="text-white font-bold text-lg">Fintarg</div>
-        <div>
-          <h1 className="text-4xl font-bold leading-tight mb-4">
-            Take control<br />
-            <span style={{ color: 'var(--color-primary)' }}>of your month</span>
+    <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #09121f 0%, #0d192c 50%, #0b1a2e 100%)' }}>
+      <section className="hidden md:flex flex-col justify-between px-16 py-12 flex-1 relative overflow-hidden" style={{ color: '#fff' }}>
+        {/* Ambient background glow */}
+        <div className="absolute top-1/4 -left-20 w-80 h-80 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/4 right-0 w-96 h-96 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+
+        <div className="flex items-center gap-3 relative z-10">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg bg-gradient-to-br from-cyan-500 to-blue-600">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          </div>
+          <div>
+            <div className="text-white font-extrabold text-xl tracking-tight flex items-center gap-2">
+              <span>Fintarg</span>
+              <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded text-cyan-300 bg-cyan-950/80 border border-cyan-800/80">v2.0</span>
+            </div>
+            <div className="text-xs text-slate-400 font-medium">Personal & Business Finance</div>
+          </div>
+        </div>
+
+        <div className="relative z-10 max-w-md">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-semibold mb-6">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span>Sri Lanka's Modern Financial OS</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-black leading-tight tracking-tight mb-4 text-white">
+            Take total control <br />
+            <span className="bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent">of your month</span>
           </h1>
-          <p className="text-white/70 text-base max-w-sm leading-relaxed">
-            Track income and expenses, plan savings and keep your papers in one safe place.
+          <p className="text-slate-300 text-base leading-relaxed">
+            Eliminate cashflow surprises. Track recurring burn, automate daily savings goals, and manage your complete wealth portfolio.
           </p>
-          <ul className="mt-10 space-y-4 text-sm text-white/85">
-            {['See if you can make it through the month', 'Plan daily and monthly savings', 'Generate letters in seconds'].map(feature => (
+          <ul className="mt-8 space-y-3.5 text-sm text-slate-200">
+            {['Predict shortfalls and burn rate before month end', 'Set automated daily savings targets for every goal', 'Secure document vault & automated legal letter generator'].map(feature => (
               <li key={feature} className="flex items-start gap-3">
-                <span aria-hidden="true" className="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: 'var(--color-primary)' }} />
-                <span>{feature}</span>
+                <span className="mt-0.5 w-5 h-5 rounded-full flex items-center justify-center bg-cyan-500/20 text-cyan-400 flex-shrink-0 text-xs font-bold">✓</span>
+                <span className="leading-snug">{feature}</span>
               </li>
             ))}
           </ul>
         </div>
-        <p className="text-white/45 text-xs">Built for life and business in Sri Lanka.</p>
+
+        <div className="relative z-10 pt-6 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
+          <span>Built specifically for Sri Lankan currency & laws.</span>
+          <span className="font-semibold text-slate-300">Bank-grade security</span>
+        </div>
       </section>
       <section className="flex-1 flex items-center justify-center p-4 sm:p-8">
         <div className={`onboarding-card${authMode === 'signup' && signupStep === 'mode' ? ' onboarding-card-wide' : ''}`}>

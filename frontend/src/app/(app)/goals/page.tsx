@@ -57,22 +57,39 @@ export default function Goals() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Header row */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <div className="text-sm" style={{ color: 'var(--color-muted)' }}>
-          Free cash this month: <span className="font-bold" style={{ color: freeCash < 0 ? 'var(--color-danger)' : 'var(--color-text)' }}>{formatRs(freeCash)}</span>
-          {savingsExceedsCash && <span className="ml-2 badge-danger">Goals exceed free cash!</span>}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-slate-800">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Savings & Goals</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Automate daily targets, track contributions, and ensure target feasibility.</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowAddGoal(v => !v)}>+ New goal</button>
+        <div className="flex items-center gap-3">
+          <div className="text-xs px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/60 flex items-center gap-2">
+            <span className="text-slate-500 dark:text-slate-400 font-medium">Free cash:</span>
+            <span className={`font-bold ${freeCash < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100'}`}>
+              {formatRs(freeCash)}
+            </span>
+            {savingsExceedsCash && <span className="badge-danger text-[10px] ml-1">Exceeds cash</span>}
+          </div>
+          <button className="btn-primary !min-h-[38px] !text-xs font-semibold" onClick={() => setShowAddGoal(v => !v)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            <span>New Goal</span>
+          </button>
+        </div>
       </div>
 
       {/* Add goal form */}
       {showAddGoal && (
-        <div className="card mb-5">
-          <div className="font-semibold text-sm mb-4" style={{ color: 'var(--color-text)' }}>Create savings goal</div>
-          {goalError && <p className="text-xs mb-3" style={{ color: 'var(--color-danger)' }}>{goalError}</p>}
-          <div className="grid md:grid-cols-3 gap-3">
+        <div className="card p-6 border-cyan-500/30 shadow-lg">
+          <div className="flex items-center justify-between mb-4">
+            <div className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-600 dark:text-cyan-400"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+              <span>Create New Savings Goal</span>
+            </div>
+          </div>
+          {goalError && <p className="text-xs mb-3 text-rose-600 dark:text-rose-400 font-medium">{goalError}</p>}
+          <div className="grid md:grid-cols-3 gap-4">
             <div>
               <label className="form-label">Goal name</label>
               <input className="form-input" value={goalForm.name} onChange={e => setGoalForm(f => ({ ...f, name: e.target.value }))} placeholder="Emergency Fund" />
@@ -81,8 +98,8 @@ export default function Goals() {
               <label className="form-label">Daily amount (Rs.)</label>
               <input className="form-input" type="number" value={goalForm.dailyAmount} onChange={e => setGoalForm(f => ({ ...f, dailyAmount: e.target.value }))} placeholder="1,000" />
               {goalForm.dailyAmount && (
-                <p className="text-xs mt-1" style={{ color: 'var(--color-muted)' }}>
-                  Monthly target: <strong>{formatRs(Number(goalForm.dailyAmount) * 30)}</strong>
+                <p className="text-[11px] mt-1.5 font-medium text-cyan-600 dark:text-cyan-400">
+                  Monthly target: <span className="font-bold">{formatRs(Number(goalForm.dailyAmount) * 30)}</span>
                 </p>
               )}
             </div>
@@ -91,9 +108,9 @@ export default function Goals() {
               <input className="form-input" type="date" value={goalForm.endDate} onChange={e => setGoalForm(f => ({ ...f, endDate: e.target.value }))} />
             </div>
           </div>
-          <div className="flex gap-3 mt-4">
-            <button className="btn-primary" onClick={submitGoal}>Create goal</button>
-            <button className="btn-secondary" onClick={() => setShowAddGoal(false)}>Cancel</button>
+          <div className="flex gap-2.5 mt-5">
+            <button className="btn-primary !min-h-[38px] !text-xs font-semibold" onClick={submitGoal}>Create Goal</button>
+            <button className="btn-secondary !min-h-[38px] !text-xs font-semibold" onClick={() => setShowAddGoal(false)}>Cancel</button>
           </div>
         </div>
       )}
