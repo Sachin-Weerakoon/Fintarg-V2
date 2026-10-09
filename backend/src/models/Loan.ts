@@ -20,7 +20,7 @@ const LoanSchema = new Schema<ILoan>({
   ratePercent: { type: Number, required: true, min: 0 },
   method: { type: String, enum: ['simple', 'compound'], required: true },
   startDate: { type: String, required: true },
-  dueDate: { type: String, required: true },
+  dueDate: { type: String, default: '' },
   balanceCents: { type: Number, required: true, min: 0 },
 }, { timestamps: true });
 

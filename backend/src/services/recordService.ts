@@ -53,7 +53,7 @@ const moneyFields: Partial<Record<RecordKind, Record<string, string>>> = {
   agreements: { value: 'valueCents' },
 };
 
-function toStored(kind: RecordKind, input: Record<string, unknown>) {
+function toStored(kind: RecordKind, input: Record<string, unknown>, isCreate = false) {
   const stored: Record<string, unknown> = { ...input };
   for (const [inputKey, modelKey] of Object.entries(moneyFields[kind] ?? {})) {
     if (inputKey in stored) {
@@ -65,12 +65,24 @@ function toStored(kind: RecordKind, input: Record<string, unknown>) {
     const dailyCents = Math.round(Number(stored.dailyAmount) * 100);
     stored.dailyAmountCents = dailyCents;
     stored.monthlyTargetCents = dailyCents * 30;
-    stored.savedAmountCents = 0;
-    stored.contributions = [];
+    if (isCreate) {
+      if (!('savedAmountCents' in stored)) stored.savedAmountCents = 0;
+      if (!('contributions' in stored)) stored.contributions = [];
+    }
     delete stored.dailyAmount;
   }
-  if (kind === 'loans' && 'principalCents' in stored && !('balanceCents' in stored)) {
-    stored.balanceCents = stored.principalCents;
+  if (kind === 'loans') {
+    if ('rate' in stored) {
+      stored.ratePercent = Number(stored.rate);
+      delete stored.rate;
+    }
+    if ('principalCents' in stored && !('balanceCents' in stored)) {
+      stored.balanceCents = stored.principalCents;
+    }
+  }
+  if (kind === 'pawnedItems' && 'interestRate' in stored) {
+    stored.interestRatePercent = Number(stored.interestRate);
+    delete stored.interestRate;
   }
   return stored;
 }
@@ -89,13 +101,15 @@ export async function listRecords(kind: RecordKind, userId: string) {
 }
 
 export async function createRecord(kind: RecordKind, userId: string, input: Record<string, unknown>) {
-  if (kind === 'loans' && String(input.dueDate) < String(input.startDate)) throw new HttpError(400, 'Due date cannot be before start date');
+  if (kind === 'loans' && input.dueDate && input.startDate && String(input.dueDate) < String(input.startDate)) {
+    throw new HttpError(400, 'Due date cannot be before start date');
+  }
   if (kind === 'businessBranches' || kind === 'ownerDraws') {
     if (!mongoose.isValidObjectId(input.companyId) || !await CompanyModel.exists({ _id: input.companyId, userId })) throw new HttpError(404, 'Company not found');
   }
   if (kind === 'branchEntries' && (!mongoose.isValidObjectId(input.branchId) || !await BusinessBranchModel.exists({ _id: input.branchId, userId }))) throw new HttpError(404, 'Branch not found');
   if (kind === 'documents' && input.fileId && (!mongoose.isValidObjectId(input.fileId) || !await FileModel.exists({ _id: input.fileId, userId }))) throw new HttpError(404, 'File not found');
-  const data = toStored(kind, input);
+  const data = toStored(kind, input, true);
   if (kind === 'businessBranches') delete data.entries;
   if (kind === 'branchEntries') data.branchId = new mongoose.Types.ObjectId(String(input.branchId));
   if (kind === 'ownerDraws') data.companyId = new mongoose.Types.ObjectId(String(input.companyId));
@@ -108,7 +122,7 @@ export async function updateRecord(kind: RecordKind, userId: string, id: string,
   if (!mongoose.isValidObjectId(id)) throw new HttpError(400, 'Invalid record id');
   if (kind === 'businessBranches' && input.companyId && !await CompanyModel.exists({ _id: input.companyId, userId })) throw new HttpError(404, 'Company not found');
   if (kind === 'branchEntries' && input.branchId && !await BusinessBranchModel.exists({ _id: input.branchId, userId })) throw new HttpError(404, 'Branch not found');
-  const changes = toStored(kind, input);
+  const changes = toStored(kind, input, false);
   const entries = kind === 'businessBranches' && Array.isArray(changes.entries) ? changes.entries as Record<string, unknown>[] : [];
   delete changes.entries;
   const updated = await models[kind].findOneAndUpdate(

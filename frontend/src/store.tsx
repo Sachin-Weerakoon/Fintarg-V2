@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useRef, useState, ReactNode } from 'react';
 import { loadPersistedData, persistStoreAction } from '@/services/storeApi';
 import type {
   AppState, Page, IncomeEntry, ExpenseEntry, FinancePayment, Loan, PawnedItem,
@@ -179,12 +179,14 @@ type Action =
   | { type: 'UPDATE_REMINDER'; id: string; status: Reminder['status'] }
   | { type: 'DELETE_REMINDER'; id: string }
   | { type: 'ADD_LOAN_FROM_SHORTFALL'; amount: number; month: string }
-  | { type: 'SET_MONTH'; month: string };
+  | { type: 'SET_MONTH'; month: string }
+  | { type: 'ROLLBACK'; previousState: AppState };
 
 type PersistedCollection = Extract<Action, { type: 'REPLACE_RECORD_ID' }>['collection'];
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    case 'ROLLBACK': return action.previousState;
     case 'HYDRATE': return { ...state, ...action.data, profile: { ...state.profile, ...action.data.profile } };
     case 'REPLACE_RECORD_ID': return {
       ...state,
@@ -278,13 +280,29 @@ function reducer(state: AppState, action: Action): AppState {
   }
 }
 
-const AppContext = createContext<{ state: AppState; dispatch: (action: Action) => Promise<string | undefined> } | null>(null);
+export type Toast = { id: string; message: string; tone: 'success' | 'error' | 'info' };
+
+const AppContext = createContext<{
+  state: AppState;
+  dispatch: (action: Action) => Promise<string | undefined>;
+  showToast: (message: string, tone?: 'success' | 'error' | 'info') => void;
+} | null>(null);
 
 export function AppProvider({ children, initialProfile = {} }: { children: ReactNode; initialProfile?: Partial<AppState['profile']> }) {
   const [state, reduce] = useReducer(reducer, {
     ...emptyInitialState,
     profile: { ...emptyInitialState.profile, ...initialProfile },
   });
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const showToast = (message: string, tone: 'success' | 'error' | 'info' = 'info') => {
+    const id = 't_' + Date.now();
+    setToasts((prev: Toast[]) => [...prev, { id, message, tone }]);
+    setTimeout(() => setToasts((prev: Toast[]) => prev.filter((t: Toast) => t.id !== id)), 4000);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -297,8 +315,9 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
   }, []);
 
   const dispatch = async (action: Action): Promise<string | undefined> => {
+    const prevState = stateRef.current;
     reduce(action);
-    if (action.type === 'HYDRATE' || action.type === 'REPLACE_RECORD_ID') return undefined;
+    if (action.type === 'HYDRATE' || action.type === 'REPLACE_RECORD_ID' || action.type === 'ROLLBACK') return undefined;
     try {
       const serverId = await persistStoreAction(action);
       const collectionByAction: Record<string, PersistedCollection> = {
@@ -311,13 +330,38 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
       const localId = 'entry' in action && action.entry && 'id' in action.entry ? String(action.entry.id) : undefined;
       if (serverId && collection && localId) reduce({ type: 'REPLACE_RECORD_ID', collection, localId, serverId });
       return serverId;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unable to save account change', error);
+      reduce({ type: 'ROLLBACK', previousState: prevState });
+      showToast(error?.message || 'Failed to save changes. Reverting...', 'error');
       return undefined;
     }
   };
 
-  return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={{ state, dispatch, showToast }}>
+      {children}
+      {toasts.length > 0 && (
+        <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none" aria-live="polite">
+          {toasts.map((t: Toast) => (
+            <div
+              key={t.id}
+              className={`pointer-events-auto px-4 py-3 rounded-xl shadow-lg border text-xs font-medium flex items-center gap-2 transition-all ${
+                t.tone === 'error'
+                  ? 'bg-danger-tint border-danger-solid/40 text-danger-text'
+                  : t.tone === 'success'
+                  ? 'bg-success-tint border-success-solid/40 text-success-text'
+                  : 'bg-surface border-border text-text'
+              }`}
+            >
+              <span>{t.tone === 'error' ? '⚠' : t.tone === 'success' ? '✓' : 'ℹ'}</span>
+              <span>{t.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </AppContext.Provider>
+  );
 }
 
 export function useApp() {

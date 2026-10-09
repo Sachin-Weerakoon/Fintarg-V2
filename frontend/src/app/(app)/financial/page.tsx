@@ -538,11 +538,23 @@ function FinanceTab() {
 function LoansTab() {
   const { state, dispatch } = useApp();
   type LoanForm = { lender: string; amount: string; rate: string; method: 'simple' | 'compound'; startDate: string; dueDate: string };
-  const [form, setForm] = useState<LoanForm>({ lender: '', amount: '', rate: '', method: 'simple', startDate: '', dueDate: '' });
+  const [form, setForm] = useState<LoanForm>({
+    lender: '',
+    amount: '',
+    rate: '',
+    method: 'simple',
+    startDate: new Date().toISOString().slice(0, 10),
+    dueDate: '',
+  });
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const submit = () => {
     if (!form.lender || !form.amount) return;
+    const startDate = form.startDate || new Date().toISOString().slice(0, 10);
+    const defaultDueDate = new Date();
+    defaultDueDate.setFullYear(defaultDueDate.getFullYear() + 1);
+    const dueDate = form.dueDate || defaultDueDate.toISOString().slice(0, 10);
+
     dispatch({
       type: 'ADD_LOAN',
       entry: {
@@ -551,12 +563,12 @@ function LoansTab() {
         principal: Number(form.amount),
         rate: Number(form.rate) || 0,
         method: form.method,
-        startDate: form.startDate || new Date().toISOString().slice(0, 10),
-        dueDate: form.dueDate || '',
+        startDate,
+        dueDate,
         balance: Number(form.amount),
       },
     });
-    setForm({ lender: '', amount: '', rate: '', method: 'simple', startDate: '', dueDate: '' });
+    setForm({ lender: '', amount: '', rate: '', method: 'simple', startDate: new Date().toISOString().slice(0, 10), dueDate: '' });
   };
 
   return (
@@ -628,6 +640,22 @@ function LoansTab() {
               <option value="compound">Compound</option>
             </Select>
           </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field id="loan-start" label="Start Date">
+              <Input
+                type="date"
+                value={form.startDate}
+                onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
+              />
+            </Field>
+            <Field id="loan-due" label="Due Date">
+              <Input
+                type="date"
+                value={form.dueDate}
+                onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
+              />
+            </Field>
+          </div>
           <Button variant="primary" className="w-full pt-1" onClick={submit}>
             Save Loan
           </Button>
@@ -653,11 +681,22 @@ function LoansTab() {
 
 function PawnedTab() {
   const { state, dispatch } = useApp();
-  const [form, setForm] = useState({ description: '', amountReceived: '', interestRate: '', nextDue: '', redemptionDate: '' });
+  const [form, setForm] = useState({
+    description: '',
+    amountReceived: '',
+    interestRate: '',
+    nextDue: new Date().toISOString().slice(0, 10),
+    redemptionDate: '',
+  });
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const submit = () => {
     if (!form.description || !form.amountReceived) return;
+    const nextDue = form.nextDue || new Date().toISOString().slice(0, 10);
+    const defaultRedemption = new Date();
+    defaultRedemption.setMonth(defaultRedemption.getMonth() + 6);
+    const redemptionDate = form.redemptionDate || defaultRedemption.toISOString().slice(0, 10);
+
     dispatch({
       type: 'ADD_PAWNED',
       entry: {
@@ -665,11 +704,17 @@ function PawnedTab() {
         description: form.description,
         amountReceived: Number(form.amountReceived),
         interestRate: Number(form.interestRate) || 0,
-        nextDue: form.nextDue || new Date().toISOString().slice(0, 10),
-        redemptionDate: form.redemptionDate || '',
+        nextDue,
+        redemptionDate,
       },
     });
-    setForm({ description: '', amountReceived: '', interestRate: '', nextDue: '', redemptionDate: '' });
+    setForm({
+      description: '',
+      amountReceived: '',
+      interestRate: '',
+      nextDue: new Date().toISOString().slice(0, 10),
+      redemptionDate: '',
+    });
   };
 
   return (
@@ -732,13 +777,22 @@ function PawnedTab() {
               placeholder="2"
             />
           </Field>
-          <Field id="pawn-due" label="Next due date">
-            <Input
-              type="date"
-              value={form.nextDue}
-              onChange={e => setForm(f => ({ ...f, nextDue: e.target.value }))}
-            />
-          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field id="pawn-due" label="Next due date">
+              <Input
+                type="date"
+                value={form.nextDue}
+                onChange={e => setForm(f => ({ ...f, nextDue: e.target.value }))}
+              />
+            </Field>
+            <Field id="pawn-redemption" label="Redemption date">
+              <Input
+                type="date"
+                value={form.redemptionDate}
+                onChange={e => setForm(f => ({ ...f, redemptionDate: e.target.value }))}
+              />
+            </Field>
+          </div>
           <Button variant="primary" className="w-full pt-1" onClick={submit}>
             Save Item
           </Button>

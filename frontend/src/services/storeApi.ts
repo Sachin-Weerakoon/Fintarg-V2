@@ -10,8 +10,9 @@ async function list(kind: string) {
 }
 
 export async function loadPersistedData(): Promise<Partial<AppState>> {
-  const [income, expenses, financePayments, loans, pawnedItems, savingsGoals, letters, agreements, companies, businessBranches, employmentProfiles, ownerDraws, medicalExpenses, documents, reminders] = await Promise.all([
+  const [income, expenses, financePayments, loans, pawnedItems, savingsGoals, letters, agreements, companies, businessBranches, employmentProfiles, ownerDraws, medicalExpenses, documents, reminders, budgetData] = await Promise.all([
     list('incomes'), list('expenses'), list('financePayments'), list('loans'), list('pawnedItems'), list('goals'), list('letters'), list('agreements'), list('companies'), list('businessBranches'), list('employmentProfiles'), list('ownerDraws'), list('medicalExpenses'), list('documents'), list('reminders'),
+    apiClient<{ budget: number }>('/api/backend/profile/personal-budget').catch(() => ({ budget: 0 })),
   ]);
 
   return {
@@ -30,6 +31,7 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
     medicalExpenses: medicalExpenses.map(row => ({ id: row._id, date: row.date, type: row.type, amount: row.amountCents / 100, note: row.note })),
     documents: documents.map(row => ({ id: row._id, type: row.type, label: row.label, uploadDate: row.uploadDate, note: row.note, fileName: row.fileName, fileId: row.fileId })),
     reminders: reminders.map(row => ({ id: row._id, type: row.type, relatedId: row.relatedId, label: row.label, dueDate: row.dueDate, channel: row.channel, status: row.status })),
+    personalSpendingBudget: budgetData && 'budget' in budgetData ? budgetData.budget : 0,
   };
 }
 

@@ -17,7 +17,7 @@ const PawnedItemSchema = new Schema<IPawnedItem>({
   amountReceivedCents: { type: Number, required: true, min: 1 },
   interestRatePercent: { type: Number, required: true, min: 0 },
   nextDue: { type: String, required: true },
-  redemptionDate: { type: String, required: true },
+  redemptionDate: { type: String, default: '' },
 }, { timestamps: true });
 
 export const PawnedItemModel = mongoose.models.PawnedItem || mongoose.model<IPawnedItem>('PawnedItem', PawnedItemSchema);

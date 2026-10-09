@@ -191,4 +191,206 @@ describe('Backend API Integration Tests', () => {
       assert.strictEqual(data.error, 'Route not found');
     });
   });
+
+  describe('Stage 2: Data Integrity & Persistence', () => {
+    let authCookie: string;
+
+    before(async () => {
+      const email = `stage2-user-${Date.now()}@fintarg.example.com`;
+      const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Stage2 Test User',
+          email,
+          password: 'Password123!',
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(regRes.status, 201);
+      const cookieHeader = regRes.headers.get('set-cookie');
+      assert.ok(cookieHeader, 'Expected auth cookie to be set');
+      authCookie = cookieHeader;
+    });
+
+    it('persists a loan with startDate and dueDate, and reloads it intact (Gate 2)', async () => {
+      // 1. Create a loan
+      const createRes = await fetch(`${baseUrl}/api/records/loans`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: authCookie,
+        },
+        body: JSON.stringify({
+          lender: 'National Bank',
+          amount: 50000,
+          rate: 12.5,
+          method: 'simple',
+          startDate: '2026-01-01',
+          dueDate: '2026-12-31',
+        }),
+      });
+
+      assert.strictEqual(createRes.status, 201);
+      const created = await createRes.json();
+      assert.strictEqual(created.data.lender, 'National Bank');
+      assert.strictEqual(created.data.principalCents, 5000000);
+      assert.strictEqual(created.data.startDate, '2026-01-01');
+      assert.strictEqual(created.data.dueDate, '2026-12-31');
+
+      // 2. Also test loan with empty dueDate
+      const emptyDueRes = await fetch(`${baseUrl}/api/records/loans`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: authCookie,
+        },
+        body: JSON.stringify({
+          lender: 'Private Friend',
+          amount: 15000,
+          rate: 0,
+          method: 'simple',
+          startDate: '2026-02-01',
+          dueDate: '',
+        }),
+      });
+      assert.strictEqual(emptyDueRes.status, 201);
+
+      // 3. Reload list (GET /api/records/loans)
+      const listRes = await fetch(`${baseUrl}/api/records/loans`, {
+        headers: { Cookie: authCookie },
+      });
+      assert.strictEqual(listRes.status, 200);
+      const listData = await listRes.json();
+      assert.ok(Array.isArray(listData.data));
+      const found = listData.data.find((l: any) => l._id === created.data._id);
+      assert.ok(found, 'Created loan must be present after reload');
+      assert.strictEqual(found.lender, 'National Bank');
+      assert.strictEqual(found.startDate, '2026-01-01');
+      assert.strictEqual(found.dueDate, '2026-12-31');
+    });
+
+    it('persists a pawned item with redemptionDate support', async () => {
+      const createRes = await fetch(`${baseUrl}/api/records/pawnedItems`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: authCookie,
+        },
+        body: JSON.stringify({
+          description: '22K Gold Necklace',
+          amountReceived: 80000,
+          interestRate: 14,
+          nextDue: '2026-04-01',
+          redemptionDate: '2026-09-01',
+        }),
+      });
+      assert.strictEqual(createRes.status, 201);
+      const created = await createRes.json();
+      assert.strictEqual(created.data.description, '22K Gold Necklace');
+      assert.strictEqual(created.data.redemptionDate, '2026-09-01');
+    });
+
+    it('retains savings goal progress and contributions when editing the goal (Gate 2)', async () => {
+      // 1. Create goal
+      const createRes = await fetch(`${baseUrl}/api/records/goals`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: authCookie,
+        },
+        body: JSON.stringify({
+          name: 'House Downpayment',
+          dailyAmount: 500,
+        }),
+      });
+      assert.strictEqual(createRes.status, 201);
+      const goal = (await createRes.json()).data;
+      assert.strictEqual(goal.savedAmountCents, 0);
+      assert.deepStrictEqual(goal.contributions, []);
+
+      // 2. Add contributions
+      const contribRes1 = await fetch(`${baseUrl}/api/records/goals/${goal._id}/contributions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: authCookie,
+        },
+        body: JSON.stringify({
+          amount: 2500,
+          date: '2026-01-10',
+        }),
+      });
+      assert.strictEqual(contribRes1.status, 200);
+
+      const contribRes2 = await fetch(`${baseUrl}/api/records/goals/${goal._id}/contributions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: authCookie,
+        },
+        body: JSON.stringify({
+          amount: 1500,
+          date: '2026-01-20',
+        }),
+      });
+      assert.strictEqual(contribRes2.status, 200);
+      const withContribs = (await contribRes2.json()).data;
+      assert.strictEqual(withContribs.savedAmountCents, 400000); // 4000 * 100
+      assert.strictEqual(withContribs.contributions.length, 2);
+
+      // 3. Edit goal details (e.g. rename, change dailyAmount)
+      const editRes = await fetch(`${baseUrl}/api/records/goals/${goal._id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: authCookie,
+        },
+        body: JSON.stringify({
+          name: 'Dream House Downpayment (Updated)',
+          dailyAmount: 600,
+        }),
+      });
+      assert.strictEqual(editRes.status, 200);
+      const edited = (await editRes.json()).data;
+
+      // Crucial Gate Check: savedAmountCents and contributions must NOT be wiped!
+      assert.strictEqual(edited.name, 'Dream House Downpayment (Updated)');
+      assert.strictEqual(edited.savedAmountCents, 400000, 'savedAmountCents must not be reset to 0 on edit');
+      assert.strictEqual(edited.contributions.length, 2, 'contributions array must not be wiped on edit');
+    });
+
+    it('persists and retrieves personal spending budget via /api/profile/personal-budget', async () => {
+      // 1. Initial GET
+      const getRes1 = await fetch(`${baseUrl}/api/profile/personal-budget`, {
+        headers: { Cookie: authCookie },
+      });
+      assert.strictEqual(getRes1.status, 200);
+      const initialData = await getRes1.json();
+      assert.ok('budget' in initialData);
+
+      // 2. PUT new budget
+      const putRes = await fetch(`${baseUrl}/api/profile/personal-budget`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: authCookie,
+        },
+        body: JSON.stringify({ budget: 75000 }),
+      });
+      assert.strictEqual(putRes.status, 200);
+      const putData = await putRes.json();
+      assert.strictEqual(putData.ok, true);
+      assert.strictEqual(putData.budget, 75000);
+
+      // 3. GET verify persistence
+      const getRes2 = await fetch(`${baseUrl}/api/profile/personal-budget`, {
+        headers: { Cookie: authCookie },
+      });
+      assert.strictEqual(getRes2.status, 200);
+      const updatedData = await getRes2.json();
+      assert.strictEqual(updatedData.budget, 75000);
+    });
+  });
 });
+
