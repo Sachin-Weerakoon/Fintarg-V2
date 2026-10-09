@@ -392,5 +392,308 @@ describe('Backend API Integration Tests', () => {
       assert.strictEqual(updatedData.budget, 75000);
     });
   });
+
+  describe('Stage 3: Backend Data Model (Phase 1)', () => {
+    let userACookie: string;
+    let userBCookie: string;
+    let userABankAccountId: string;
+    let userACardId: string;
+    let userALoanId: string;
+    let userAGoalId: string;
+
+    before(async () => {
+      // 1. Create User A
+      const resA = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'User Alpha',
+          email: `usera-${Date.now()}@fintarg.example.com`,
+          password: 'Password123!',
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(resA.status, 201);
+      userACookie = resA.headers.get('set-cookie')!;
+
+      // 2. Create User B
+      const resB = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'User Beta',
+          email: `userb-${Date.now()}@fintarg.example.com`,
+          password: 'Password123!',
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(resB.status, 201);
+      userBCookie = resB.headers.get('set-cookie')!;
+    });
+
+    it('creates and manages bankAccounts and cards with validation', async () => {
+      // 1. Create bank account
+      const bankRes = await fetch(`${baseUrl}/api/records/bankAccounts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: userACookie },
+        body: JSON.stringify({
+          bankName: 'Commercial Bank',
+          accountNumber: '1098273645',
+          accountName: 'Main Salary Account',
+          branch: 'Kollupitiya',
+          accountType: 'savings',
+          balance: 250000,
+          currency: 'LKR',
+          isDefault: true,
+        }),
+      });
+      assert.strictEqual(bankRes.status, 201);
+      const bankData = (await bankRes.json()).data;
+      assert.strictEqual(bankData.bankName, 'Commercial Bank');
+      assert.strictEqual(bankData.balanceCents, 25000000);
+      userABankAccountId = bankData._id;
+
+      // 2. Create linked card
+      const cardRes = await fetch(`${baseUrl}/api/records/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: userACookie },
+        body: JSON.stringify({
+          bankAccountId: userABankAccountId,
+          cardName: 'Commercial Bank Visa Debit',
+          cardType: 'debit',
+          last4: '9876',
+          expiryMonth: 11,
+          expiryYear: 2028,
+        }),
+      });
+      assert.strictEqual(cardRes.status, 201);
+      const cardData = (await cardRes.json()).data;
+      assert.strictEqual(cardData.cardName, 'Commercial Bank Visa Debit');
+      assert.strictEqual(cardData.last4, '9876');
+      userACardId = cardData._id;
+    });
+
+    it('extends incomes and expenses with paymentMethod and bankAccount, updating balance and transactions', async () => {
+      // 1. Add income linked to bank account
+      const incomeRes = await fetch(`${baseUrl}/api/records/incomes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: userACookie },
+        body: JSON.stringify({
+          source: 'Consulting Gig',
+          type: 'other',
+          amount: 50000,
+          frequency: 'one-time',
+          date: '2026-10-01',
+          paymentMethod: 'bank_transfer',
+          bankAccountId: userABankAccountId,
+        }),
+      });
+      assert.strictEqual(incomeRes.status, 201);
+
+      // 2. Add expense linked to bank account and card
+      const expenseRes = await fetch(`${baseUrl}/api/records/expenses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: userACookie },
+        body: JSON.stringify({
+          date: '2026-10-05',
+          amount: 15000,
+          category: 'Hardware',
+          note: 'Office monitor',
+          paymentMethod: 'card',
+          bankAccountId: userABankAccountId,
+          cardId: userACardId,
+        }),
+      });
+      assert.strictEqual(expenseRes.status, 201);
+
+      // 3. Verify bank account balance: 250,000 + 50,000 - 15,000 = 285,000 (28,500,000 cents)
+      const listBanks = await fetch(`${baseUrl}/api/records/bankAccounts`, {
+        headers: { Cookie: userACookie },
+      });
+      assert.strictEqual(listBanks.status, 200);
+      const accounts = (await listBanks.json()).data;
+      const account = accounts.find((a: any) => a._id === userABankAccountId);
+      assert.ok(account);
+      assert.strictEqual(account.balanceCents, 28500000);
+    });
+
+    it('creates and manages reworked financePayments (cheque and standing orders)', async () => {
+      const chequeRes = await fetch(`${baseUrl}/api/records/financePayments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: userACookie },
+        body: JSON.stringify({
+          lender: 'ABC Leasing',
+          amount: 35000,
+          dueDay: 15,
+          monthsRemaining: 24,
+          paymentKind: 'cheque',
+          chequeNumber: 'CHQ-55019',
+          bankAccountId: userABankAccountId,
+        }),
+      });
+      assert.strictEqual(chequeRes.status, 201);
+      const chequeData = (await chequeRes.json()).data;
+      assert.strictEqual(chequeData.paymentKind, 'cheque');
+      assert.strictEqual(chequeData.chequeNumber, 'CHQ-55019');
+
+      const soRes = await fetch(`${baseUrl}/api/records/financePayments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: userACookie },
+        body: JSON.stringify({
+          lender: 'Insurance Provider',
+          amount: 8500,
+          dueDay: 1,
+          monthsRemaining: 12,
+          paymentKind: 'standing_order',
+          bankAccountId: userABankAccountId,
+        }),
+      });
+      assert.strictEqual(soRes.status, 201);
+      const soData = (await soRes.json()).data;
+      assert.strictEqual(soData.paymentKind, 'standing_order');
+    });
+
+    it('creates loan with reducing balance math and records repayment history', async () => {
+      // 1. Create reducing_balance loan: 100,000 at 12% for 12 months
+      const loanRes = await fetch(`${baseUrl}/api/records/loans`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: userACookie },
+        body: JSON.stringify({
+          lender: 'Commercial Bank Loan',
+          amount: 100000,
+          rate: 12,
+          method: 'reducing_balance',
+          interestBasis: 'annual',
+          tenureMonths: 12,
+          startDate: '2026-01-01',
+          dueDate: '2026-12-31',
+        }),
+      });
+      assert.strictEqual(loanRes.status, 201);
+      const loanData = (await loanRes.json()).data;
+      userALoanId = loanData._id;
+
+      // Check loan math calculations match test vectors:
+      // Monthly EMI: 8,884.88 -> 888488 cents
+      // Total Interest: 6,618.55 -> 661855 cents
+      assert.strictEqual(loanData.monthlyPaymentCents, 888488);
+      assert.strictEqual(loanData.totalInterestCents, 661855);
+
+      // 2. Record repayment with date and note
+      const repayRes = await fetch(`${baseUrl}/api/records/loans/${userALoanId}/repay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: userACookie },
+        body: JSON.stringify({
+          amount: 8884.88,
+          date: '2026-02-01',
+          note: 'Installment #1',
+        }),
+      });
+      assert.strictEqual(repayRes.status, 200);
+      const updatedLoan = (await repayRes.json()).data;
+      assert.strictEqual(updatedLoan.balanceCents, 10000000 - 888488);
+      assert.strictEqual(updatedLoan.repayments.length, 1);
+      assert.strictEqual(updatedLoan.repayments[0].note, 'Installment #1');
+      assert.strictEqual(updatedLoan.repayments[0].amountCents, 888488);
+    });
+
+    it('creates reworked goals with targetAmount and targetDate and adds contributions', async () => {
+      const goalRes = await fetch(`${baseUrl}/api/records/goals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: userACookie },
+        body: JSON.stringify({
+          name: 'Home Renovation',
+          targetAmount: 500000,
+          targetDate: '2027-06-30',
+        }),
+      });
+      assert.strictEqual(goalRes.status, 201);
+      const goalData = (await goalRes.json()).data;
+      userAGoalId = goalData._id;
+      assert.strictEqual(goalData.targetAmountCents, 50000000);
+      assert.strictEqual(goalData.endDate, '2027-06-30');
+
+      // Add contribution
+      const contribRes = await fetch(`${baseUrl}/api/records/goals/${userAGoalId}/contributions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: userACookie },
+        body: JSON.stringify({
+          amount: 25000,
+          date: '2026-10-09',
+          note: 'Q3 savings',
+        }),
+      });
+      assert.strictEqual(contribRes.status, 200);
+      const updatedGoal = (await contribRes.json()).data;
+      assert.strictEqual(updatedGoal.savedAmountCents, 2500000);
+      assert.strictEqual(updatedGoal.contributions[0].note, 'Q3 savings');
+    });
+
+    it('provides transactions-history endpoint with filters and running totals', async () => {
+      // 1. Fetch via /api/transactions/history
+      const historyRes = await fetch(`${baseUrl}/api/transactions/history`, {
+        headers: { Cookie: userACookie },
+      });
+      assert.strictEqual(historyRes.status, 200);
+      const historyData = await historyRes.json();
+      assert.ok(Array.isArray(historyData.transactions));
+      assert.ok(historyData.transactions.length >= 2); // income + expense created earlier
+      assert.ok(historyData.summary);
+      assert.strictEqual(historyData.summary.totalIncomeCents, 5000000);
+      assert.strictEqual(historyData.summary.totalExpenseCents, 1500000);
+      assert.strictEqual(historyData.summary.netCents, 3500000);
+
+      // 2. Fetch with filter by bankAccountId
+      const filterRes = await fetch(`${baseUrl}/api/transactions/history?bankAccountId=${userABankAccountId}`, {
+        headers: { Cookie: userACookie },
+      });
+      assert.strictEqual(filterRes.status, 200);
+      const filteredData = await filterRes.json();
+      assert.strictEqual(filteredData.transactions.length, 2);
+    });
+
+    it('enforces multi-tenant data isolation: User B cannot view or mutate User A data', async () => {
+      // 1. User B lists bank accounts -> User A bank account not visible
+      const bAccountsRes = await fetch(`${baseUrl}/api/records/bankAccounts`, {
+        headers: { Cookie: userBCookie },
+      });
+      assert.strictEqual(bAccountsRes.status, 200);
+      const bAccounts = (await bAccountsRes.json()).data;
+      assert.strictEqual(bAccounts.length, 0);
+
+      // 2. User B tries to update User A loan -> 404
+      const bPatchLoanRes = await fetch(`${baseUrl}/api/records/loans/${userALoanId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Cookie: userBCookie },
+        body: JSON.stringify({ lender: 'Hacked Lender' }),
+      });
+      assert.strictEqual(bPatchLoanRes.status, 404);
+
+      // 3. User B tries to delete User A loan -> 404
+      const bDeleteLoanRes = await fetch(`${baseUrl}/api/records/loans/${userALoanId}`, {
+        method: 'DELETE',
+        headers: { Cookie: userBCookie },
+      });
+      assert.strictEqual(bDeleteLoanRes.status, 404);
+
+      // 4. User B tries to contribute to User A goal -> 404
+      const bContribGoalRes = await fetch(`${baseUrl}/api/records/goals/${userAGoalId}/contributions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: userBCookie },
+        body: JSON.stringify({ amount: 1000, date: '2026-10-10' }),
+      });
+      assert.strictEqual(bContribGoalRes.status, 404);
+
+      // 5. User B transactions history has 0 records
+      const bHistoryRes = await fetch(`${baseUrl}/api/transactions/history`, {
+        headers: { Cookie: userBCookie },
+      });
+      assert.strictEqual(bHistoryRes.status, 200);
+      const bHistory = await bHistoryRes.json();
+      assert.strictEqual(bHistory.transactions.length, 0);
+      assert.strictEqual(bHistory.summary.totalIncomeCents, 0);
+      assert.strictEqual(bHistory.summary.totalExpenseCents, 0);
+    });
+  });
 });
 

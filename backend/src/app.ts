@@ -17,6 +17,7 @@ import { fileRoutes } from './routes/fileRoutes';
 import { healthRoutes } from './routes/healthRoutes';
 import { profileRoutes } from './routes/profileRoutes';
 import { recordRoutes } from './routes/recordRoutes';
+import { transactionHistory } from './controllers/recordController';
 
 export const app = express();
 
@@ -174,11 +175,13 @@ app.use('/api/auth/reset-password', authRateLimiter, ensureDatabase);
 app.use('/api/auth/me', requireAuth, ensureDatabase);
 app.use('/api/profile', ensureDatabase);
 app.use('/api/records', ensureDatabase);
+app.use('/api/transactions', ensureDatabase);
 app.use('/api/files', ensureDatabase);
 app.use('/api/cron', ensureDatabase);
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/records', recordRoutes);
+app.use('/api/transactions/history', requireAuth, transactionHistory);
 app.use('/api/files', fileRoutes);
 app.use('/api/cron', cronRoutes);
 app.use((_request, response) => response.status(404).json({ error: 'Route not found' }));
