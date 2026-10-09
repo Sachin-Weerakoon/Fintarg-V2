@@ -24,6 +24,7 @@ export interface UserProfile {
   bankBranch: string;
   accountName: string;
   accountNumber: string;
+  profilePictureFileId?: string;
 }
 
 export interface Contact {

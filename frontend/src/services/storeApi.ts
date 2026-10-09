@@ -291,6 +291,8 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
 
     case 'ADD_FINANCE_PAYMENT':
       return create('/api/backend/records/financePayments', action.entry);
+    case 'UPDATE_FINANCE_PAYMENT':
+      return void (await send(`/api/backend/records/financePayments/${id}`, 'PATCH', action.entry));
     case 'DELETE_FINANCE_PAYMENT':
       return void (await send(`/api/backend/records/financePayments/${id}`, 'DELETE'));
 

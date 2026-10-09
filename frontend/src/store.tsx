@@ -148,6 +148,7 @@ type Action =
   | { type: 'UPDATE_EXPENSE'; entry: ExpenseEntry }
   | { type: 'DELETE_EXPENSE'; id: string }
   | { type: 'ADD_FINANCE_PAYMENT'; entry: FinancePayment }
+  | { type: 'UPDATE_FINANCE_PAYMENT'; entry: FinancePayment }
   | { type: 'DELETE_FINANCE_PAYMENT'; id: string }
   | { type: 'ADD_BANK_ACCOUNT'; entry: BankAccount }
   | { type: 'UPDATE_BANK_ACCOUNT'; entry: BankAccount }
@@ -159,15 +160,15 @@ type Action =
   | { type: 'DELETE_TRANSACTION'; id: string }
   | { type: 'ADD_LOAN'; entry: Loan }
   | { type: 'UPDATE_LOAN'; entry: Loan }
-  | { type: 'RECORD_LOAN_REPAYMENT'; id: string; amount: number }
+  | { type: 'RECORD_LOAN_REPAYMENT'; id: string; amount: number; note?: string; date?: string }
   | { type: 'DELETE_LOAN'; id: string }
   | { type: 'ADD_PAWNED'; entry: PawnedItem }
   | { type: 'RECORD_PAWN_PAYMENT'; id: string }
   | { type: 'DELETE_PAWNED'; id: string }
   | { type: 'ADD_GOAL'; entry: SavingsGoal }
-  | { type: 'UPDATE_GOAL'; id: string; dailyAmount: number; monthlyTarget: number }
+  | { type: 'UPDATE_GOAL'; id: string; dailyAmount?: number; monthlyTarget?: number; targetAmount?: number; targetDate?: string; savedAmount?: number }
   | { type: 'DELETE_GOAL'; id: string }
-  | { type: 'ADD_SAVING_CONTRIBUTION'; goalId: string; amount: number; date: string }
+  | { type: 'ADD_SAVING_CONTRIBUTION'; goalId: string; amount: number; date: string; note?: string }
   | { type: 'SET_PERSONAL_SPENDING_BUDGET'; budget: number }
   | { type: 'ADD_LETTER'; entry: Letter }
   | { type: 'DELETE_LETTER'; id: string }
@@ -216,6 +217,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'UPDATE_EXPENSE': return { ...state, expenses: state.expenses.map(e => e.id === action.entry.id ? action.entry : e) };
     case 'DELETE_EXPENSE': return { ...state, expenses: state.expenses.filter(e => e.id !== action.id) };
     case 'ADD_FINANCE_PAYMENT': return { ...state, financePayments: [...state.financePayments, action.entry] };
+    case 'UPDATE_FINANCE_PAYMENT': return { ...state, financePayments: state.financePayments.map(f => f.id === action.entry.id ? action.entry : f) };
     case 'DELETE_FINANCE_PAYMENT': return { ...state, financePayments: state.financePayments.filter(f => f.id !== action.id) };
     case 'ADD_BANK_ACCOUNT': return { ...state, bankAccounts: [...state.bankAccounts, action.entry] };
     case 'UPDATE_BANK_ACCOUNT': return { ...state, bankAccounts: state.bankAccounts.map(b => b.id === action.entry.id ? action.entry : b) };
@@ -229,7 +231,14 @@ function reducer(state: AppState, action: Action): AppState {
     case 'UPDATE_LOAN': return { ...state, loans: state.loans.map(l => l.id === action.entry.id ? action.entry : l) };
     case 'RECORD_LOAN_REPAYMENT': return {
       ...state,
-      loans: state.loans.map(l => l.id === action.id ? { ...l, balance: Math.max(0, l.balance - action.amount) } : l),
+      loans: state.loans.map(l => l.id === action.id ? {
+        ...l,
+        balance: Math.max(0, l.balance - action.amount),
+        repayments: [
+          ...(l.repayments || []),
+          { date: action.date || new Date().toISOString().slice(0, 10), amount: action.amount, note: action.note },
+        ],
+      } : l),
     };
     case 'DELETE_LOAN': return { ...state, loans: state.loans.filter(l => l.id !== action.id) };
     case 'ADD_PAWNED': return { ...state, pawnedItems: [...state.pawnedItems, action.entry] };
@@ -249,13 +258,24 @@ function reducer(state: AppState, action: Action): AppState {
     case 'UPDATE_GOAL': return {
       ...state,
       savingsGoals: state.savingsGoals.map(g => g.id === action.id
-        ? { ...g, dailyAmount: action.dailyAmount, monthlyTarget: action.monthlyTarget } : g),
+        ? {
+            ...g,
+            dailyAmount: action.dailyAmount !== undefined ? action.dailyAmount : g.dailyAmount,
+            monthlyTarget: action.monthlyTarget !== undefined ? action.monthlyTarget : g.monthlyTarget,
+            targetAmount: action.targetAmount !== undefined ? action.targetAmount : g.targetAmount,
+            targetDate: action.targetDate !== undefined ? action.targetDate : g.targetDate,
+            savedAmount: action.savedAmount !== undefined ? action.savedAmount : g.savedAmount,
+          } : g),
     };
     case 'DELETE_GOAL': return { ...state, savingsGoals: state.savingsGoals.filter(g => g.id !== action.id) };
     case 'ADD_SAVING_CONTRIBUTION': return {
       ...state,
       savingsGoals: state.savingsGoals.map(g => g.id === action.goalId
-        ? { ...g, savedAmount: g.savedAmount + action.amount, contributions: [...g.contributions, { date: action.date, amount: action.amount }] }
+        ? {
+            ...g,
+            savedAmount: g.savedAmount + action.amount,
+            contributions: [...(g.contributions || []), { date: action.date, amount: action.amount, note: action.note }],
+          }
         : g),
     };
     case 'SET_PERSONAL_SPENDING_BUDGET': return { ...state, personalSpendingBudget: action.budget };

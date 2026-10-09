@@ -136,11 +136,8 @@ export default function AppLayout({
           >
             <div className="px-5 py-6">
               <div className="flex items-center gap-3">
-                <div
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-base shadow-md"
-                  style={{ background: 'linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700))' }}
-                >
-                  <Icon name="bolt" size={20} className="text-white" />
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/10 p-1.5 shadow-md flex-shrink-0 border border-white/10">
+                  <img src="/brand/fintarg-logo.svg" alt="Fintarg Logo" className="w-6 h-6 object-contain" />
                 </div>
                 <div>
                   <div className="text-white font-bold text-lg leading-tight tracking-tight flex items-center gap-2">
@@ -179,10 +176,18 @@ export default function AppLayout({
             <div className="px-4 pb-5 pt-3 border-t border-white/5">
               <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] transition-colors">
                 <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-sm flex-shrink-0"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-sm flex-shrink-0 overflow-hidden"
                   style={{ background: 'linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700))' }}
                 >
-                  {user.name ? user.name[0].toUpperCase() : 'U'}
+                  {user.profile?.profilePictureFileId ? (
+                    <img
+                      src={`/api/files/${encodeURIComponent(user.profile.profilePictureFileId)}`}
+                      alt={user.name || 'User avatar'}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    user.name ? user.name[0].toUpperCase() : 'U'
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-white truncate">{user.name || 'User'}</div>
@@ -191,6 +196,18 @@ export default function AppLayout({
                 <Link href="/settings" className="text-chrome-text hover:text-white transition-colors" title="Settings" aria-label="Settings">
                   <Icon name="settings" size={16} />
                 </Link>
+              </div>
+              <div className="pt-2 px-1 flex items-center justify-between text-[11px] text-chrome-text">
+                <a
+                  href="https://raxwo.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-white transition-colors flex items-center gap-1 opacity-75 hover:opacity-100"
+                >
+                  <span>By</span>
+                  <span className="font-semibold text-primary-400">Raxwo</span>
+                </a>
+                <span className="text-[10px] text-chrome-text/50">v2.0</span>
               </div>
             </div>
           </aside>
@@ -214,12 +231,20 @@ export default function AppLayout({
               <div className="flex items-center gap-3">
                 <Link
                   href="/settings"
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm transition-transform hover:scale-105"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm transition-transform hover:scale-105 overflow-hidden"
                   style={{ background: 'linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700))' }}
                   title="Settings"
                   aria-label="Settings"
                 >
-                  {user.name ? user.name[0].toUpperCase() : 'U'}
+                  {user.profile?.profilePictureFileId ? (
+                    <img
+                      src={`/api/files/${encodeURIComponent(user.profile.profilePictureFileId)}`}
+                      alt={user.name || 'User avatar'}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    user.name ? user.name[0].toUpperCase() : 'U'
+                  )}
                 </Link>
                 <button
                   type="button"
@@ -245,17 +270,28 @@ export default function AppLayout({
             className="mobile-topbar flex items-center justify-between px-4 py-3 sticky top-0 z-10 no-print"
             style={{ background: 'var(--color-chrome-900)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
           >
-            <span className="font-bold text-white text-base">Fintarg</span>
+            <div className="flex items-center gap-2">
+              <img src="/brand/fintarg-logo.svg" alt="Fintarg logo" className="w-6 h-6 object-contain" />
+              <span className="font-bold text-white text-base tracking-tight">Fintarg</span>
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold px-2 py-1 rounded-full bg-white/10 text-white">
                 {modeLabel}
               </span>
               <Link
                 href="/settings"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm bg-white/20"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm bg-white/20 overflow-hidden"
                 aria-label="Settings"
               >
-                {user.name ? user.name[0].toUpperCase() : 'U'}
+                {user.profile?.profilePictureFileId ? (
+                  <img
+                    src={`/api/files/${encodeURIComponent(user.profile.profilePictureFileId)}`}
+                    alt={user.name || 'User avatar'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  user.name ? user.name[0].toUpperCase() : 'U'
+                )}
               </Link>
               <button
                 type="button"
