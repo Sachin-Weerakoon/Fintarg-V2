@@ -20,26 +20,26 @@ export default function Settings() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <div className="pb-2 border-b border-slate-200/80 dark:border-slate-800">
-        <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Account Settings</h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Customize your appearance, profile parameters, document vault, and notifications.</p>
+      <div className="pb-2 border-b border-border">
+        <h2 className="text-xl font-bold tracking-tight text-text">Account Settings</h2>
+        <p className="text-xs text-muted mt-0.5">Customize your appearance, profile parameters, document vault, and notifications.</p>
       </div>
 
       <div className="grid md:grid-cols-4 gap-6">
         {/* Settings nav */}
         <div className="md:col-span-1">
-          <div className="card p-2 space-y-1 border-slate-200/80 dark:border-slate-800">
+          <div className="card p-2 space-y-1 border-border">
             {SETTING_TABS.map(t => (
               <button
                 key={t.id}
                 className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                   tab === t.id
-                    ? 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 shadow-sm border border-cyan-200/60 dark:border-cyan-800/40'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                    ? 'bg-primary-tint text-primary-text shadow-sm border border-primary-500/30'
+                    : 'text-text-2 hover:text-text hover:bg-surface-hover'
                 }`}
                 onClick={() => setTab(t.id)}
               >
-                <span className={tab === t.id ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-400'}>{t.icon}</span>
+                <span className={tab === t.id ? 'text-primary-text' : 'text-muted'}>{t.icon}</span>
                 <span>{t.label}</span>
               </button>
             ))}
@@ -227,7 +227,7 @@ function AppearanceTab() {
           <button
             onClick={() => update({ darkMode: !profile.darkMode })}
             className="relative w-12 h-6 rounded-full transition-colors"
-            style={{ background: profile.darkMode ? 'var(--color-primary)' : '#d1d5db' }}
+            style={{ background: profile.darkMode ? 'var(--color-primary)' : 'var(--color-border-input)' }}
           >
             <span
               className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform"
@@ -303,7 +303,7 @@ function ProfileTab() {
         <div className="md:col-span-2"><label className="form-label">Address</label><input className="form-input" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="No. 1, Main Street, Colombo" /></div>
         <div><label className="form-label">NIC number</label><input className="form-input" value={form.nicNumber} onChange={e => setForm(f => ({ ...f, nicNumber: e.target.value }))} placeholder="200012345678" /></div>
         <div><label className="form-label">Portfolio link</label><input className="form-input" value={form.portfolioLink} onChange={e => setForm(f => ({ ...f, portfolioLink: e.target.value }))} /></div>
-        <div className="border-t pt-4 md:col-span-2" style={{ borderColor: '#e0e7ef' }}>
+        <div className="border-t border-border pt-4 md:col-span-2">
           <div className="font-semibold text-sm mb-3" style={{ color: 'var(--color-text)' }}>Bank details (for letters)</div>
           <div className="grid md:grid-cols-2 gap-3">
             <div><label className="form-label">Bank name</label><input className="form-input" value={form.bankName} onChange={e => setForm(f => ({ ...f, bankName: e.target.value }))} /></div>
@@ -356,7 +356,7 @@ function ContactsTab() {
         </div>
       )}
 
-      <div className="border-t pt-4" style={{ borderColor: '#e0e7ef' }}>
+      <div className="border-t border-border pt-4">
         <div className="font-semibold text-sm mb-3" style={{ color: 'var(--color-text)' }}>Add contact</div>
         {error && <p className="text-xs mb-2" style={{ color: 'var(--color-danger)' }}>{error}</p>}
         <div className="grid md:grid-cols-3 gap-3">
@@ -430,7 +430,7 @@ function DocumentsTab() {
         </div>
       )}
 
-      <div className="border-t pt-4" style={{ borderColor: '#e0e7ef' }}>
+      <div className="border-t border-border pt-4">
         <div className="font-semibold text-sm mb-3" style={{ color: 'var(--color-text)' }}>Upload document</div>
         <div className="grid md:grid-cols-3 gap-3 mb-3">
           <div>
@@ -521,7 +521,7 @@ function PlanTab() {
           </button>
         ))}
       </div>
-      <div className="mt-5 pt-5 border-t" style={{ borderColor: '#e0e7ef' }}>
+      <div className="mt-5 pt-5 border-t border-border">
         <div className="font-semibold text-sm mb-2" style={{ color: 'var(--color-danger)' }}>Danger zone</div>
         <button className="btn-danger text-sm" onClick={() => { if (confirm('Delete your account and all data? This cannot be undone.')) alert('Account deletion requested.'); }}>Delete my account</button>
       </div>

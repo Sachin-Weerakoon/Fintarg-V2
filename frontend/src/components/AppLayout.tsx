@@ -149,8 +149,8 @@ export default function AppLayout({
                       v2
                     </span>
                   </div>
-                  <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-chrome-text">
+                    <span className="w-1.5 h-1.5 rounded-full bg-success-solid animate-pulse" />
                     <span>{modeLabel}</span>
                   </div>
                 </div>
@@ -186,9 +186,9 @@ export default function AppLayout({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-white truncate">{user.name || 'User'}</div>
-                  <div className="text-[11px] text-slate-400 truncate">{user.email || 'Free tier'}</div>
+                  <div className="text-[11px] text-chrome-text truncate">{user.email || 'Free tier'}</div>
                 </div>
-                <Link href="/settings" className="text-slate-400 hover:text-white transition-colors" title="Settings" aria-label="Settings">
+                <Link href="/settings" className="text-chrome-text hover:text-white transition-colors" title="Settings" aria-label="Settings">
                   <Icon name="settings" size={16} />
                 </Link>
               </div>
