@@ -197,6 +197,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html:has(.dark-mode),
+body:has(.dark-mode) {
+  background-color: #0B1220;
+  color-scheme: dark;
+}
+
 /* Accessible focus ring */
 :focus-visible {
   outline: 2px solid var(--color-primary-600);

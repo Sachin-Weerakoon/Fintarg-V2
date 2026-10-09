@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { logout } from '@/actions/logout';
 import { AppProvider } from '@/store';
+import { deriveBrand, validateCustomOverrides } from '@/lib/theme';
 
 const navItems = [
   { href: '/', label: 'Home', page: 'dashboard' },
@@ -54,7 +55,15 @@ export default function AppLayout({ user, children }: { user: { name: string; em
   const primary = user.profile?.themeColor || '#0FA3B1';
   const modeLabel = user.workMode === 'both' ? 'Job + Business' : user.workMode === 'business' ? 'Business' : 'Salary';
   const textSizeClass = `text-size-${user.profile?.textSize || 'medium'}`;
-  const darkClass = user.profile?.darkMode ? 'dark-mode' : '';
+  const isDark = Boolean(user.profile?.darkMode);
+  const darkClass = isDark ? 'dark-mode' : '';
+
+  const brandVars = deriveBrand(primary, isDark);
+  const { validOverrides } = !isDark && user.profile ? validateCustomOverrides(user.profile) : { validOverrides: {} };
+  const layoutStyle = {
+    ...brandVars,
+    ...validOverrides,
+  } as React.CSSProperties;
 
   const mobileBottomItems = user.workMode === 'salary' ? salaryBottomItems : businessBottomItems;
   const isMorePage = !mobileBottomItems.some(item => item.page === pathname.replace('/', ''));
@@ -73,7 +82,7 @@ export default function AppLayout({ user, children }: { user: { name: string; em
 
   return (
     <AppProvider initialProfile={user.profile || {}}>
-      <div className={`min-h-screen flex flex-col ${darkClass} ${textSizeClass}`} style={{ '--color-primary': primary } as React.CSSProperties}>
+      <div className={`min-h-screen flex flex-col ${darkClass} ${textSizeClass}`} style={layoutStyle}>
       {/* Desktop layout */}
       <div className="hidden md:flex min-h-screen">
         <aside className="flex-shrink-0 flex flex-col" style={{ width: 240, minHeight: '100vh', background: 'linear-gradient(180deg, #0e1c33 0%, #081120 100%)', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto', borderRight: '1px solid rgba(255,255,255,0.07)' }}>
