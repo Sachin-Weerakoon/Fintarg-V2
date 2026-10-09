@@ -326,9 +326,7 @@ export function useApp() {
   return ctx;
 }
 
-export function formatRs(amount: number): string {
-  return 'Rs. ' + Math.abs(Math.round(amount)).toLocaleString('en-LK');
-}
+export { formatRs } from '@/utils/formatCurrency';
 
 export function calcMonthlyIncome(income: AppState['income'], month: string): number {
   return income.reduce((sum, i) => {

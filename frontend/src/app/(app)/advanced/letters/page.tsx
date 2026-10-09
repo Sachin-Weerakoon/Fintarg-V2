@@ -3,6 +3,18 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useApp } from '@/store';
+import { PageContainer } from '@/components/ui/PageContainer';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Field } from '@/components/ui/Field';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
+import { Icon } from '@/components/ui/Icon';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 type Template = 'bank' | 'offer' | 'general';
 
@@ -95,6 +107,7 @@ export default function LettersClient() {
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState('');
   const [saved, setSaved] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const selectedCompany = state.companies.find(c => c.id === selectedCompanyId) || null;
 
@@ -133,85 +146,128 @@ export default function LettersClient() {
   const latestId = state.letters.length > 0 ? state.letters[state.letters.length - 1].id : null;
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <PageContainer width="narrow">
+      <PageHeader
+        title="Formal Letter Generator"
+        description="Draft, customize, and export Sri Lankan legal and banking correspondence."
+        actions={
+          <Link href="/advanced">
+            <Button variant="secondary" size="sm" iconLeft={<Icon name="arrow-left" size={14} />}>
+              Advanced Hub
+            </Button>
+          </Link>
+        }
+      />
+
       <div className="grid md:grid-cols-5 gap-6">
         {/* Form panel */}
-        <div className="md:col-span-2">
+        <div className="md:col-span-2 space-y-4">
           {/* Mode toggle */}
           {isBusiness && (
-            <div className="flex gap-2 mb-5">
-              <button className={`tab-btn${mode === 'personal' ? ' active' : ''}`} onClick={() => setMode('personal')}>Personal</button>
-              <button className={`tab-btn${mode === 'business' ? ' active' : ''}`} onClick={() => setMode('business')}>Business</button>
-            </div>
+            <SegmentedTabs
+              options={[
+                { id: 'personal', label: 'Personal' },
+                { id: 'business', label: 'Business' },
+              ]}
+              value={mode}
+              onChange={v => setMode(v as any)}
+            />
           )}
 
           {missingFields.length > 0 && (
-            <div className="alert-warning mb-4 text-xs">
-              ⚠ Missing: <strong>{missingFields.join(', ')}</strong>.{' '}
-              <button style={{ color: 'var(--color-primary)', fontWeight: 600 }}
-                onClick={() => dispatch({ type: 'SET_PAGE', page: 'settings' })}>
-                Go to Settings →
-              </button>
+            <div className="p-3.5 rounded-xl border border-warning-solid/30 bg-warning-tint/30 text-warning-text text-xs">
+              <span className="font-semibold">Notice:</span> Missing {missingFields.join(', ')} in your profile.{' '}
+              <Link href="/settings" className="font-semibold underline text-primary-text">
+                Settings →
+              </Link>
             </div>
           )}
 
-          <div className="card space-y-3">
-            <div>
-              <label className="form-label">Template</label>
-              <select className="form-input" value={template} onChange={e => setTemplate(e.target.value as Template)}>
+          <Card className="p-5 space-y-3.5">
+            <Field id="letter-template" label="Template">
+              <Select value={template} onChange={e => setTemplate(e.target.value as Template)}>
                 <option value="bank">Bank letter</option>
                 <option value="offer">Offer letter</option>
                 <option value="general">General letter</option>
-              </select>
-            </div>
+              </Select>
+            </Field>
 
             {mode === 'business' && state.companies.length > 0 && (
-              <div>
-                <label className="form-label">Company</label>
-                <select className="form-input" value={selectedCompanyId} onChange={e => setSelectedCompanyId(e.target.value)}>
-                  {state.companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
+              <Field id="letter-company" label="Company">
+                <Select value={selectedCompanyId} onChange={e => setSelectedCompanyId(e.target.value)}>
+                  {state.companies.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </Select>
+              </Field>
             )}
 
-            <div>
-              <label className="form-label">Addressed to</label>
-              <input className="form-input" value={form.addressedTo} onChange={e => setForm(f => ({ ...f, addressedTo: e.target.value }))} placeholder="The Manager, Bank" />
-            </div>
+            <Field id="letter-addressee" label="Addressed to">
+              <Input
+                value={form.addressedTo}
+                onChange={e => setForm(f => ({ ...f, addressedTo: e.target.value }))}
+                placeholder="The Manager, Bank"
+              />
+            </Field>
 
             {template === 'bank' && (
-              <div>
-                <label className="form-label">Account number</label>
-                <input className="form-input" value={form.accountNumber || profile.accountNumber} onChange={e => setForm(f => ({ ...f, accountNumber: e.target.value }))} placeholder="0012 3456 789" />
-              </div>
+              <Field id="letter-account" label="Account number">
+                <Input
+                  value={form.accountNumber || profile.accountNumber}
+                  onChange={e => setForm(f => ({ ...f, accountNumber: e.target.value }))}
+                  placeholder="0012 3456 789"
+                />
+              </Field>
             )}
 
-            <div>
-              <label className="form-label">Purpose / Subject</label>
-              <input className="form-input" value={form.purpose} onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))} placeholder="Loan settlement request" />
-            </div>
+            <Field id="letter-purpose" label="Purpose / Subject">
+              <Input
+                value={form.purpose}
+                onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))}
+                placeholder="Loan settlement request"
+              />
+            </Field>
 
-            <p className="text-xs" style={{ color: 'var(--color-muted)' }}>Details are pre-filled from your {mode === 'business' ? 'company' : 'profile'}.</p>
-            <button className="btn-primary w-full" onClick={generate}>Generate letter</button>
-          </div>
+            <p className="text-xs text-muted">
+              Sender details are auto-populated from your {mode === 'business' ? 'company' : 'profile'}.
+            </p>
+
+            <Button variant="primary" className="w-full pt-1" onClick={generate}>
+              Generate Letter
+            </Button>
+          </Card>
 
           {/* Letter history */}
           {state.letters.length > 0 && (
-            <div className="mt-5">
-              <div className="font-semibold text-xs mb-2" style={{ color: 'var(--color-muted)' }}>Letter history</div>
+            <div>
+              <div className="font-semibold text-xs mb-2 text-muted">Letter history</div>
               <div className="space-y-1.5">
                 {state.letters.slice().reverse().map(l => (
-                  <div key={l.id} className="card py-2 px-3 flex items-center justify-between gap-2">
+                  <Card key={l.id} className="py-2.5 px-3 flex items-center justify-between gap-2">
                     <div
-                      className="flex-1 cursor-pointer"
-                      onClick={() => { setGenerated(l.body); setEditBody(l.body); setEditing(false); setSaved(true); }}
+                      className="flex-1 cursor-pointer min-w-0"
+                      onClick={() => {
+                        setGenerated(l.body);
+                        setEditBody(l.body);
+                        setEditing(false);
+                        setSaved(true);
+                      }}
                     >
-                      <div className="text-xs font-medium" style={{ color: 'var(--color-text)' }}>{l.type} · {l.mode}</div>
-                      <div className="text-xs" style={{ color: 'var(--color-muted)' }}>{l.date} · {l.addressedTo || '—'}</div>
+                      <div className="text-xs font-semibold text-text truncate">
+                        {l.type.toUpperCase()} · {l.mode}
+                      </div>
+                      <div className="text-xs text-muted truncate">{l.date} · {l.addressedTo || '—'}</div>
                     </div>
-                    <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }}
-                      onClick={() => { if (confirm('Delete letter?')) dispatch({ type: 'DELETE_LETTER', id: l.id }); }}>✕</button>
-                  </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-danger-text hover:text-danger-text !p-1.5"
+                      onClick={() => setDeleteConfirmId(l.id)}
+                      aria-label="Delete letter"
+                    >
+                      <Icon name="trash" size={14} />
+                    </Button>
+                  </Card>
                 ))}
               </div>
             </div>
@@ -221,55 +277,81 @@ export default function LettersClient() {
         {/* Preview panel */}
         <div className="md:col-span-3">
           {generated ? (
-            <div className="card flex flex-col" style={{ minHeight: 400 }}>
+            <Card className="p-5 flex flex-col min-h-[400px]">
               <div className="flex items-center justify-between mb-4 flex-wrap gap-2 no-print">
-                <div className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>
-                  Letter preview
-                  {saved && <span className="ml-2 badge-success">Saved</span>}
+                <div className="font-semibold text-sm text-text flex items-center gap-2">
+                  <span>Letter Preview</span>
+                  {saved && <Badge tone="success" size="sm">Saved</Badge>}
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <button className="btn-ghost text-xs" onClick={() => setEditing(v => !v)}>
-                    {editing ? '👁 Preview' : '✎ Edit text'}
-                  </button>
-                  <button className="btn-secondary text-xs" style={{ fontSize: 13, padding: '6px 14px' }} onClick={save} disabled={saved}>
-                    {saved ? 'Saved ✓' : 'Save'}
-                  </button>
-                  <Link
-                    href={`/print/letter/${latestId || 'new'}`}
-                    className="btn-primary text-xs no-print"
-                    style={{ fontSize: 13, padding: '6px 14px', textDecoration: 'none' }}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditing(v => !v)}
+                    iconLeft={<Icon name={editing ? 'check' : 'edit'} size={14} />}
                   >
-                    Download PDF
+                    {editing ? 'Preview' : 'Edit text'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={save}
+                    disabled={saved}
+                  >
+                    {saved ? 'Saved ✓' : 'Save'}
+                  </Button>
+                  <Link href={`/print/letter/${latestId || 'new'}`} className="no-print">
+                    <Button variant="primary" size="sm" iconLeft={<Icon name="download" size={14} />}>
+                      Download PDF
+                    </Button>
                   </Link>
                 </div>
               </div>
 
               {editing ? (
-                <textarea
-                  className="form-input flex-1 font-mono text-sm"
-                  style={{ resize: 'vertical', minHeight: 360 }}
+                <Textarea
+                  className="font-mono text-xs flex-1 !min-h-[360px]"
                   value={editBody}
                   onChange={e => setEditBody(e.target.value)}
                 />
               ) : (
                 <div
-                  className="flex-1 rounded-lg p-6 text-sm whitespace-pre-wrap leading-relaxed"
-                  style={{ background: '#fafafa', border: '1px solid var(--color-border)', color: 'var(--color-text)', minHeight: 360, fontFamily: 'inherit' }}
+                  className="flex-1 rounded-xl p-6 text-xs whitespace-pre-wrap leading-relaxed border border-border bg-surface text-text font-mono"
+                  style={{ minHeight: 360 }}
                 >
                   {editing ? editBody : generated}
                 </div>
               )}
-            </div>
+            </Card>
           ) : (
-            <div className="card flex items-center justify-center" style={{ minHeight: 300 }}>
-              <div className="text-center">
-                <div className="text-4xl mb-3">✉</div>
-                <p className="text-sm" style={{ color: 'var(--color-muted)' }}>Fill the form and click "Generate letter"</p>
+            <Card className="flex items-center justify-center min-h-[360px] p-8 text-center">
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-surface-hover border border-border flex items-center justify-center text-muted mx-auto">
+                  <Icon name="file-text" size={24} />
+                </div>
+                <h4 className="font-semibold text-sm text-text">No letter generated</h4>
+                <p className="text-xs text-muted max-w-xs">
+                  Fill in the recipient and purpose on the left, then click &ldquo;Generate Letter&rdquo;.
+                </p>
               </div>
-            </div>
+            </Card>
           )}
         </div>
       </div>
-    </div>
+
+      {deleteConfirmId && (
+        <ConfirmDialog
+          title="Delete Letter"
+          message="Are you sure you want to delete this letter record from your history?"
+          confirmLabel="Delete"
+          tone="danger"
+          onConfirm={() => {
+            dispatch({ type: 'DELETE_LETTER', id: deleteConfirmId });
+            setDeleteConfirmId(null);
+          }}
+          onCancel={() => setDeleteConfirmId(null)}
+        />
+      )}
+    </PageContainer>
   );
 }

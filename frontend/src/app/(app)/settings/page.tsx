@@ -1,11 +1,10 @@
 'use client';
 import { useState, useRef } from 'react';
 import { useApp } from '@/store';
+import { THEME_COLORS, LIGHT_DEFAULTS, validateCustomOverrides } from '@/lib/theme';
 import type { Document } from '@/types';
 
 type Tab = 'appearance' | 'profile' | 'contacts' | 'documents' | 'reminders' | 'plan';
-
-const THEME_COLORS = ['#0FA3B1', '#14284B', '#2E9E6B', '#7C3AED', '#E91E8C', '#F2A900'];
 
 const SETTING_TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'appearance', label: 'Appearance', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20v-4a6 6 0 0 0 0-12V2z"/></svg> },
@@ -61,71 +60,72 @@ export default function Settings() {
   );
 }
 
-// Default light-mode color values (mirrors index.css)
-const COLOR_DEFAULTS = {
-  colorText: '#222B38',
-  colorMuted: '#5B6573',
-  colorBg: '#F4F8FA',
-  colorSurface: '#FFFFFF',
-};
-
-function ColorPicker({ label, description, value, defaultValue, onChange, onReset }: {
+function ColorPicker({ label, description, value, defaultValue, onChange, onReset, warning }: {
   label: string; description: string; value: string; defaultValue: string;
   onChange: (v: string) => void; onReset: () => void;
+  warning?: string;
 }) {
   const effective = value || defaultValue;
   return (
-    <div className="flex items-center justify-between py-3 border-b last:border-b-0" style={{ borderColor: 'var(--color-border)' }}>
-      <div className="flex-1 min-w-0 mr-4">
-        <div className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>{label}</div>
-        <div className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>{description}</div>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        {/* Swatch + native picker */}
-        <label className="relative cursor-pointer group" title={`Pick ${label}`}>
-          <div
-            className="w-10 h-10 rounded-xl border-2 transition-all shadow-sm group-hover:scale-105"
-            style={{
-              background: effective,
-              borderColor: value ? 'var(--color-primary)' : 'var(--color-border)',
-            }}
-          />
+    <div className="py-3 border-b last:border-b-0" style={{ borderColor: 'var(--color-border)' }}>
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0 mr-4">
+          <div className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>{label}</div>
+          <div className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>{description}</div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Swatch + native picker */}
+          <label className="relative cursor-pointer group" title={`Pick ${label}`}>
+            <div
+              className="w-10 h-10 rounded-xl border-2 transition-all shadow-sm group-hover:scale-105"
+              style={{
+                background: effective,
+                borderColor: value ? 'var(--color-primary)' : 'var(--color-border)',
+              }}
+            />
+            <input
+              type="color"
+              value={effective}
+              onChange={e => onChange(e.target.value)}
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              style={{ fontSize: 0 }}
+            />
+          </label>
+          {/* Hex display */}
           <input
-            type="color"
+            className="w-24 text-xs font-mono rounded-lg px-2 py-1.5 border"
+            style={{
+              background: 'var(--color-bg)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text)',
+            }}
             value={effective}
-            onChange={e => onChange(e.target.value)}
-            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-            style={{ fontSize: 0 }}
+            onChange={e => {
+              const v = e.target.value;
+              if (/^#[0-9a-fA-F]{0,6}$/.test(v)) onChange(v);
+            }}
+            maxLength={7}
+            spellCheck={false}
           />
-        </label>
-        {/* Hex display */}
-        <input
-          className="w-24 text-xs font-mono rounded-lg px-2 py-1.5 border"
-          style={{
-            background: 'var(--color-bg)',
-            border: '1px solid var(--color-border)',
-            color: 'var(--color-text)',
-          }}
-          value={effective}
-          onChange={e => {
-            const v = e.target.value;
-            if (/^#[0-9a-fA-F]{0,6}$/.test(v)) onChange(v);
-          }}
-          maxLength={7}
-          spellCheck={false}
-        />
-        {/* Reset */}
-        {value && (
-          <button
-            className="text-xs px-2 py-1 rounded-lg transition-colors"
-            style={{ color: 'var(--color-muted)', background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
-            onClick={onReset}
-            title="Reset to default"
-          >
-            ↺
-          </button>
-        )}
+          {/* Reset */}
+          {value && (
+            <button
+              className="text-xs px-2 py-1 rounded-lg transition-colors"
+              style={{ color: 'var(--color-muted)', background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+              onClick={onReset}
+              title="Reset to default"
+            >
+              ↺
+            </button>
+          )}
+        </div>
       </div>
+      {warning && (
+        <div className="mt-2 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center gap-1.5" style={{ background: 'var(--color-warning-tint)', color: 'var(--color-warning-text)' }}>
+          <span>⚠️</span>
+          <span>{warning} (override will not be applied to ensure readability)</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -137,12 +137,13 @@ function AppearanceTab() {
 
   const resetAllColors = () => update({ colorText: '', colorMuted: '', colorBg: '', colorSurface: '' });
   const hasCustomColors = profile.colorText || profile.colorMuted || profile.colorBg || profile.colorSurface;
+  const { warnings, validOverrides } = validateCustomOverrides(profile);
 
-  // Preview uses effective values
-  const previewBg = profile.colorBg || COLOR_DEFAULTS.colorBg;
-  const previewSurface = profile.colorSurface || COLOR_DEFAULTS.colorSurface;
-  const previewText = profile.colorText || COLOR_DEFAULTS.colorText;
-  const previewMuted = profile.colorMuted || COLOR_DEFAULTS.colorMuted;
+  // Preview uses effective values (valid overrides or light defaults)
+  const previewBg = validOverrides['--color-bg'] || LIGHT_DEFAULTS.colorBg;
+  const previewSurface = validOverrides['--color-surface'] || LIGHT_DEFAULTS.colorSurface;
+  const previewText = validOverrides['--color-text'] || LIGHT_DEFAULTS.colorText;
+  const previewMuted = validOverrides['--color-muted'] || LIGHT_DEFAULTS.colorMuted;
 
   return (
     <div className="space-y-4">
@@ -179,34 +180,38 @@ function AppearanceTab() {
         <ColorPicker
           label="Primary text"
           description="Headings, labels, values"
-          value={profile.colorText}
-          defaultValue={COLOR_DEFAULTS.colorText}
+          value={profile.colorText || ''}
+          defaultValue={LIGHT_DEFAULTS.colorText}
           onChange={v => update({ colorText: v })}
           onReset={() => update({ colorText: '' })}
+          warning={warnings.colorText}
         />
         <ColorPicker
           label="Secondary text"
           description="Hints, captions, dates"
-          value={profile.colorMuted}
-          defaultValue={COLOR_DEFAULTS.colorMuted}
+          value={profile.colorMuted || ''}
+          defaultValue={LIGHT_DEFAULTS.colorMuted}
           onChange={v => update({ colorMuted: v })}
           onReset={() => update({ colorMuted: '' })}
+          warning={warnings.colorMuted}
         />
         <ColorPicker
           label="Page background"
           description="The overall page fill"
-          value={profile.colorBg}
-          defaultValue={COLOR_DEFAULTS.colorBg}
+          value={profile.colorBg || ''}
+          defaultValue={LIGHT_DEFAULTS.colorBg}
           onChange={v => update({ colorBg: v })}
           onReset={() => update({ colorBg: '' })}
+          warning={warnings.colorBg}
         />
         <ColorPicker
           label="Card / panel colour"
           description="Cards, modals, text boxes"
-          value={profile.colorSurface}
-          defaultValue={COLOR_DEFAULTS.colorSurface}
+          value={profile.colorSurface || ''}
+          defaultValue={LIGHT_DEFAULTS.colorSurface}
           onChange={v => update({ colorSurface: v })}
           onReset={() => update({ colorSurface: '' })}
+          warning={warnings.colorSurface}
         />
       </div>
 
