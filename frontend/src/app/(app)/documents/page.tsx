@@ -9,7 +9,6 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { EmptyState } from '@/components/ui/EmptyState';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 export default function DocumentsClient() {

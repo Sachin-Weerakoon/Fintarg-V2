@@ -44,7 +44,7 @@ export type IconName =
   | 'heart'
   | 'briefcase';
 
-export type IconSize = 14 | 16 | 18 | 20 | 22 | 24;
+export type IconSize = 12 | 14 | 15 | 16 | 18 | 20 | 22 | 24 | 28 | 32 | number;
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   name: IconName;

@@ -1,8 +1,6 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { login } from '@/actions/login';
-import { signup } from '@/actions/signup';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
@@ -57,36 +55,40 @@ export default function Welcome() {
 
   const continueToApp = async () => {
     setError('');
+    if (authMode === 'signup' && !form.name.trim()) {
+      setError('Please enter your name.');
+      return;
+    }
     if (!form.email || !form.password) {
       setError('Please provide your email and password.');
+      return;
+    }
+    if (authMode === 'signup' && form.password.length < 8) {
+      setError('Password must be at least 8 characters.');
       return;
     }
 
     setSubmitting(true);
     try {
-      if (authMode === 'signup') {
-        const result = await signup({
-          email: form.email,
-          password: form.password,
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: authMode,
           name: form.name.trim(),
-          workMode,
-        });
-        if (!result.ok) {
-          setError(result.error || 'Could not create account.');
-          return;
-        }
-      } else {
-        const result = await login({
           email: form.email,
           password: form.password,
-        });
-        if (!result.ok) {
-          setError(result.error || 'Invalid email or password.');
-          return;
-        }
+          workMode,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data.error || (authMode === 'signup' ? 'Could not create account.' : 'Invalid email or password.'));
+        return;
       }
 
       router.push('/');
+      router.refresh();
     } catch {
       setError('Network error. Please try again.');
     } finally {
