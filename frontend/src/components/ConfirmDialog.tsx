@@ -1,16 +1,45 @@
 'use client';
+import React from 'react';
+import { Modal } from './ui/Modal';
+import { Button } from './ui/Button';
 
-export default function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
+export interface ConfirmDialogProps {
+  title?: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  tone?: 'danger' | 'primary' | 'warning';
+  loading?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+export default function ConfirmDialog({
+  title = 'Confirm',
+  message,
+  confirmLabel = 'Delete',
+  cancelLabel = 'Cancel',
+  tone = 'danger',
+  loading = false,
+  onConfirm,
+  onCancel,
+}: ConfirmDialogProps) {
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal-box" onClick={e => e.stopPropagation()}>
-        <div className="font-semibold text-base mb-3" style={{ color: 'var(--color-text)' }}>Confirm</div>
-        <p className="text-sm mb-5" style={{ color: 'var(--color-muted)' }}>{message}</p>
-        <div className="flex gap-3">
-          <button className="btn-danger" onClick={onConfirm}>Delete</button>
-          <button className="btn-secondary" onClick={onCancel}>Cancel</button>
-        </div>
+    <Modal isOpen={true} onClose={onCancel} title={title} size="sm" showCloseButton={false}>
+      <p className="text-sm text-muted mb-6 mt-1">{message}</p>
+      <div className="flex items-center justify-end gap-3">
+        <Button variant="secondary" size="sm" onClick={onCancel} disabled={loading}>
+          {cancelLabel}
+        </Button>
+        <Button
+          variant={tone === 'danger' ? 'danger' : 'primary'}
+          size="sm"
+          onClick={onConfirm}
+          loading={loading}
+        >
+          {confirmLabel}
+        </Button>
       </div>
-    </div>
+    </Modal>
   );
 }
