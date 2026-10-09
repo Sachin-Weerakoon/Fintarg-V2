@@ -144,6 +144,46 @@ describe('Backend API Integration Tests', () => {
       assert.strictEqual(data.error, 'Authentication required');
     });
 
+    it('handles concurrent registration for the same email gracefully with 409 and clear message', async () => {
+      const email = `concurrent-test-${Date.now()}@fintarg.example.com`;
+      const payload = {
+        name: 'Concurrent User',
+        email,
+        password: 'SecurePassword123!',
+        workMode: 'salary',
+      };
+
+      // Fire two simultaneous registration requests
+      const [res1, res2] = await Promise.all([
+        fetch(`${baseUrl}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }),
+        fetch(`${baseUrl}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }),
+      ]);
+
+      const statuses = [res1.status, res2.status].sort();
+      // One request should succeed (201) and the duplicate must return 409 (not 500!)
+      assert.deepStrictEqual(statuses, [201, 409]);
+
+      const conflictRes = res1.status === 409 ? res1 : res2;
+      const data = await conflictRes.json();
+      assert.strictEqual(data.error, 'Email already registered');
+    });
+
+    it('rejects CORS requests from untrusted external origins', async () => {
+      const response = await fetch(`${baseUrl}/api/health`, {
+        headers: { Origin: 'https://evil-untrusted-site.com' },
+      });
+      // Express CORS middleware either omits the allow-origin header or sends an error
+      assert.notStrictEqual(response.headers.get('access-control-allow-origin'), 'https://evil-untrusted-site.com');
+    });
+
     it('returns structured 404 error for non-existent routes', async () => {
       const response = await fetch(`${baseUrl}/api/unregistered/random/path`);
       assert.strictEqual(response.status, 404);

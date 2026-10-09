@@ -54,6 +54,7 @@ export default function Welcome() {
   };
 
   const continueToApp = async () => {
+    if (submitting) return;
     setError('');
     if (authMode === 'signup' && !form.name.trim()) {
       setError('Please enter your name.');

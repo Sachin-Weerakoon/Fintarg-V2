@@ -28,6 +28,4 @@ const UserSchema = new Schema<IUser>({
   failedLoginAttempts: { type: Number, default: 0 },
 }, { timestamps: true });
 
-UserSchema.index({ lockedUntil: 1 }, { sparse: true, expireAfterSeconds: 0 });
-
 export const UserModel = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
