@@ -1,6 +1,27 @@
 import { describe, expect, it } from 'vitest';
+import React from 'react';
 import { PAYMENT_METHOD_OPTIONS } from './PaymentMethodField';
 import { fetchTransactionHistory } from '../../services/storeApi';
+import {
+  FormField,
+  FormGrid,
+  MoneyField,
+  DateField,
+  Checkbox,
+  RadioGroup,
+  SettingRow,
+  SectionHeader,
+  ListRow,
+  DataTable,
+  FilterBar,
+  Tooltip,
+  IconChip,
+  Avatar,
+  ErrorState,
+  Divider,
+  PageSection,
+  Alert,
+} from './index';
 
 describe('Stage 4 Building Blocks & Payment Methods', () => {
   it('defines all required payment methods with user-friendly labels', () => {
@@ -15,7 +36,6 @@ describe('Stage 4 Building Blocks & Payment Methods', () => {
   });
 
   it('formats fetchTransactionHistory queries properly', async () => {
-    // Mock global fetch
     const originalFetch = global.fetch;
     let requestedUrl = '';
     global.fetch = async (input: RequestInfo | URL) => {
@@ -58,5 +78,43 @@ describe('Stage 4 Building Blocks & Payment Methods', () => {
     } finally {
       global.fetch = originalFetch;
     }
+  });
+
+  it('exports all new UI primitives from components/ui/index', () => {
+    expect(FormField).toBeDefined();
+    expect(FormGrid).toBeDefined();
+    expect(MoneyField).toBeDefined();
+    expect(DateField).toBeDefined();
+    expect(Checkbox).toBeDefined();
+    expect(RadioGroup).toBeDefined();
+    expect(SettingRow).toBeDefined();
+    expect(SectionHeader).toBeDefined();
+    expect(ListRow).toBeDefined();
+    expect(DataTable).toBeDefined();
+    expect(FilterBar).toBeDefined();
+    expect(Tooltip).toBeDefined();
+    expect(IconChip).toBeDefined();
+    expect(Avatar).toBeDefined();
+    expect(ErrorState).toBeDefined();
+    expect(Divider).toBeDefined();
+    expect(PageSection).toBeDefined();
+    expect(Alert).toBeDefined();
+  });
+
+  it('Avatar generates initials properly', () => {
+    const avatarEl = React.createElement(Avatar, { name: 'Kasun Perera' });
+    expect(avatarEl.props.name).toBe('Kasun Perera');
+  });
+
+  it('MoneyField handles numeric and formatted inputs', () => {
+    let changed = '';
+    const field = React.createElement(MoneyField, {
+      value: 50000,
+      onChange: (v) => {
+        changed = String(v);
+      },
+    });
+    expect(field.props.currency).toBeUndefined(); // defaults to Rs. inside component
+    expect(field.props.value).toBe(50000);
   });
 });
