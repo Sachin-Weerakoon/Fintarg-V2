@@ -4,8 +4,9 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { logout } from '@/actions/logout';
 import { AppProvider } from '@/store';
-import { deriveBrand, validateCustomOverrides } from '@/lib/theme';
+import { deriveBrand, validateCustomOverrides, THEME_COLORS } from '@/lib/theme';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { Avatar } from '@/components/ui/Avatar';
 
 const navItems = [
   { href: '/', label: 'Home', page: 'dashboard' },
@@ -80,7 +81,7 @@ export default function AppLayout({
   const searchParams = useSearchParams();
   const [moreOpen, setMoreOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  const primary = user.profile?.themeColor || '#0FA3B1';
+  const primary = user.profile?.themeColor || THEME_COLORS[0];
   const modeLabel = user.workMode === 'both' ? 'Job + Business' : user.workMode === 'business' ? 'Business' : 'Salary';
   const textSizeClass = `text-size-${user.profile?.textSize || 'medium'}`;
   const isDark = Boolean(user.profile?.darkMode);
@@ -122,17 +123,7 @@ export default function AppLayout({
         {/* Desktop layout */}
         <div className="hidden md:flex min-h-screen">
           <aside
-            className="flex-shrink-0 flex flex-col"
-            style={{
-              width: 240,
-              minHeight: '100vh',
-              background: 'linear-gradient(180deg, var(--color-chrome-900) 0%, var(--color-chrome-800) 100%)',
-              position: 'sticky',
-              top: 0,
-              height: '100vh',
-              overflowY: 'auto',
-              borderRight: '1px solid rgba(255,255,255,0.07)',
-            }}
+            className="w-60 min-h-screen sticky top-0 h-screen overflow-y-auto border-r border-white/[0.07] bg-gradient-to-b from-chrome-900 to-chrome-800 flex-shrink-0 flex flex-col"
           >
             <div className="px-5 py-6">
               <div className="flex items-center gap-3">
@@ -175,20 +166,12 @@ export default function AppLayout({
 
             <div className="px-4 pb-5 pt-3 border-t border-white/5">
               <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] transition-colors">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-sm flex-shrink-0 overflow-hidden"
-                  style={{ background: 'linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700))' }}
-                >
-                  {user.profile?.profilePictureFileId ? (
-                    <img
-                      src={`/api/files/${encodeURIComponent(user.profile.profilePictureFileId)}`}
-                      alt={user.name || 'User avatar'}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    user.name ? user.name[0].toUpperCase() : 'U'
-                  )}
-                </div>
+                <Avatar
+                  name={user.name || 'User'}
+                  fileId={user.profile?.profilePictureFileId}
+                  size="sm"
+                  className="rounded-lg shadow-sm"
+                />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-white truncate">{user.name || 'User'}</div>
                   <div className="text-[11px] text-chrome-text truncate">{user.email || 'Free tier'}</div>
@@ -214,11 +197,7 @@ export default function AppLayout({
 
           <div className="flex-1 flex flex-col min-w-0">
             <header
-              className="flex items-center justify-between px-8 py-4 sticky top-0 z-10 backdrop-blur-md bg-opacity-90"
-              style={{
-                background: 'color-mix(in srgb, var(--color-surface) 92%, transparent)',
-                borderBottom: '1px solid var(--color-border)',
-              }}
+              className="flex items-center justify-between px-8 py-4 sticky top-0 z-10 backdrop-blur-md bg-surface/90 border-b border-border"
             >
               <div>
                 <div className="text-xs uppercase tracking-wider font-semibold text-muted">
@@ -231,20 +210,16 @@ export default function AppLayout({
               <div className="flex items-center gap-3">
                 <Link
                   href="/settings"
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm transition-transform hover:scale-105 overflow-hidden"
-                  style={{ background: 'linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700))' }}
+                  className="rounded-xl transition-transform hover:scale-105 overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary-500"
                   title="Settings"
                   aria-label="Settings"
                 >
-                  {user.profile?.profilePictureFileId ? (
-                    <img
-                      src={`/api/files/${encodeURIComponent(user.profile.profilePictureFileId)}`}
-                      alt={user.name || 'User avatar'}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    user.name ? user.name[0].toUpperCase() : 'U'
-                  )}
+                  <Avatar
+                    name={user.name || 'User'}
+                    fileId={user.profile?.profilePictureFileId}
+                    size="md"
+                    className="!rounded-xl shadow-sm"
+                  />
                 </Link>
                 <button
                   type="button"
@@ -258,7 +233,7 @@ export default function AppLayout({
               </div>
             </header>
 
-            <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-8 focus:outline-none" style={{ background: 'var(--color-bg)' }}>
+            <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-8 focus:outline-none bg-background">
               {children}
             </main>
           </div>
@@ -267,8 +242,7 @@ export default function AppLayout({
         {/* Mobile layout */}
         <div className="mobile-shell md:hidden flex flex-col min-h-screen">
           <header
-            className="mobile-topbar flex items-center justify-between px-4 py-3 sticky top-0 z-10 no-print"
-            style={{ background: 'var(--color-chrome-900)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+            className="mobile-topbar flex items-center justify-between px-4 py-3 sticky top-0 z-10 no-print bg-chrome-900 border-b border-white/[0.08]"
           >
             <div className="flex items-center gap-2">
               <img src="/brand/fintarg-logo.svg" alt="Fintarg logo" className="w-6 h-6 object-contain" />
@@ -280,18 +254,15 @@ export default function AppLayout({
               </span>
               <Link
                 href="/settings"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm bg-white/20 overflow-hidden"
+                className="rounded-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-white/40"
                 aria-label="Settings"
               >
-                {user.profile?.profilePictureFileId ? (
-                  <img
-                    src={`/api/files/${encodeURIComponent(user.profile.profilePictureFileId)}`}
-                    alt={user.name || 'User avatar'}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  user.name ? user.name[0].toUpperCase() : 'U'
-                )}
+                <Avatar
+                  name={user.name || 'User'}
+                  fileId={user.profile?.profilePictureFileId}
+                  size="sm"
+                  className="!w-8 !h-8"
+                />
               </Link>
               <button
                 type="button"
@@ -304,7 +275,7 @@ export default function AppLayout({
             </div>
           </header>
 
-          <main id="main-content" tabIndex={-1} className="mobile-main flex-1 overflow-y-auto p-4 pb-20 focus:outline-none" style={{ background: 'var(--color-bg)' }}>
+          <main id="main-content" tabIndex={-1} className="mobile-main flex-1 overflow-y-auto p-4 pb-20 focus:outline-none bg-background">
             <div className="mobile-page-title text-lg font-semibold mb-4 text-text">
               {pageTitleOf(pathname, currentTab)}
             </div>
@@ -312,8 +283,7 @@ export default function AppLayout({
           </main>
 
           <nav
-            className="mobile-bottom-nav fixed bottom-0 left-0 right-0 flex no-print z-10"
-            style={{ background: 'var(--color-surface)', borderTop: '1px solid var(--color-border)' }}
+            className="mobile-bottom-nav fixed bottom-0 left-0 right-0 flex no-print z-10 bg-surface border-t border-border pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]"
             aria-label="Primary navigation"
           >
             {mobileBottomItems.map(item => {

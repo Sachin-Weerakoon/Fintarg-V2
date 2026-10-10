@@ -6,6 +6,7 @@ export type AvatarSize = 'sm' | 'md' | 'lg' | 'xl';
 export interface AvatarProps {
   name?: string;
   src?: string;
+  fileId?: string;
   size?: AvatarSize;
   className?: string;
 }
@@ -13,9 +14,11 @@ export interface AvatarProps {
 export function Avatar({
   name = 'User',
   src,
+  fileId,
   size = 'md',
   className = '',
 }: AvatarProps) {
+  const resolvedSrc = src || (fileId ? `/api/files/${encodeURIComponent(fileId)}` : undefined);
   const sizeClasses: Record<AvatarSize, { container: string; text: string }> = {
     sm: { container: 'w-7 h-7', text: 'text-xs' },
     md: { container: 'w-9 h-9', text: 'text-xs font-semibold' },
@@ -32,10 +35,10 @@ export function Avatar({
 
   const style = sizeClasses[size];
 
-  if (src) {
+  if (resolvedSrc) {
     return (
       <img
-        src={src}
+        src={resolvedSrc}
         alt={name}
         className={`${style.container} rounded-full object-cover border border-border flex-shrink-0 ${className}`.trim()}
       />
