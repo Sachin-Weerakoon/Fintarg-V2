@@ -186,8 +186,17 @@
   letter-spacing: -0.01em;
 }
 
-body {
+html,
+body,
+button,
+input,
+optgroup,
+select,
+textarea {
   font-family: var(--font-sans);
+}
+
+body {
   background-color: var(--color-bg);
   color: var(--color-text);
   font-size: var(--font-size-base);
