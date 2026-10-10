@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useApp, formatRs, calcAnalysis, calcPersonalSpent } from '@/store';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -15,7 +16,7 @@ import { Icon } from '@/components/ui/Icon';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 export default function Goals() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, showToast } = useApp();
   const month = state.selectedMonth;
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [goalForm, setGoalForm] = useState({
@@ -68,10 +69,11 @@ export default function Goals() {
     const monthly = calculatedDaily * DAYS_IN_MONTH;
     const targetAmt = goalForm.targetAmount ? Number(goalForm.targetAmount) : monthly * 12;
 
+    const goalId = 'g_' + Date.now();
     dispatch({
       type: 'ADD_GOAL',
       entry: {
-        id: 'g_' + Date.now(),
+        id: goalId,
         name: goalForm.name,
         dailyAmount: calculatedDaily,
         monthlyTarget: monthly,
@@ -82,6 +84,23 @@ export default function Goals() {
         contributions: [],
       },
     });
+
+    if (goalForm.targetDate) {
+      dispatch({
+        type: 'ADD_REMINDER',
+        entry: {
+          id: 'rem_g_' + Date.now(),
+          type: 'custom',
+          relatedId: goalId,
+          label: `Goal Target Deadline: ${goalForm.name} (Target: ${formatRs(targetAmt)})`,
+          dueDate: goalForm.targetDate,
+          channel: 'in-app',
+          status: 'pending',
+        },
+      });
+    }
+
+    showToast(`Savings goal "${goalForm.name}" created! Target deadline reminder scheduled.`, 'success');
     setGoalForm({ name: '', targetAmount: '', targetDate: '', dailyAmount: '' });
     setGoalError('');
     setShowAddGoal(false);
@@ -231,6 +250,35 @@ export default function Goals() {
           </p>
         )}
       </Card>
+
+      {/* Goal Milestones & System Reminders Banner */}
+      {state.savingsGoals.length > 0 && (
+        <Card className="p-4 border border-primary-500/25 bg-primary-tint/25">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl bg-primary-500 text-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Icon name="bell" size={16} />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-text flex items-center gap-2">
+                  <span>Goal Milestones & Notification Reminders</span>
+                  <Badge tone={savingsExceedsCash ? 'warning' : 'success'} size="sm">
+                    {savingsExceedsCash ? 'Exceeds Free Cash' : 'On Track'}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted mt-0.5 leading-relaxed">
+                  Active target of <span className="font-bold text-text num">{formatRs(state.savingsGoals.reduce((s, g) => s + g.dailyAmount, 0))}</span>/day across {state.savingsGoals.length} savings goals ({formatRs(totalSavingsTarget)}/mo). Target reminders are synced to your notifications.
+                </p>
+              </div>
+            </div>
+            <Link href="/settings" className="shrink-0 self-end sm:self-center">
+              <Button variant="ghost" size="sm" className="text-primary-text hover:text-primary-text text-xs">
+                View In Settings →
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      )}
 
       {/* Goals list */}
       {state.savingsGoals.length === 0 ? (
