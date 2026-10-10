@@ -8,14 +8,19 @@ import { Badge } from '@/components/ui/Badge';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { MoneyField } from '@/components/ui/MoneyField';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { BankSelect } from '@/components/ui/BankSelect';
-import ConfirmDialog from '@/components/ConfirmDialog';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useToast } from '@/components/ui/ToastProvider';
 import type { FinancePayment } from '@/types';
 
 export function FinanceTab() {
   const { state, dispatch } = useApp();
+  const confirm = useConfirm();
+  const toast = useToast();
+
   const [form, setForm] = useState({
     paymentKind: 'instalment' as NonNullable<FinancePayment['paymentKind']>,
     lender: '',
@@ -30,7 +35,6 @@ export function FinanceTab() {
   });
   const [editId, setEditId] = useState<string | null>(null);
   const [filterKind, setFilterKind] = useState<string>('all');
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const submit = () => {
     if (!form.amount || Number(form.amount) <= 0) return;
@@ -55,9 +59,11 @@ export function FinanceTab() {
 
     if (editId) {
       dispatch({ type: 'UPDATE_FINANCE_PAYMENT', entry });
+      toast.success('Payment updated');
       setEditId(null);
     } else {
       dispatch({ type: 'ADD_FINANCE_PAYMENT', entry });
+      toast.success('Payment recorded');
     }
 
     setForm({
@@ -72,6 +78,20 @@ export function FinanceTab() {
       bankAccountId: '',
       status: 'active',
     });
+  };
+
+  const handleDelete = async (id: string, label: string) => {
+    const ok = await confirm({
+      title: 'Delete Finance Payment',
+      message: `Are you sure you want to remove payment "${label}"?`,
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (ok) {
+      dispatch({ type: 'DELETE_FINANCE_PAYMENT', id });
+      toast.success('Payment removed');
+    }
   };
 
   const filteredPayments = state.financePayments.filter(f => {
@@ -106,11 +126,12 @@ export function FinanceTab() {
             {filteredPayments.map(fp => {
               const kind = fp.paymentKind || 'instalment';
               const bank = state.bankAccounts.find(b => b.id === fp.bankAccountId);
+              const label = fp.lender || fp.payee || 'Payment';
               return (
                 <Card key={fp.id} className="p-4 flex items-center justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm text-text truncate">{fp.lender || fp.payee}</span>
+                      <span className="font-medium text-sm text-text truncate">{label}</span>
                       <Badge tone={kind === 'cheque' ? 'warning' : kind === 'standing_order' ? 'primary' : 'neutral'} size="sm" className="capitalize text-[10px]">
                         {kind.replace('_', ' ')}
                       </Badge>
@@ -155,7 +176,7 @@ export function FinanceTab() {
                       variant="ghost"
                       size="sm"
                       className="text-danger-text hover:text-danger-text !p-1.5"
-                      onClick={() => setDeleteConfirmId(fp.id)}
+                      onClick={() => handleDelete(fp.id, label)}
                       aria-label="Delete payment"
                     >
                       <Icon name="trash" size={14} />
@@ -232,10 +253,9 @@ export function FinanceTab() {
           )}
 
           <Field id="fp-amount" label="Amount (Rs.)">
-            <Input
-              type="number"
+            <MoneyField
               value={form.amount}
-              onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+              onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
               placeholder="25,000"
             />
           </Field>
@@ -309,21 +329,6 @@ export function FinanceTab() {
           </div>
         </div>
       </Card>
-
-      {deleteConfirmId && (
-        <ConfirmDialog
-          title="Delete Finance Payment"
-          message="Are you sure you want to remove this finance payment?"
-          confirmLabel="Yes, Delete"
-          cancelLabel="No, Keep"
-          tone="danger"
-          onConfirm={() => {
-            dispatch({ type: 'DELETE_FINANCE_PAYMENT', id: deleteConfirmId });
-            setDeleteConfirmId(null);
-          }}
-          onCancel={() => setDeleteConfirmId(null)}
-        />
-      )}
     </div>
   );
 }

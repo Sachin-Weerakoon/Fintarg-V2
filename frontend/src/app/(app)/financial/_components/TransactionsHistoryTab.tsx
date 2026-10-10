@@ -1,26 +1,79 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
+import { StatCard } from '@/components/ui/StatCard';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
+import { DataTable, Column } from '@/components/ui/DataTable';
 import { fetchTransactionHistory } from '@/services/storeApi';
 import type { Transaction } from '@/types';
 
 export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
   const { state } = useApp();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [loading, setLoading] = useState(false);
   const [remoteTransactions, setRemoteTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, netFlow: 0, count: 0 });
 
-  // Filters
-  const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>('all');
-  const [methodFilter, setMethodFilter] = useState<string>('all');
-  const [accountFilter, setAccountFilter] = useState<string>('all');
+  // Read initial filters from URL
+  const initialSearch = searchParams.get('search') || '';
+  const initialType = (searchParams.get('type') || 'all') as 'all' | 'income' | 'expense' | 'transfer';
+  const initialMethod = searchParams.get('method') || 'all';
+  const initialAccount = searchParams.get('account') || 'all';
+
+  const [search, setSearch] = useState(initialSearch);
+  const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>(initialType);
+  const [methodFilter, setMethodFilter] = useState(initialMethod);
+  const [accountFilter, setAccountFilter] = useState(initialAccount);
+
+  // Sync to URL
+  const updateUrlFilters = useCallback(
+    (newSearch: string, newType: string, newMethod: string, newAccount: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (newSearch) params.set('search', newSearch); else params.delete('search');
+      if (newType !== 'all') params.set('type', newType); else params.delete('type');
+      if (newMethod !== 'all') params.set('method', newMethod); else params.delete('method');
+      if (newAccount !== 'all') params.set('account', newAccount); else params.delete('account');
+      router.replace(`?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams]
+  );
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    updateUrlFilters(val, typeFilter, methodFilter, accountFilter);
+  };
+
+  const handleTypeChange = (val: 'all' | 'income' | 'expense' | 'transfer') => {
+    setTypeFilter(val);
+    updateUrlFilters(search, val, methodFilter, accountFilter);
+  };
+
+  const handleMethodChange = (val: string) => {
+    setMethodFilter(val);
+    updateUrlFilters(search, typeFilter, val, accountFilter);
+  };
+
+  const handleAccountChange = (val: string) => {
+    setAccountFilter(val);
+    updateUrlFilters(search, typeFilter, methodFilter, val);
+  };
+
+  const handleClearFilters = () => {
+    setSearch('');
+    setTypeFilter('all');
+    setMethodFilter('all');
+    setAccountFilter('all');
+    updateUrlFilters('', 'all', 'all', 'all');
+  };
 
   const loadHistory = async () => {
     setLoading(true);
@@ -48,46 +101,126 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
 
   // Combine local and remote fallback
   const items = remoteTransactions.length > 0 ? remoteTransactions : state.transactions;
-  const filteredItems = items.filter(t => {
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      const match = (t.category || '').toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q);
-      if (!match) return false;
-    }
-    if (typeFilter !== 'all' && t.type !== typeFilter) return false;
-    if (methodFilter !== 'all' && t.paymentMethod !== methodFilter) return false;
-    if (accountFilter !== 'all' && t.bankAccountId !== accountFilter) return false;
-    return true;
-  });
+  const filteredItems = useMemo(() => {
+    return items.filter(t => {
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const match = (t.category || '').toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      if (typeFilter !== 'all' && t.type !== typeFilter) return false;
+      if (methodFilter !== 'all' && t.paymentMethod !== methodFilter) return false;
+      if (accountFilter !== 'all' && t.bankAccountId !== accountFilter) return false;
+      return true;
+    });
+  }, [items, search, typeFilter, methodFilter, accountFilter]);
+
+  const hasActiveFilters = search || typeFilter !== 'all' || methodFilter !== 'all' || accountFilter !== 'all';
+
+  const columns: Column<Transaction>[] = [
+    {
+      key: 'date',
+      header: 'Date',
+      render: t => <span className="text-muted num">{t.date}</span>,
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      render: t => (
+        <Badge
+          tone={t.type === 'income' ? 'success' : t.type === 'transfer' ? 'primary' : 'neutral'}
+          size="sm"
+          className="capitalize text-[11px]"
+        >
+          {t.type}
+        </Badge>
+      ),
+    },
+    {
+      key: 'description',
+      header: 'Category / Description',
+      render: t => (
+        <div>
+          <div className="font-medium text-text">{t.category || t.description || 'General'}</div>
+          {t.description && t.category && (
+            <div className="text-[11px] text-muted truncate">{t.description}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'method',
+      header: 'Method',
+      render: t => (
+        <span className="text-xs text-muted capitalize font-medium">
+          {(t.paymentMethod || 'cash').replace('_', ' ')}
+        </span>
+      ),
+    },
+    {
+      key: 'account',
+      header: 'Account',
+      render: t => {
+        const acc = state.bankAccounts.find(a => a.id === t.bankAccountId);
+        return (
+          <span className="text-xs text-muted">
+            {acc ? `${acc.bankName} (•••• ${acc.accountNumber.slice(-4)})` : '—'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      align: 'right',
+      render: t => {
+        const isPositive = t.type === 'income';
+        return (
+          <span className={`font-bold num ${isPositive ? 'text-success-text' : 'text-danger-text'}`}>
+            {isPositive ? `+${formatRs(t.amount)}` : `-${formatRs(t.amount)}`}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'balanceAfter',
+      header: 'Balance After',
+      align: 'right',
+      render: t => (
+        <span className="text-muted num font-medium">
+          {t.balanceAfter !== undefined ? formatRs(t.balanceAfter) : '—'}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-4">
-      {/* Summary Stat Bar */}
+      {/* Summary Stat Bar with StatCard */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="p-3 text-center">
-          <div className="text-xs text-muted mb-0.5">Total Inflow</div>
-          <div className="font-bold text-sm text-success-text num">
-            {formatRs(summary.totalIncome || 0)}
-          </div>
-        </Card>
-        <Card className="p-3 text-center">
-          <div className="text-xs text-muted mb-0.5">Total Outflow</div>
-          <div className="font-bold text-sm text-danger-text num">
-            {formatRs(summary.totalExpense || 0)}
-          </div>
-        </Card>
-        <Card className="p-3 text-center">
-          <div className="text-xs text-muted mb-0.5">Net Flow</div>
-          <div className={`font-bold text-sm num ${summary.netFlow >= 0 ? 'text-success-text' : 'text-danger-text'}`}>
-            {formatRs(summary.netFlow || 0)}
-          </div>
-        </Card>
-        <Card className="p-3 text-center">
-          <div className="text-xs text-muted mb-0.5">Total Records</div>
-          <div className="font-bold text-sm text-text num">
-            {filteredItems.length}
-          </div>
-        </Card>
+        <StatCard
+          label="Total Inflow"
+          value={formatRs(summary.totalIncome || 0)}
+          tone="success"
+          icon={<Icon name="arrow-up" size={18} />}
+        />
+        <StatCard
+          label="Total Outflow"
+          value={formatRs(summary.totalExpense || 0)}
+          tone="danger"
+          icon={<Icon name="arrow-down" size={18} />}
+        />
+        <StatCard
+          label="Net Flow"
+          value={formatRs(summary.netFlow || 0)}
+          tone={summary.netFlow >= 0 ? 'success' : 'danger'}
+          icon={<Icon name="financial" size={18} />}
+        />
+        <StatCard
+          label="Total Records"
+          value={filteredItems.length}
+          icon={<Icon name="documents" size={18} />}
+        />
       </div>
 
       {/* Filter Toolbar */}
@@ -96,12 +229,12 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
           <Input
             placeholder="Search category or note..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => handleSearchChange(e.target.value)}
             className="!py-1.5 !text-xs"
           />
           <Select
             value={typeFilter}
-            onChange={e => setTypeFilter(e.target.value as any)}
+            onChange={e => handleTypeChange(e.target.value as any)}
             className="!py-1.5 !text-xs"
           >
             <option value="all">All Types</option>
@@ -111,7 +244,7 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
           </Select>
           <Select
             value={methodFilter}
-            onChange={e => setMethodFilter(e.target.value)}
+            onChange={e => handleMethodChange(e.target.value)}
             className="!py-1.5 !text-xs"
           >
             <option value="all">All Payment Methods</option>
@@ -122,87 +255,57 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
             <option value="standing_order">Standing Order</option>
             <option value="online">Online</option>
           </Select>
-          <Select
-            value={accountFilter}
-            onChange={e => setAccountFilter(e.target.value)}
-            className="!py-1.5 !text-xs"
-          >
-            <option value="all">All Accounts</option>
-            {state.bankAccounts.map(b => (
-              <option key={b.id} value={b.id}>{b.bankName} - {b.name}</option>
-            ))}
-          </Select>
+          <div className="flex gap-2">
+            <Select
+              value={accountFilter}
+              onChange={e => handleAccountChange(e.target.value)}
+              className="!py-1.5 !text-xs flex-1"
+            >
+              <option value="all">All Accounts</option>
+              {state.bankAccounts.map(b => (
+                <option key={b.id} value={b.id}>{b.bankName} - {b.name}</option>
+              ))}
+            </Select>
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearFilters}
+                className="!py-1 !px-2 text-xs shrink-0"
+                title="Clear all filters"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
 
-      {/* Ledger Table */}
-      {filteredItems.length === 0 ? (
-        <EmptyState
-          icon={<Icon name="financial" size={24} />}
-          title="No transaction records"
-          helper={loading ? 'Loading ledger records...' : 'Transactions recorded from expenses and income appear here automatically.'}
-        />
-      ) : (
-        <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="data-table w-full">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Category / Description</th>
-                  <th>Method</th>
-                  <th>Account</th>
-                  <th className="text-right">Amount</th>
-                  <th className="text-right">Balance After</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredItems.map(t => {
-                  const acc = state.bankAccounts.find(a => a.id === t.bankAccountId);
-                  const isPositive = t.type === 'income';
-                  return (
-                    <tr key={t.id}>
-                      <td className="text-muted num">{t.date}</td>
-                      <td>
-                        <Badge
-                          tone={t.type === 'income' ? 'success' : t.type === 'transfer' ? 'primary' : 'neutral'}
-                          size="sm"
-                          className="capitalize text-[11px]"
-                        >
-                          {t.type}
-                        </Badge>
-                      </td>
-                      <td>
-                        <div className="font-medium text-text">{t.category || t.description || 'General'}</div>
-                        {t.description && t.category && (
-                          <div className="text-[11px] text-muted truncate">{t.description}</div>
-                        )}
-                      </td>
-                      <td>
-                        <span className="text-xs text-muted capitalize font-medium">
-                          {(t.paymentMethod || 'cash').replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="text-xs text-muted">
-                          {acc ? `${acc.bankName} (•••• ${acc.accountNumber.slice(-4)})` : '—'}
-                        </span>
-                      </td>
-                      <td className={`text-right font-bold num ${isPositive ? 'text-success-text' : 'text-danger-text'}`}>
-                        {isPositive ? `+${formatRs(t.amount)}` : `-${formatRs(t.amount)}`}
-                      </td>
-                      <td className="text-right text-muted num font-medium">
-                        {t.balanceAfter !== undefined ? formatRs(t.balanceAfter) : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
+      {/* DataTable with responsive card view */}
+      <DataTable
+        columns={columns}
+        data={filteredItems}
+        keyExtractor={t => t.id}
+        loading={loading}
+        emptyState={
+          <EmptyState
+            icon={<Icon name="financial" size={24} />}
+            title="No transaction records"
+            helper={
+              hasActiveFilters
+                ? 'No transactions matched the selected filters. Try clearing filters.'
+                : 'Transactions recorded from expenses and income appear here automatically.'
+            }
+            action={
+              hasActiveFilters ? (
+                <Button variant="secondary" size="sm" onClick={handleClearFilters}>
+                  Clear Filters
+                </Button>
+              ) : undefined
+            }
+          />
+        }
+      />
     </div>
   );
 }

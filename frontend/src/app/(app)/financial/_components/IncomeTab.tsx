@@ -7,15 +7,20 @@ import { Badge } from '@/components/ui/Badge';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { MoneyField } from '@/components/ui/MoneyField';
+import { DateField } from '@/components/ui/DateField';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
-import { Modal } from '@/components/ui/Modal';
 import { PaymentMethodField, PaymentMethod } from '@/components/ui/PaymentMethodField';
 import { BankSelect } from '@/components/ui/BankSelect';
-import ConfirmDialog from '@/components/ConfirmDialog';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useToast } from '@/components/ui/ToastProvider';
 
 export function IncomeTab({ month }: { month: string }) {
   const { state, dispatch } = useApp();
+  const confirm = useConfirm();
+  const toast = useToast();
+
   type IncomeForm = {
     source: string;
     type: 'salary' | 'business' | 'other';
@@ -36,7 +41,6 @@ export function IncomeTab({ month }: { month: string }) {
   });
   const [editId, setEditId] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const submit = () => {
     if (!form.source || !form.amount || Number(form.amount) <= 0) {
@@ -54,9 +58,11 @@ export function IncomeTab({ month }: { month: string }) {
     };
     if (editId) {
       dispatch({ type: 'UPDATE_INCOME', entry: { ...entry, id: editId } });
+      toast.success('Income source updated');
       setEditId(null);
     } else {
       dispatch({ type: 'ADD_INCOME', entry: { ...entry, id: 'i_' + Date.now() } });
+      toast.success('Income source added');
     }
     setForm({
       source: '',
@@ -68,6 +74,20 @@ export function IncomeTab({ month }: { month: string }) {
       bankAccountId: '',
     });
     setError('');
+  };
+
+  const handleDelete = async (id: string, source: string) => {
+    const ok = await confirm({
+      title: 'Delete Income Source',
+      message: `Are you sure you want to remove "${source}" from your ledger?`,
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (ok) {
+      dispatch({ type: 'DELETE_INCOME', id });
+      toast.success('Income source deleted');
+    }
   };
 
   const totalMonthly = state.income.reduce((s, i) => {
@@ -101,7 +121,7 @@ export function IncomeTab({ month }: { month: string }) {
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm text-text">{i.source}</div>
                     <div className="text-xs text-muted mt-0.5">
-                      {i.type} · {i.frequency} · {i.date}
+                      <span className="capitalize">{i.type}</span> · <span className="capitalize">{i.frequency}</span> · {i.date}
                       {linkedBank && ` · ${linkedBank.bankName}`}
                     </div>
                   </div>
@@ -131,7 +151,7 @@ export function IncomeTab({ month }: { month: string }) {
                       variant="ghost"
                       size="sm"
                       className="text-danger-text hover:text-danger-text"
-                      onClick={() => setDeleteConfirmId(i.id)}
+                      onClick={() => handleDelete(i.id, i.source)}
                       title="Delete"
                       aria-label="Delete income"
                     >
@@ -166,11 +186,9 @@ export function IncomeTab({ month }: { month: string }) {
             </Select>
           </Field>
           <Field id="income-amount" label="Amount (Rs.)">
-            <Input
-              type="number"
-              min="1"
+            <MoneyField
               value={form.amount}
-              onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+              onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
               placeholder="50,000"
             />
           </Field>
@@ -196,8 +214,7 @@ export function IncomeTab({ month }: { month: string }) {
             </Select>
           </Field>
           <Field id="income-date" label="Date received">
-            <Input
-              type="date"
+            <DateField
               value={form.date}
               onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
             />
@@ -228,21 +245,6 @@ export function IncomeTab({ month }: { month: string }) {
           </div>
         </div>
       </Card>
-
-      {deleteConfirmId && (
-        <ConfirmDialog
-          title="Delete Income Source"
-          message="Are you sure you want to remove this income source from your ledger?"
-          confirmLabel="Yes, Delete"
-          cancelLabel="No, Keep"
-          tone="danger"
-          onConfirm={() => {
-            dispatch({ type: 'DELETE_INCOME', id: deleteConfirmId });
-            setDeleteConfirmId(null);
-          }}
-          onCancel={() => setDeleteConfirmId(null)}
-        />
-      )}
     </div>
   );
 }

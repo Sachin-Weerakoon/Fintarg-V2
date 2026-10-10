@@ -2,21 +2,30 @@
 import { useState, useMemo } from 'react';
 import { useApp, formatRs, calcExpensesByCategory } from '@/store';
 import { Card } from '@/components/ui/Card';
+import { StatCard } from '@/components/ui/StatCard';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { MoneyField } from '@/components/ui/MoneyField';
+import { DateField } from '@/components/ui/DateField';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
-import { Modal } from '@/components/ui/Modal';
+import { DataTable, Column } from '@/components/ui/DataTable';
 import { PaymentMethodField, PaymentMethod } from '@/components/ui/PaymentMethodField';
 import { BankSelect } from '@/components/ui/BankSelect';
-import ConfirmDialog from '@/components/ConfirmDialog';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useToast } from '@/components/ui/ToastProvider';
 import { EXPENSE_CATS } from '@/utils/bankData';
+import type { ExpenseEntry } from '@/types';
 
 export function ExpensesTab({ month }: { month: string }) {
   const { state, dispatch } = useApp();
+  const confirm = useConfirm();
+  const toast = useToast();
+
   const [form, setForm] = useState({
     date: month + '-' + new Date().toISOString().slice(8, 10),
     category: 'Food',
@@ -30,15 +39,16 @@ export function ExpensesTab({ month }: { month: string }) {
   const [editId, setEditId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [catFilter, setCatFilter] = useState('All');
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const monthExp = state.expenses.filter(e => e.date.startsWith(month));
   const monthTotal = monthExp.reduce((s, e) => s + e.amount, 0);
   const catMap = calcExpensesByCategory(state.expenses, month);
   const cats = ['All', ...Object.keys(catMap).sort()];
-  const filtered = monthExp
-    .filter(e => catFilter === 'All' || e.category === catFilter)
-    .sort((a, b) => b.date.localeCompare(a.date));
+  const filtered = useMemo(() => {
+    return monthExp
+      .filter(e => catFilter === 'All' || e.category === catFilter)
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [monthExp, catFilter]);
 
   // Real days-left & daily budget computation
   const [yearStr, monthStr] = month.split('-');
@@ -72,9 +82,11 @@ export function ExpensesTab({ month }: { month: string }) {
     };
     if (editId) {
       dispatch({ type: 'UPDATE_EXPENSE', entry: { ...entry, id: editId } });
+      toast.success('Expense updated');
       setEditId(null);
     } else {
       dispatch({ type: 'ADD_EXPENSE', entry: { ...entry, id: 'e_' + Date.now() } });
+      toast.success('Expense recorded');
     }
     setForm({
       date: month + '-' + new Date().toISOString().slice(8, 10),
@@ -89,23 +101,123 @@ export function ExpensesTab({ month }: { month: string }) {
     setError('');
   };
 
+  const handleEdit = (expense: ExpenseEntry) => {
+    setEditId(expense.id);
+    setForm({
+      date: expense.date,
+      category: expense.category,
+      amount: String(expense.amount),
+      note: expense.note || '',
+      recurring: !!expense.recurring,
+      paymentMethod: (expense.paymentMethod as PaymentMethod) || 'cash',
+      bankAccountId: expense.bankAccountId || '',
+      cardId: expense.cardId || '',
+    });
+    setError('');
+  };
+
+  const handleDelete = async (id: string, category: string, amount: number) => {
+    const ok = await confirm({
+      title: 'Delete Expense',
+      message: `Are you sure you want to delete this ${formatRs(amount)} ${category} expense?`,
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (ok) {
+      dispatch({ type: 'DELETE_EXPENSE', id });
+      toast.success('Expense deleted');
+    }
+  };
+
+  const columns: Column<ExpenseEntry>[] = [
+    {
+      key: 'date',
+      header: 'Date',
+      render: e => <span className="text-muted num">{e.date}</span>,
+    },
+    {
+      key: 'category',
+      header: 'Category',
+      render: e => <span className="font-medium text-text">{e.category}</span>,
+    },
+    {
+      key: 'method',
+      header: 'Payment Method',
+      render: e => {
+        const linkedBank = state.bankAccounts.find(b => b.id === e.bankAccountId);
+        return (
+          <span className="text-xs text-muted capitalize">
+            {(e.paymentMethod || 'cash').replace('_', ' ')}
+            {linkedBank && ` (${linkedBank.bankName})`}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'note',
+      header: 'Note',
+      render: e => <span className="text-muted">{e.note || '—'}</span>,
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      align: 'right',
+      render: e => <span className="font-medium text-text num">{formatRs(e.amount)}</span>,
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'center',
+      className: 'w-24',
+      render: e => (
+        <div className="flex items-center justify-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="!p-1 text-muted hover:text-text"
+            onClick={() => handleEdit(e)}
+            aria-label="Edit expense"
+          >
+            <Icon name="edit" size={14} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-danger-text hover:text-danger-text !p-1"
+            onClick={() => handleDelete(e.id, e.category, e.amount)}
+            aria-label="Delete expense"
+          >
+            <Icon name="trash" size={14} />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="grid md:grid-cols-3 gap-6">
       <div className="md:col-span-2 space-y-4">
-        {/* Metric Cards */}
-        <div className="grid grid-cols-3 gap-3">
-          <Card className="text-center p-3">
-            <div className="text-xs text-muted mb-0.5">This Month</div>
-            <div className="font-bold text-sm text-text num">{formatRs(monthTotal)}</div>
-          </Card>
-          <Card className="text-center p-3">
-            <div className="text-xs text-muted mb-0.5">Days Remaining</div>
-            <div className="font-bold text-sm text-primary-text num">{daysLeft} days</div>
-          </Card>
-          <Card className="text-center p-3">
-            <div className="text-xs text-muted mb-0.5">Daily Budget Left</div>
-            <div className="font-bold text-sm text-success-text num">{formatRs(dailyBudget)} / day</div>
-          </Card>
+        {/* Metric Cards with StatCard */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <StatCard
+            label="This Month"
+            value={formatRs(monthTotal)}
+            tone="danger"
+            icon={<Icon name="arrow-down" size={18} />}
+          />
+          <StatCard
+            label="Days Remaining"
+            value={`${daysLeft} days`}
+            tone="default"
+            icon={<Icon name="calendar" size={18} />}
+          />
+          <StatCard
+            label="Daily Budget Left"
+            value={`${formatRs(dailyBudget)} / day`}
+            tone="success"
+            icon={<Icon name="wallet" size={18} />}
+          />
         </div>
 
         <div className="flex items-center justify-between gap-3">
@@ -124,59 +236,18 @@ export function ExpensesTab({ month }: { month: string }) {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
-          <EmptyState
-            title="No expenses recorded"
-            helper="Add your first expense for this month to track cash outflow and maintain daily budget."
-          />
-        ) : (
-          <Card className="p-0 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="data-table w-full">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Category</th>
-                    <th>Payment Method</th>
-                    <th>Note</th>
-                    <th className="text-right">Amount</th>
-                    <th className="w-16 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(e => {
-                    const linkedBank = state.bankAccounts.find(b => b.id === e.bankAccountId);
-                    return (
-                      <tr key={e.id}>
-                        <td className="text-muted num">{e.date}</td>
-                        <td className="font-medium text-text">{e.category}</td>
-                        <td>
-                          <span className="text-xs text-muted capitalize">
-                            {(e.paymentMethod || 'cash').replace('_', ' ')}
-                            {linkedBank && ` (${linkedBank.bankName})`}
-                          </span>
-                        </td>
-                        <td className="text-muted">{e.note || '—'}</td>
-                        <td className="text-right font-medium text-text num">{formatRs(e.amount)}</td>
-                        <td className="text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-danger-text hover:text-danger-text !p-1"
-                            onClick={() => setDeleteConfirmId(e.id)}
-                            aria-label="Delete expense"
-                          >
-                            <Icon name="trash" size={14} />
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        )}
+        {/* DataTable */}
+        <DataTable
+          columns={columns}
+          data={filtered}
+          keyExtractor={e => e.id}
+          emptyState={
+            <EmptyState
+              title="No expenses recorded"
+              helper="Add your first expense for this month to track cash outflow and maintain daily budget."
+            />
+          }
+        />
       </div>
 
       {/* Form */}
@@ -184,8 +255,7 @@ export function ExpensesTab({ month }: { month: string }) {
         <h3 className="font-semibold text-sm mb-4 text-text">{editId ? 'Edit expense' : 'Record Expense'}</h3>
         <div className="space-y-3.5">
           <Field id="expense-date" label="Date">
-            <Input
-              type="date"
+            <DateField
               value={form.date}
               onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
             />
@@ -199,12 +269,10 @@ export function ExpensesTab({ month }: { month: string }) {
             </Select>
           </Field>
           <Field id="expense-amount" label="Amount (Rs.)" error={error}>
-            <Input
-              type="number"
-              min="1"
+            <MoneyField
               value={form.amount}
-              onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
-              placeholder="2,500"
+              onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
+              hasError={!!error}
             />
           </Field>
           <PaymentMethodField
@@ -238,15 +306,11 @@ export function ExpensesTab({ month }: { month: string }) {
               placeholder="e.g. Supermarket, Electricity bill"
             />
           </Field>
-          <label className="flex items-center gap-2 cursor-pointer text-xs text-muted">
-            <input
-              type="checkbox"
-              className="rounded border-border text-primary-600 focus:ring-primary-600"
-              checked={form.recurring}
-              onChange={e => setForm(f => ({ ...f, recurring: e.target.checked }))}
-            />
-            <span>Recurring monthly</span>
-          </label>
+          <Checkbox
+            label="Recurring monthly"
+            checked={form.recurring}
+            onChange={checked => setForm(f => ({ ...f, recurring: checked }))}
+          />
           <div className="flex gap-2 pt-1">
             <Button variant="primary" className="flex-1" onClick={submit}>
               {editId ? 'Update Expense' : 'Save Expense'}
@@ -274,21 +338,6 @@ export function ExpensesTab({ month }: { month: string }) {
           </div>
         </div>
       </Card>
-
-      {deleteConfirmId && (
-        <ConfirmDialog
-          title="Delete Expense"
-          message="Are you sure you want to delete this expense record?"
-          confirmLabel="Yes, Delete"
-          cancelLabel="No, Keep"
-          tone="danger"
-          onConfirm={() => {
-            dispatch({ type: 'DELETE_EXPENSE', id: deleteConfirmId });
-            setDeleteConfirmId(null);
-          }}
-          onCancel={() => setDeleteConfirmId(null)}
-        />
-      )}
     </div>
   );
 }

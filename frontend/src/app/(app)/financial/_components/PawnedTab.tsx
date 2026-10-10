@@ -5,12 +5,18 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { MoneyField } from '@/components/ui/MoneyField';
+import { DateField } from '@/components/ui/DateField';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
-import ConfirmDialog from '@/components/ConfirmDialog';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useToast } from '@/components/ui/ToastProvider';
 
 export function PawnedTab() {
   const { state, dispatch } = useApp();
+  const confirm = useConfirm();
+  const toast = useToast();
+
   const [form, setForm] = useState({
     description: '',
     amountReceived: '',
@@ -18,7 +24,6 @@ export function PawnedTab() {
     nextDue: new Date().toISOString().slice(0, 10),
     redemptionDate: '',
   });
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const submit = () => {
     if (!form.description || !form.amountReceived) return;
@@ -38,6 +43,7 @@ export function PawnedTab() {
         redemptionDate,
       },
     });
+    toast.success('Pawned item recorded');
     setForm({
       description: '',
       amountReceived: '',
@@ -45,6 +51,25 @@ export function PawnedTab() {
       nextDue: new Date().toISOString().slice(0, 10),
       redemptionDate: '',
     });
+  };
+
+  const handlePayInterest = (id: string, description: string) => {
+    dispatch({ type: 'RECORD_PAWN_PAYMENT', id });
+    toast.success(`Interest payment recorded for "${description}"`);
+  };
+
+  const handleDelete = async (id: string, description: string) => {
+    const ok = await confirm({
+      title: 'Delete Pawned Item',
+      message: `Are you sure you want to remove the record for "${description}"?`,
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (ok) {
+      dispatch({ type: 'DELETE_PAWNED', id });
+      toast.success('Pawned item record deleted');
+    }
   };
 
   return (
@@ -70,7 +95,7 @@ export function PawnedTab() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => dispatch({ type: 'RECORD_PAWN_PAYMENT', id: p.id })}
+                    onClick={() => handlePayInterest(p.id, p.description)}
                   >
                     Pay Interest
                   </Button>
@@ -78,7 +103,7 @@ export function PawnedTab() {
                     variant="ghost"
                     size="sm"
                     className="text-danger-text hover:text-danger-text !p-1.5"
-                    onClick={() => setDeleteConfirmId(p.id)}
+                    onClick={() => handleDelete(p.id, p.description)}
                     aria-label="Delete item"
                   >
                     <Icon name="trash" size={14} />
@@ -101,10 +126,9 @@ export function PawnedTab() {
             />
           </Field>
           <Field id="pawn-amount" label="Amount received (Rs.)">
-            <Input
-              type="number"
+            <MoneyField
               value={form.amountReceived}
-              onChange={e => setForm(f => ({ ...f, amountReceived: e.target.value }))}
+              onChange={v => setForm(f => ({ ...f, amountReceived: String(v) }))}
               placeholder="50,000"
             />
           </Field>
@@ -118,15 +142,13 @@ export function PawnedTab() {
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field id="pawn-due" label="Next due date">
-              <Input
-                type="date"
+              <DateField
                 value={form.nextDue}
                 onChange={e => setForm(f => ({ ...f, nextDue: e.target.value }))}
               />
             </Field>
             <Field id="pawn-redemption" label="Redemption date">
-              <Input
-                type="date"
+              <DateField
                 value={form.redemptionDate}
                 onChange={e => setForm(f => ({ ...f, redemptionDate: e.target.value }))}
               />
@@ -137,21 +159,6 @@ export function PawnedTab() {
           </Button>
         </div>
       </Card>
-
-      {deleteConfirmId && (
-        <ConfirmDialog
-          title="Delete Pawned Item"
-          message="Are you sure you want to remove this pawned item record?"
-          confirmLabel="Yes, Delete"
-          cancelLabel="No, Keep"
-          tone="danger"
-          onConfirm={() => {
-            dispatch({ type: 'DELETE_PAWNED', id: deleteConfirmId });
-            setDeleteConfirmId(null);
-          }}
-          onCancel={() => setDeleteConfirmId(null)}
-        />
-      )}
     </div>
   );
 }

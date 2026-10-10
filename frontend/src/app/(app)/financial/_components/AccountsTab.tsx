@@ -14,7 +14,10 @@ import { Sheet } from '@/components/ui/Sheet';
 import { Modal } from '@/components/ui/Modal';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { BankSelect } from '@/components/ui/BankSelect';
-import ConfirmDialog from '@/components/ConfirmDialog';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useToast } from '@/components/ui/ToastProvider';
+import { StatCard } from '@/components/ui/StatCard';
+import { MoneyField } from '@/components/ui/MoneyField';
 import { Alert } from '@/components/ui/Alert';
 import {
   SRI_LANKAN_BANKS,
@@ -27,6 +30,8 @@ import type { BankAccount, Card as CardType } from '@/types';
 
 export function AccountsTab() {
   const { state, dispatch } = useApp();
+  const confirm = useConfirm();
+  const toast = useToast();
   const [activeSubTab, setActiveSubTab] = useState<'accounts' | 'cards'>('accounts');
 
   // Bank Account Form
@@ -67,9 +72,33 @@ export function AccountsTab() {
   // Clipboard copy state
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Delete confirmations
-  const [deleteAccountConfirmId, setDeleteAccountConfirmId] = useState<string | null>(null);
-  const [deleteCardConfirmId, setDeleteCardConfirmId] = useState<string | null>(null);
+  const handleDeleteAccount = async (id: string, name: string) => {
+    const ok = await confirm({
+      title: 'Delete Bank Account',
+      message: `Are you sure you want to remove "${name}"? Cards and transactions linked to this account may lose their reference.`,
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (ok) {
+      dispatch({ type: 'DELETE_BANK_ACCOUNT', id });
+      toast.success(`Bank account "${name}" deleted`);
+    }
+  };
+
+  const handleDeleteCard = async (id: string, name: string) => {
+    const ok = await confirm({
+      title: 'Delete Payment Card',
+      message: `Are you sure you want to remove payment card "${name}"?`,
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (ok) {
+      dispatch({ type: 'DELETE_CARD', id });
+      toast.success(`Payment card "${name}" deleted`);
+    }
+  };
 
   const totalBankBalance = state.bankAccounts.reduce((s, a) => s + (a.currentBalance || 0), 0);
 
@@ -302,10 +331,11 @@ export function AccountsTab() {
                               {acc.accountNumber}
                             </span>
                           </div>
-                          <button
-                            type="button"
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => copyToClipboard(acc.accountNumber, `acc_${acc.id}`)}
-                            className="p-1.5 rounded-md text-muted hover:text-primary-text hover:bg-surface transition-colors shrink-0"
+                            className="!p-1.5 shrink-0"
                             title="Copy account number"
                             aria-label="Copy account number"
                           >
@@ -314,7 +344,7 @@ export function AccountsTab() {
                               size={14}
                               className={copiedId === `acc_${acc.id}` ? 'text-primary-text' : ''}
                             />
-                          </button>
+                          </Button>
                         </div>
 
                         {/* Industry Banking Specifications */}
@@ -382,7 +412,7 @@ export function AccountsTab() {
                             variant="ghost"
                             size="sm"
                             className="text-danger-text hover:text-danger-text"
-                            onClick={() => setDeleteAccountConfirmId(acc.id)}
+                            onClick={() => handleDeleteAccount(acc.id, acc.name)}
                             aria-label="Delete account"
                           >
                             <Icon name="trash" size={14} />
@@ -660,7 +690,7 @@ export function AccountsTab() {
                             variant="ghost"
                             size="sm"
                             className="text-danger-text hover:text-danger-text"
-                            onClick={() => setDeleteCardConfirmId(c.id)}
+                            onClick={() => handleDeleteCard(c.id, c.name)}
                             aria-label="Delete card"
                           >
                             <Icon name="trash" size={14} />
@@ -686,14 +716,14 @@ export function AccountsTab() {
               className="mb-4 p-4 rounded-xl relative overflow-hidden border border-border/80 shadow-md transition-all text-white"
               style={{
                 background: cardForm.cardType === 'credit'
-                  ? 'linear-gradient(135deg, #0B1626 0%, #152A4A 60%, #0FA3B1 140%)'
-                  : 'linear-gradient(135deg, #0F1D32 0%, #0B1626 70%, #0FA3B1 150%)',
+                  ? 'linear-gradient(135deg, var(--bg-surface-elevated, var(--bg-surface)) 0%, var(--bg-surface) 60%, var(--color-primary) 150%)'
+                  : 'linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-surface-elevated, var(--bg-surface)) 70%, var(--color-primary) 150%)',
               }}
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-6 rounded bg-amber-400/90 border border-amber-300/40 flex items-center justify-center">
-                    <div className="w-4 h-3 border border-amber-800/40 rounded-sm" />
+                  <div className="w-8 h-6 rounded bg-warning-tint border border-warning-solid/30 flex items-center justify-center">
+                    <div className="w-4 h-3 border border-warning-solid/40 rounded-sm" />
                   </div>
                   <svg className="w-4 h-4 text-white/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M8.5 16.5a5 5 0 0 1 0-7" />
@@ -912,7 +942,7 @@ export function AccountsTab() {
             <div
               className="p-5 rounded-xl border border-primary-500/40 text-white shadow-lg relative overflow-hidden"
               style={{
-                background: 'linear-gradient(135deg, #0B1626 0%, #10263E 60%, #0FA3B1 140%)',
+                background: 'linear-gradient(135deg, var(--bg-surface-elevated, var(--bg-surface)) 0%, var(--bg-surface) 60%, var(--color-primary) 150%)',
               }}
             >
               <div className="flex items-start justify-between gap-2 mb-4">
@@ -1094,14 +1124,14 @@ export function AccountsTab() {
               className="p-5 rounded-xl border border-primary-500/40 text-white shadow-lg relative overflow-hidden"
               style={{
                 background: viewCardDetails.cardType === 'credit'
-                  ? 'linear-gradient(135deg, #0B1626 0%, #152A4A 60%, #0FA3B1 140%)'
-                  : 'linear-gradient(135deg, #0F1D32 0%, #0B1626 70%, #0FA3B1 150%)',
+                  ? 'linear-gradient(135deg, var(--bg-surface-elevated, var(--bg-surface)) 0%, var(--bg-surface) 60%, var(--color-primary) 150%)'
+                  : 'linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-surface-elevated, var(--bg-surface)) 70%, var(--color-primary) 150%)',
               }}
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-6 rounded bg-amber-400/90 border border-amber-300/40 flex items-center justify-center">
-                    <div className="w-4 h-3 border border-amber-800/40 rounded-sm" />
+                  <div className="w-8 h-6 rounded bg-warning-tint border border-warning-solid/30 flex items-center justify-center">
+                    <div className="w-4 h-3 border border-warning-solid/40 rounded-sm" />
                   </div>
                   <svg className="w-4 h-4 text-white/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M8.5 16.5a5 5 0 0 1 0-7" />
@@ -1217,37 +1247,7 @@ export function AccountsTab() {
         </Modal>
       )}
 
-      {/* Delete Bank Account Dialog */}
-      {deleteAccountConfirmId && (
-        <ConfirmDialog
-          title="Delete Bank Account"
-          message="Are you sure you want to remove this bank account? Cards and transactions linked to this account may lose their reference."
-          confirmLabel="Yes, Delete"
-          cancelLabel="No, Keep"
-          tone="danger"
-          onConfirm={() => {
-            dispatch({ type: 'DELETE_BANK_ACCOUNT', id: deleteAccountConfirmId });
-            setDeleteAccountConfirmId(null);
-          }}
-          onCancel={() => setDeleteAccountConfirmId(null)}
-        />
-      )}
 
-      {/* Delete Card Dialog */}
-      {deleteCardConfirmId && (
-        <ConfirmDialog
-          title="Delete Payment Card"
-          message="Are you sure you want to remove this payment card record?"
-          confirmLabel="Yes, Delete"
-          cancelLabel="No, Keep"
-          tone="danger"
-          onConfirm={() => {
-            dispatch({ type: 'DELETE_CARD', id: deleteCardConfirmId });
-            setDeleteCardConfirmId(null);
-          }}
-          onCancel={() => setDeleteCardConfirmId(null)}
-        />
-      )}
     </div>
   );
 }
