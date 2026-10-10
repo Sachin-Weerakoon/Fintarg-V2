@@ -184,8 +184,8 @@ export default function Analysis() {
                 </span>
               </div>
             </div>
-            <Link href="/print/analysis" className="w-full mt-4 block text-center no-print">
-              <Button variant="secondary" size="sm" className="w-full">
+            <Link href="/print/analysis" target="_blank" className="w-full mt-4 block text-center no-print">
+              <Button variant="secondary" size="sm" className="w-full" iconLeft={<Icon name="download" size={14} />}>
                 Export Analysis as PDF
               </Button>
             </Link>
