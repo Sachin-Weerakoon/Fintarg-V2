@@ -13,10 +13,15 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
-import ConfirmDialog from '@/components/ConfirmDialog';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useToast } from '@/components/ui/ToastProvider';
+import { MoneyField } from '@/components/ui/MoneyField';
+import { DateField } from '@/components/ui/DateField';
 
 export default function Goals() {
-  const { state, dispatch, showToast } = useApp();
+  const { state, dispatch } = useApp();
+  const confirm = useConfirm();
+  const toast = useToast();
   const month = state.selectedMonth;
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [goalForm, setGoalForm] = useState({
@@ -29,7 +34,19 @@ export default function Goals() {
   const [saving, setSaving] = useState<Record<string, { amount: string; date: string; note: string }>>({});
   const [adjusting, setAdjusting] = useState<string | null>(null);
   const [adjustForm, setAdjustForm] = useState({ dailyAmount: '' });
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const handleDeleteGoal = async (id: string, name: string) => {
+    const ok = await confirm({
+      title: 'Delete Savings Goal',
+      message: `Are you sure you want to delete savings goal "${name}"? This action cannot be undone.`,
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (ok) {
+      dispatch({ type: 'DELETE_GOAL', id });
+      toast.success(`Savings goal "${name}" deleted`);
+    }
+  };
 
   const DAYS_IN_MONTH = 30;
   const a = calcAnalysis(state, month);
@@ -100,7 +117,7 @@ export default function Goals() {
       });
     }
 
-    showToast(`Savings goal "${goalForm.name}" created! Target deadline reminder scheduled.`, 'success');
+    toast.success(`Savings goal "${goalForm.name}" created! Target deadline reminder scheduled.`);
     setGoalForm({ name: '', targetAmount: '', targetDate: '', dailyAmount: '' });
     setGoalError('');
     setShowAddGoal(false);
@@ -172,11 +189,10 @@ export default function Goals() {
               />
             </Field>
             <Field id="goal-targetamt" label="Target Total Amount (Rs.)">
-              <Input
-                type="number"
+              <MoneyField
                 value={goalForm.targetAmount}
-                onChange={e => setGoalForm(f => ({ ...f, targetAmount: e.target.value }))}
-                placeholder="e.g. 500,000"
+                onChange={v => setGoalForm(f => ({ ...f, targetAmount: String(v) }))}
+                placeholder="500,000"
               />
             </Field>
             <Field id="goal-targetdate" label="Target Date">
@@ -322,7 +338,7 @@ export default function Goals() {
                     variant="ghost"
                     size="sm"
                     className="text-danger-text hover:text-danger-text !p-1.5"
-                    onClick={() => setDeleteConfirmId(goal.id)}
+                    onClick={() => handleDeleteGoal(goal.id, goal.name)}
                     aria-label="Delete goal"
                   >
                     <Icon name="trash" size={14} />
@@ -387,15 +403,17 @@ export default function Goals() {
                       Maximum achievable: <strong className="num">{formatRs(Math.max(0, cashForThisGoal))}</strong>.
                     </p>
                     {!adjusting && (
-                      <button
-                        className="mt-2 text-xs font-semibold text-primary-text hover:underline block"
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="!p-0 mt-2 text-xs font-semibold text-primary-text hover:underline block"
                         onClick={() => {
                           setAdjusting(goal.id);
                           setAdjustForm({ dailyAmount: String(Math.max(0, Math.floor(cashForThisGoal / DAYS_IN_MONTH))) });
                         }}
                       >
                         Adjust goal to feasible amount →
-                      </button>
+                      </Button>
                     )}
                   </div>
                 )}
@@ -478,20 +496,7 @@ export default function Goals() {
         </div>
       )}
 
-      {deleteConfirmId && (
-        <ConfirmDialog
-          title="Delete Savings Goal"
-          message="Are you sure you want to delete this savings goal? This action cannot be undone."
-          confirmLabel="Yes, Delete"
-          cancelLabel="No, Keep"
-          tone="danger"
-          onConfirm={() => {
-            dispatch({ type: 'DELETE_GOAL', id: deleteConfirmId });
-            setDeleteConfirmId(null);
-          }}
-          onCancel={() => setDeleteConfirmId(null)}
-        />
-      )}
+
     </PageContainer>
   );
 }

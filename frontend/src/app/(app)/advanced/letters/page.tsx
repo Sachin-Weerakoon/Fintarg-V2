@@ -14,7 +14,9 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { Icon } from '@/components/ui/Icon';
-import ConfirmDialog from '@/components/ConfirmDialog';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useToast } from '@/components/ui/ToastProvider';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type Template = 'bank' | 'offer' | 'general';
 
@@ -96,6 +98,8 @@ ${name}`;
 
 export default function LettersClient() {
   const { state, dispatch } = useApp();
+  const confirm = useConfirm();
+  const toast = useToast();
   const { profile } = state;
   const isBusiness = profile.plan === 'business';
 
@@ -107,7 +111,19 @@ export default function LettersClient() {
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState('');
   const [saved, setSaved] = useState(false);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const handleDelete = async (id: string, purpose: string) => {
+    const ok = await confirm({
+      title: 'Delete Letter',
+      message: `Are you sure you want to delete the letter for "${purpose}" from your history?`,
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (ok) {
+      dispatch({ type: 'DELETE_LETTER', id });
+      toast.success('Letter record deleted');
+    }
+  };
 
   const selectedCompany = state.companies.find(c => c.id === selectedCompanyId) || null;
 
@@ -262,7 +278,7 @@ export default function LettersClient() {
                       variant="ghost"
                       size="sm"
                       className="text-danger-text hover:text-danger-text !p-1.5"
-                      onClick={() => setDeleteConfirmId(l.id)}
+                      onClick={() => handleDelete(l.id, l.purpose || l.type)}
                       aria-label="Delete letter"
                     >
                       <Icon name="trash" size={14} />
@@ -323,35 +339,16 @@ export default function LettersClient() {
               )}
             </Card>
           ) : (
-            <Card className="flex items-center justify-center min-h-[360px] p-8 text-center">
-              <div className="space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-surface-hover border border-border flex items-center justify-center text-muted mx-auto">
-                  <Icon name="file-text" size={24} />
-                </div>
-                <h4 className="font-semibold text-sm text-text">No letter generated</h4>
-                <p className="text-xs text-muted max-w-xs">
-                  Fill in the recipient and purpose on the left, then click &ldquo;Generate Letter&rdquo;.
-                </p>
-              </div>
-            </Card>
+            <EmptyState
+              icon={<Icon name="documents" size={28} />}
+              title="No letter generated"
+              helper="Fill in the recipient and purpose on the left, then click Generate Letter to preview."
+            />
           )}
         </div>
       </div>
 
-      {deleteConfirmId && (
-        <ConfirmDialog
-          title="Delete Letter"
-          message="Are you sure you want to delete this letter record from your history?"
-          confirmLabel="Yes, Delete"
-          cancelLabel="No, Keep"
-          tone="danger"
-          onConfirm={() => {
-            dispatch({ type: 'DELETE_LETTER', id: deleteConfirmId });
-            setDeleteConfirmId(null);
-          }}
-          onCancel={() => setDeleteConfirmId(null)}
-        />
-      )}
+
     </PageContainer>
   );
 }

@@ -14,7 +14,11 @@ import { Badge } from '@/components/ui/Badge';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
-import ConfirmDialog from '@/components/ConfirmDialog';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useToast } from '@/components/ui/ToastProvider';
+import { StatCard } from '@/components/ui/StatCard';
+import { MoneyField } from '@/components/ui/MoneyField';
+import { DateField } from '@/components/ui/DateField';
 
 const MEDICAL_TYPES = ['Consultation', 'Pharmacy', 'Lab test', 'Hospital', 'Dental', 'Specialist', 'Other'];
 const MONTHS = ['2026-07', '2026-08', '2026-09'];
@@ -22,6 +26,8 @@ const MONTH_LABELS: Record<string, string> = { '2026-07': 'Jul 2026', '2026-08':
 
 export default function MedicalClient() {
   const { state, dispatch } = useApp();
+  const confirm = useConfirm();
+  const toast = useToast();
   const month = state.selectedMonth;
   const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), type: 'Consultation', amount: '', note: '' });
   const [error, setError] = useState('');
@@ -30,9 +36,47 @@ export default function MedicalClient() {
   const [remError, setRemError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'expenses' | 'documents' | 'reminders'>('expenses');
-  const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
-  const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
-  const [deleteReminderId, setDeleteReminderId] = useState<string | null>(null);
+  const handleDeleteExpense = async (id: string, type: string) => {
+    const ok = await confirm({
+      title: 'Delete Medical Expense',
+      message: `Are you sure you want to delete this ${type} expense record?`,
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (ok) {
+      dispatch({ type: 'DELETE_MEDICAL_EXPENSE', id });
+      toast.success('Medical expense deleted');
+    }
+  };
+
+  const handleDeleteDoc = async (id: string, label: string) => {
+    const ok = await confirm({
+      title: 'Delete Document',
+      message: `Are you sure you want to delete medical document "${label}"?`,
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (ok) {
+      dispatch({ type: 'DELETE_DOCUMENT', id });
+      toast.success('Medical document removed');
+    }
+  };
+
+  const handleDeleteReminder = async (id: string, label: string) => {
+    const ok = await confirm({
+      title: 'Delete Reminder',
+      message: `Are you sure you want to delete reminder "${label}"?`,
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (ok) {
+      dispatch({ type: 'DELETE_REMINDER', id });
+      toast.success('Reminder deleted');
+    }
+  };
 
   const monthExpenses = state.medicalExpenses.filter(m => m.date.startsWith(month));
   const monthTotal = monthExpenses.reduce((s, m) => s + m.amount, 0);
@@ -47,6 +91,7 @@ export default function MedicalClient() {
       type: 'ADD_MEDICAL_EXPENSE',
       entry: { id: 'm_' + Date.now(), date: form.date, type: form.type, amount: Number(form.amount), note: form.note },
     });
+    toast.success('Medical expense recorded');
     setForm({ date: new Date().toISOString().slice(0, 10), type: 'Consultation', amount: '', note: '' });
     setError('');
   };
@@ -95,6 +140,7 @@ export default function MedicalClient() {
         status: 'pending',
       },
     });
+    toast.success('Medical reminder added');
     setRemForm({ label: '', dueDate: '', channel: 'email' });
     setRemError('');
   };
@@ -187,7 +233,7 @@ export default function MedicalClient() {
                                 variant="ghost"
                                 size="sm"
                                 className="text-danger-text hover:text-danger-text !p-1"
-                                onClick={() => setDeleteExpenseId(m.id)}
+                                onClick={() => handleDeleteExpense(m.id, m.type)}
                                 aria-label="Delete medical expense"
                               >
                                 <Icon name="trash" size={14} />
@@ -292,7 +338,7 @@ export default function MedicalClient() {
                         variant="ghost"
                         size="sm"
                         className="text-danger-text hover:text-danger-text !p-1.5"
-                        onClick={() => setDeleteDocId(d.id)}
+                        onClick={() => handleDeleteDoc(d.id, d.label)}
                         aria-label="Delete document"
                       >
                         <Icon name="trash" size={14} />
@@ -365,7 +411,7 @@ export default function MedicalClient() {
                       variant="ghost"
                       size="sm"
                       className="text-danger-text hover:text-danger-text !p-1.5"
-                      onClick={() => setDeleteReminderId(r.id)}
+                      onClick={() => handleDeleteReminder(r.id, r.label)}
                       aria-label="Delete reminder"
                     >
                       <Icon name="trash" size={14} />
@@ -378,48 +424,7 @@ export default function MedicalClient() {
         </div>
       )}
 
-      {deleteExpenseId && (
-        <ConfirmDialog
-          title="Delete Medical Expense"
-          message="Are you sure you want to delete this medical expense?"
-          confirmLabel="Delete"
-          tone="danger"
-          onConfirm={() => {
-            dispatch({ type: 'DELETE_MEDICAL_EXPENSE', id: deleteExpenseId });
-            setDeleteExpenseId(null);
-          }}
-          onCancel={() => setDeleteExpenseId(null)}
-        />
-      )}
 
-      {deleteDocId && (
-        <ConfirmDialog
-          title="Delete Document"
-          message="Are you sure you want to delete this medical file?"
-          confirmLabel="Delete"
-          tone="danger"
-          onConfirm={() => {
-            dispatch({ type: 'DELETE_DOCUMENT', id: deleteDocId });
-            setDeleteDocId(null);
-          }}
-          onCancel={() => setDeleteDocId(null)}
-        />
-      )}
-
-      {deleteReminderId && (
-        <ConfirmDialog
-          title="Delete Reminder"
-          message="Are you sure you want to delete this reminder?"
-          confirmLabel="Yes, Delete"
-          cancelLabel="No, Keep"
-          tone="danger"
-          onConfirm={() => {
-            dispatch({ type: 'DELETE_REMINDER', id: deleteReminderId });
-            setDeleteReminderId(null);
-          }}
-          onCancel={() => setDeleteReminderId(null)}
-        />
-      )}
     </PageContainer>
   );
 }

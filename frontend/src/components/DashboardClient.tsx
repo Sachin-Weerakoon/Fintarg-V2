@@ -136,7 +136,7 @@ export default function DashboardClient() {
         description="Here is your financial pulse and priority items for this month."
         actions={
           <div className="flex items-center gap-3">
-            <Link href="/financial">
+            <Link href="/financial?tab=expenses">
               <Button variant="primary" iconLeft={<Icon name="plus" size={16} />}>
                 Record Entry
               </Button>
@@ -261,7 +261,7 @@ export default function DashboardClient() {
                 </div>
                 <p className="text-xs text-muted mt-0.5">Automated cashflow forecast & risk assessment</p>
               </div>
-              <Link href="/financial">
+              <Link href="/financial?tab=expenses">
                 <Button variant="secondary" size="sm" iconRight={<Icon name="arrow-right" size={14} />}>
                   Full Details
                 </Button>
@@ -334,14 +334,14 @@ export default function DashboardClient() {
                 <Icon name="bank" size={16} className="text-primary-text" />
                 <span>Connected Accounts</span>
               </div>
-              <Link href="/financial" className="text-xs text-primary-text font-semibold hover:underline">
+              <Link href="/financial?tab=accounts" className="text-xs text-primary-text font-semibold hover:underline">
                 Manage
               </Link>
             </div>
             {state.bankAccounts.length === 0 ? (
               <div className="text-xs text-muted py-2">
                 No bank accounts linked yet.{' '}
-                <Link href="/financial" className="text-primary-text hover:underline">Add an account</Link> to track balances.
+                <Link href="/financial?tab=accounts" className="text-primary-text hover:underline">Add an account</Link> to track balances.
               </div>
             ) : (
               <div className="space-y-2">
@@ -419,7 +419,7 @@ export default function DashboardClient() {
             </div>
             <div className="space-y-2">
               <Link
-                href="/financial"
+                href="/financial?tab=expenses"
                 className="flex items-center justify-between p-3 rounded-xl border border-border bg-surface hover:bg-surface-hover hover:border-primary-500/50 text-xs font-semibold text-text transition-all duration-200 group"
               >
                 <div className="flex items-center gap-2.5">
@@ -427,6 +427,19 @@ export default function DashboardClient() {
                     <Icon name="financial" size={16} />
                   </div>
                   <span>Record Income & Expenses</span>
+                </div>
+                <Icon name="arrow-right" size={14} className="text-muted group-hover:text-primary-text transition-colors" />
+              </Link>
+
+              <Link
+                href="/financial?tab=accounts"
+                className="flex items-center justify-between p-3 rounded-xl border border-border bg-surface hover:bg-surface-hover hover:border-primary-500/50 text-xs font-semibold text-text transition-all duration-200 group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-primary-tint text-primary-text flex items-center justify-center">
+                    <Icon name="bank" size={16} />
+                  </div>
+                  <span>Bank Accounts & Cards</span>
                 </div>
                 <Icon name="arrow-right" size={14} className="text-muted group-hover:text-primary-text transition-colors" />
               </Link>
