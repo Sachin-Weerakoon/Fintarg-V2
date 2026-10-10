@@ -162,35 +162,35 @@ export default function Welcome() {
               rel="noopener noreferrer"
               className="text-white/80 hover:text-primary-300 transition-colors"
             >
-              Powered by <span className="font-bold text-primary-400">Raxwo</span>
+              Powered by <span className="font-bold text-primary-400">Raxwo (Pvt) Ltd</span>
             </a>
           </div>
         </div>
       </section>
 
       <section className="flex-1 flex items-center justify-center p-4 sm:p-8">
-        <div className="w-full max-w-md md:max-w-lg bg-[#0F1D32]/95 border border-slate-700/70 rounded-2xl p-6 sm:p-7 shadow-2xl backdrop-blur-xl text-white">
+        <div className="w-full max-w-md md:max-w-lg bg-surface-elevated/95 border border-border rounded-2xl p-6 sm:p-7 shadow-2xl backdrop-blur-xl text-text">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 p-1 border border-white/10">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-surface p-1 border border-border">
                 <img src="/brand/fintarg-logo.svg" alt="Fintarg logo" className="w-5 h-5 object-contain" />
               </div>
-              <span className="font-bold text-lg text-white tracking-tight">Fintarg</span>
+              <span className="font-bold text-lg text-text tracking-tight">Fintarg</span>
             </div>
-            <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded text-primary-400 bg-primary-400/10 border border-primary-400/20">
+            <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded text-primary-text bg-primary-tint border border-primary-solid/20">
               v2.0
             </span>
           </div>
 
           <div className="mb-5">
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-text tracking-tight">
               {authMode === 'signin'
                 ? 'Welcome back'
                 : signupStep === 'mode'
                 ? 'Choose how you will use Fintarg'
                 : 'Create your account'}
             </h2>
-            <p className="text-xs sm:text-sm mt-1.5 text-slate-300 leading-relaxed">
+            <p className="text-xs sm:text-sm mt-1.5 text-muted leading-relaxed">
               {authMode === 'signin'
                 ? 'Sign in to access your financial dashboard.'
                 : signupStep === 'mode'
@@ -219,28 +219,28 @@ export default function Welcome() {
                       }}
                       className={`p-3.5 rounded-xl border transition-all cursor-pointer select-none ${
                         isSelected
-                          ? 'bg-primary-500/15 border-primary-400 ring-1 ring-primary-400/50 shadow-md'
-                          : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800/70 hover:border-slate-600'
+                          ? 'bg-primary-tint border-primary-solid ring-1 ring-primary-solid/40 shadow-md'
+                          : 'bg-surface border-border hover:bg-surface-hover hover:border-border-strong'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-sm text-white">{option.title}</span>
+                        <span className="font-semibold text-sm text-text">{option.title}</span>
                         <div
                           className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
                             isSelected
-                              ? 'border-primary-400 bg-primary-400 text-slate-950 font-bold text-[10px]'
-                              : 'border-slate-600'
+                              ? 'border-primary-solid bg-primary-solid text-white font-bold text-[10px]'
+                              : 'border-border-strong'
                           }`}
                         >
                           {isSelected && '✓'}
                         </div>
                       </div>
-                      <p className="text-xs text-slate-300 leading-snug mb-2">{option.description}</p>
+                      <p className="text-xs text-muted leading-snug mb-2">{option.description}</p>
                       <div className="flex flex-wrap gap-1.5">
                         {option.features.map(f => (
                           <span
                             key={f}
-                            className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-700/50 text-slate-300"
+                            className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface-hover text-muted border border-border"
                           >
                             {f}
                           </span>
@@ -262,23 +262,24 @@ export default function Welcome() {
           ) : (
             <div className="space-y-3.5">
               {authMode === 'signup' && (
-                <div className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between gap-3 text-xs">
-                  <span className="text-slate-300 font-medium">
-                    Flow: <span className="text-white font-semibold">{workModeOptions.find(o => o.value === workMode)?.title}</span>
+                <div className="p-2.5 rounded-xl bg-surface-hover/80 border border-border flex items-center justify-between gap-3 text-xs">
+                  <span className="text-muted font-medium">
+                    Flow: <span className="text-text font-semibold">{workModeOptions.find(o => o.value === workMode)?.title}</span>
                   </span>
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setSignupStep('mode')}
-                    className="text-primary-400 hover:text-primary-300 font-semibold underline text-xs"
+                    className="!p-0 text-primary-text hover:underline text-xs font-semibold"
                   >
                     Change
-                  </button>
+                  </Button>
                 </div>
               )}
 
               {authMode === 'signup' && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-200 mb-1" htmlFor="signup-name-account">
+                  <label className="block text-xs font-semibold text-text mb-1" htmlFor="signup-name-account">
                     Your name
                   </label>
                   <Input
@@ -287,13 +288,12 @@ export default function Welcome() {
                     placeholder="e.g. Kasun Perera"
                     value={form.name}
                     onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                    className="!bg-slate-800/80 !border-slate-700 !text-white placeholder:!text-slate-500 focus:!border-primary-400"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-200 mb-1" htmlFor="signup-email">
+                <label className="block text-xs font-semibold text-text mb-1" htmlFor="signup-email">
                   Email address
                 </label>
                 <Input
@@ -303,17 +303,16 @@ export default function Welcome() {
                   placeholder="kasun@email.com"
                   value={form.email}
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                  className="!bg-slate-800/80 !border-slate-700 !text-white placeholder:!text-slate-500 focus:!border-primary-400"
                 />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-slate-200" htmlFor="signup-password">
+                  <label className="block text-xs font-semibold text-text" htmlFor="signup-password">
                     Password
                   </label>
                   {authMode === 'signin' && (
-                    <a className="text-xs font-medium text-primary-400 hover:underline" href="/forgot-password">
+                    <a className="text-xs font-medium text-primary-text hover:underline" href="/forgot-password">
                       Forgot password?
                     </a>
                   )}
@@ -324,26 +323,26 @@ export default function Welcome() {
                   placeholder="At least 8 characters"
                   value={form.password}
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                  className="!bg-slate-800/80 !border-slate-700 !text-white placeholder:!text-slate-500 focus:!border-primary-400"
                 />
               </div>
 
               {authMode === 'signup' && (
                 <div className="pt-1">
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setSignupStep('mode')}
-                    className="text-xs text-slate-400 hover:text-white transition-colors"
+                    className="!p-0 text-xs text-muted hover:text-text transition-colors"
                   >
                     ← Back to flow selection
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
           )}
 
           {error && (
-            <div className="p-3 rounded-xl border border-danger-solid/40 bg-danger-solid/15 text-red-200 text-xs mt-4 flex items-center gap-2" role="alert">
+            <div className="p-3 rounded-xl border border-danger-solid/40 bg-danger-tint text-danger-text text-xs mt-4 flex items-center gap-2" role="alert">
               <span className="text-danger-solid font-bold">⚠</span>
               <span>{error}</span>
             </div>
@@ -361,11 +360,12 @@ export default function Welcome() {
             </Button>
           )}
 
-          <div className="text-center text-xs mt-5 text-slate-300">
+          <div className="text-center text-xs mt-5 text-muted">
             {authMode === 'signup' ? 'Already have an account?' : 'New to Fintarg?'}{' '}
-            <button
-              type="button"
-              className="font-semibold text-primary-400 hover:underline ml-1"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="!p-0 font-semibold text-primary-text hover:underline ml-1"
               onClick={() => {
                 setAuthMode(a => (a === 'signup' ? 'signin' : 'signup'));
                 setSignupStep('mode');
@@ -373,18 +373,18 @@ export default function Welcome() {
               }}
             >
               {authMode === 'signup' ? 'Sign in' : 'Create account'}
-            </button>
+            </Button>
           </div>
 
-          <div className="text-center text-xs text-slate-400 mt-5 pt-4 border-t border-white/10 flex items-center justify-center gap-1.5">
-            <span>Powered by</span>
+          <div className="text-center text-xs text-muted mt-5 pt-4 border-t border-border flex items-center justify-center gap-1.5">
+            <span>Fintarg is a brand of</span>
             <a
               href="https://raxwo.net"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-bold text-primary-400 hover:text-primary-300 transition-colors"
+              className="font-bold text-primary-text hover:underline transition-colors"
             >
-              Raxwo
+              Raxwo (Pvt) Ltd
             </a>
           </div>
         </div>
