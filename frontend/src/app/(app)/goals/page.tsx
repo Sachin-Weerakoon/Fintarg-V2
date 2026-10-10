@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp, formatRs, calcAnalysis, calcPersonalSpent } from '@/store';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -18,9 +18,14 @@ export default function Goals() {
   const { state, dispatch } = useApp();
   const month = state.selectedMonth;
   const [showAddGoal, setShowAddGoal] = useState(false);
-  const [goalForm, setGoalForm] = useState({ name: '', dailyAmount: '', endDate: '' });
+  const [goalForm, setGoalForm] = useState({
+    name: '',
+    targetAmount: '',
+    targetDate: '',
+    dailyAmount: '',
+  });
   const [goalError, setGoalError] = useState('');
-  const [saving, setSaving] = useState<Record<string, { amount: string; date: string }>>({});
+  const [saving, setSaving] = useState<Record<string, { amount: string; date: string; note: string }>>({});
   const [adjusting, setAdjusting] = useState<string | null>(null);
   const [adjustForm, setAdjustForm] = useState({ dailyAmount: '' });
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -39,18 +44,45 @@ export default function Goals() {
   const totalSavingsTarget = state.savingsGoals.reduce((s, g) => s + g.monthlyTarget, 0);
   const savingsExceedsCash = totalSavingsTarget > freeCash;
 
+  // Auto calculate daily amount when targetAmount & targetDate are provided
+  const autoDaily = useMemo(() => {
+    if (goalForm.targetAmount && goalForm.targetDate) {
+      const diffMs = new Date(goalForm.targetDate).getTime() - new Date().getTime();
+      const diffDays = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+      return Math.ceil(Number(goalForm.targetAmount) / diffDays);
+    }
+    return null;
+  }, [goalForm.targetAmount, goalForm.targetDate]);
+
   const submitGoal = () => {
-    if (!goalForm.name || !goalForm.dailyAmount || Number(goalForm.dailyAmount) <= 0) {
-      setGoalError('Name and daily amount are required.');
+    if (!goalForm.name) {
+      setGoalError('Goal name is required.');
       return;
     }
-    const daily = Number(goalForm.dailyAmount);
-    const monthly = daily * DAYS_IN_MONTH;
+    const daily = Number(goalForm.dailyAmount) || autoDaily || 0;
+    if (daily <= 0 && (!goalForm.targetAmount || Number(goalForm.targetAmount) <= 0)) {
+      setGoalError('Please enter either a daily amount or target amount with date.');
+      return;
+    }
+    const calculatedDaily = daily > 0 ? daily : Math.ceil(Number(goalForm.targetAmount) / 365);
+    const monthly = calculatedDaily * DAYS_IN_MONTH;
+    const targetAmt = goalForm.targetAmount ? Number(goalForm.targetAmount) : monthly * 12;
+
     dispatch({
       type: 'ADD_GOAL',
-      entry: { id: 'g_' + Date.now(), name: goalForm.name, dailyAmount: daily, monthlyTarget: monthly, endDate: goalForm.endDate, savedAmount: 0, contributions: [] },
+      entry: {
+        id: 'g_' + Date.now(),
+        name: goalForm.name,
+        dailyAmount: calculatedDaily,
+        monthlyTarget: monthly,
+        targetAmount: targetAmt,
+        targetDate: goalForm.targetDate || undefined,
+        endDate: goalForm.targetDate || new Date().toISOString().slice(0, 10),
+        savedAmount: 0,
+        contributions: [],
+      },
     });
-    setGoalForm({ name: '', dailyAmount: '', endDate: '' });
+    setGoalForm({ name: '', targetAmount: '', targetDate: '', dailyAmount: '' });
     setGoalError('');
     setShowAddGoal(false);
   };
@@ -58,8 +90,14 @@ export default function Goals() {
   const addContribution = (goalId: string) => {
     const s = saving[goalId];
     if (!s || !s.amount || Number(s.amount) <= 0) return;
-    dispatch({ type: 'ADD_SAVING_CONTRIBUTION', goalId, amount: Number(s.amount), date: s.date || new Date().toISOString().slice(0, 10) });
-    setSaving(prev => ({ ...prev, [goalId]: { amount: '', date: new Date().toISOString().slice(0, 10) } }));
+    dispatch({
+      type: 'ADD_SAVING_CONTRIBUTION',
+      goalId,
+      amount: Number(s.amount),
+      date: s.date || new Date().toISOString().slice(0, 10),
+      note: s.note,
+    });
+    setSaving(prev => ({ ...prev, [goalId]: { amount: '', date: new Date().toISOString().slice(0, 10), note: '' } }));
   };
 
   const submitAdjust = (goalId: string) => {
@@ -106,33 +144,41 @@ export default function Goals() {
             </div>
           </div>
           {goalError && <p className="text-xs mb-3 text-danger-text font-medium">{goalError}</p>}
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 gap-4">
             <Field id="goal-name" label="Goal name">
               <Input
                 value={goalForm.name}
                 onChange={e => setGoalForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="e.g. Emergency Fund"
+                placeholder="e.g. Emergency Fund, New Vehicle"
               />
             </Field>
-            <Field id="goal-daily" label="Daily amount (Rs.)">
+            <Field id="goal-targetamt" label="Target Total Amount (Rs.)">
               <Input
                 type="number"
-                value={goalForm.dailyAmount}
-                onChange={e => setGoalForm(f => ({ ...f, dailyAmount: e.target.value }))}
-                placeholder="1,000"
+                value={goalForm.targetAmount}
+                onChange={e => setGoalForm(f => ({ ...f, targetAmount: e.target.value }))}
+                placeholder="e.g. 500,000"
               />
-              {goalForm.dailyAmount && (
-                <p className="text-[11px] mt-1.5 font-medium text-primary-text">
-                  Monthly target: <span className="font-bold num">{formatRs(Number(goalForm.dailyAmount) * 30)}</span>
-                </p>
-              )}
             </Field>
-            <Field id="goal-enddate" label="End date (optional)">
+            <Field id="goal-targetdate" label="Target Date">
               <Input
                 type="date"
-                value={goalForm.endDate}
-                onChange={e => setGoalForm(f => ({ ...f, endDate: e.target.value }))}
+                value={goalForm.targetDate}
+                onChange={e => setGoalForm(f => ({ ...f, targetDate: e.target.value }))}
               />
+            </Field>
+            <Field id="goal-daily" label="Daily Target Amount (Rs.)">
+              <Input
+                type="number"
+                value={goalForm.dailyAmount || (autoDaily ? String(autoDaily) : '')}
+                onChange={e => setGoalForm(f => ({ ...f, dailyAmount: e.target.value }))}
+                placeholder={autoDaily ? String(autoDaily) : '1,000'}
+              />
+              {(goalForm.dailyAmount || autoDaily) && (
+                <p className="text-[11px] mt-1.5 font-medium text-primary-text">
+                  Monthly target: <span className="font-bold num">{formatRs((Number(goalForm.dailyAmount) || autoDaily || 0) * 30)}</span>
+                </p>
+              )}
             </Field>
           </div>
           <div className="flex gap-2.5 mt-5">
@@ -201,12 +247,18 @@ export default function Goals() {
       ) : (
         <div className="space-y-5">
           {state.savingsGoals.map(goal => {
-            const pct = Math.min(100, Math.round((goal.savedAmount / goal.monthlyTarget) * 100));
+            const effectiveTarget = goal.targetAmount || goal.monthlyTarget;
+            const pct = Math.min(100, Math.round((goal.savedAmount / (effectiveTarget || 1)) * 100));
+
+            // Tally consistency check
+            const tallySum = (goal.contributions || []).reduce((s, c) => s + c.amount, 0);
+            const hasTallyMismatch = Math.abs(goal.savedAmount - tallySum) > 0.01 && (goal.contributions || []).length > 0;
+
             // Feasibility: check if this goal is achievable given OTHER goals already allocated
             const otherGoalsTarget = state.savingsGoals.filter(g => g.id !== goal.id).reduce((s, g) => s + g.monthlyTarget, 0);
             const cashForThisGoal = freeCash - otherGoalsTarget;
             const feasible = cashForThisGoal >= goal.monthlyTarget;
-            const sv = saving[goal.id] || { amount: '', date: new Date().toISOString().slice(0, 10) };
+            const sv = saving[goal.id] || { amount: '', date: new Date().toISOString().slice(0, 10), note: '' };
 
             return (
               <Card key={goal.id} className="p-5">
@@ -214,8 +266,8 @@ export default function Goals() {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <div className="font-bold text-base text-text">{goal.name}</div>
-                    {goal.endDate && (
-                      <div className="text-xs text-muted mt-0.5">Target date: {goal.endDate}</div>
+                    {(goal.targetDate || goal.endDate) && (
+                      <div className="text-xs text-muted mt-0.5">Target date: {goal.targetDate || goal.endDate}</div>
                     )}
                   </div>
                   <Button
@@ -231,25 +283,49 @@ export default function Goals() {
 
                 {/* Target display */}
                 <div className="text-3xl font-extrabold text-primary-text mb-1 num">
-                  {formatRs(goal.monthlyTarget)}
+                  {formatRs(effectiveTarget)}
                 </div>
                 <div className="text-xs text-muted mb-3">
-                  TARGET · <span className="num font-semibold text-text">{formatRs(goal.dailyAmount)}</span> / day · {DAYS_IN_MONTH} days
+                  TARGET · <span className="num font-semibold text-text">{formatRs(goal.dailyAmount)}</span> / day · Monthly target <span className="num font-semibold text-text">{formatRs(goal.monthlyTarget)}</span>
                 </div>
 
                 {/* Progress */}
                 <ProgressBar
                   value={goal.savedAmount}
-                  max={goal.monthlyTarget}
+                  max={effectiveTarget}
                   tone={pct >= 100 ? 'success' : 'primary'}
                   size="md"
                 />
                 <div className="flex justify-between text-xs text-muted mt-2 mb-3">
                   <span className="num font-medium text-text">{formatRs(goal.savedAmount)} saved</span>
                   <span>
-                    <span className="num font-semibold text-text">{pct}%</span> · <span className="num text-text">{formatRs(Math.max(0, goal.monthlyTarget - goal.savedAmount))}</span> to go
+                    <span className="num font-semibold text-text">{pct}%</span> · <span className="num text-text">{formatRs(Math.max(0, effectiveTarget - goal.savedAmount))}</span> to go
                   </span>
                 </div>
+
+                {/* Tally check warning & reconciliation */}
+                {hasTallyMismatch && (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-warning-solid/30 bg-warning-tint/30 text-xs mb-3">
+                    <div className="flex items-center gap-1.5 text-warning-text font-medium">
+                      <Icon name="alert" size={14} />
+                      <span>Tally check: Saved is {formatRs(goal.savedAmount)}, but sum of logged contributions is {formatRs(tallySum)}.</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-primary-text font-semibold hover:underline !py-0.5 !px-2"
+                      onClick={() => {
+                        dispatch({
+                          type: 'UPDATE_GOAL',
+                          id: goal.id,
+                          savedAmount: tallySum,
+                        });
+                      }}
+                    >
+                      Reconcile
+                    </Button>
+                  </div>
+                )}
 
                 {/* Feasibility warning */}
                 {!feasible && (
@@ -300,9 +376,9 @@ export default function Goals() {
                   </div>
                 )}
 
-                {/* Add contribution */}
-                <div className="flex gap-2 mt-3 items-end">
-                  <div className="flex-1">
+                {/* Add contribution form */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mt-3 items-end">
+                  <div>
                     <label className="block text-xs font-medium text-muted mb-1">Contribution (Rs.)</label>
                     <Input
                       type="number"
@@ -319,19 +395,29 @@ export default function Goals() {
                       onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, date: e.target.value } }))}
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted mb-1">Note (optional)</label>
+                    <Input
+                      placeholder="e.g. Salary deposit"
+                      value={sv.note}
+                      onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, note: e.target.value } }))}
+                    />
+                  </div>
                   <Button variant="primary" size="sm" onClick={() => addContribution(goal.id)}>
-                    Add
+                    Add Savings
                   </Button>
                 </div>
 
                 {/* Recent contributions */}
                 {goal.contributions.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-border">
-                    <div className="text-xs font-semibold mb-2 text-muted">Recent savings</div>
+                    <div className="text-xs font-semibold mb-2 text-muted">Recent savings contributions</div>
                     <div className="space-y-1.5">
                       {goal.contributions.slice(-6).reverse().map((c, i) => (
                         <div key={i} className="flex justify-between text-xs">
-                          <span className="text-muted num">{c.date}</span>
+                          <span className="text-muted num">
+                            {c.date} {c.note ? `· ${c.note}` : ''}
+                          </span>
                           <span className="font-semibold text-success-text num">{formatRs(c.amount)}</span>
                         </div>
                       ))}

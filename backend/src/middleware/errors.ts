@@ -23,6 +23,13 @@ export const errorHandler: ErrorRequestHandler = (error, _request, response, _ne
     return;
   }
 
+  if (error && typeof error === 'object' && ('code' in error) && (error as { code: unknown }).code === 11000) {
+    const keyPattern = (error as { keyPattern?: Record<string, unknown> }).keyPattern;
+    const field = keyPattern ? Object.keys(keyPattern)[0] : 'field';
+    response.status(409).json({ error: `${field === 'email' ? 'Email' : field} already registered` });
+    return;
+  }
+
   logger.error({ err: error }, 'Unhandled request error');
   response.status(500).json({ error: 'Internal server error' });
 };

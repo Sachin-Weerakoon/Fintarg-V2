@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useRef, useState, ReactNode } from 'react';
 import { loadPersistedData, persistStoreAction } from '@/services/storeApi';
 import type {
   AppState, Page, IncomeEntry, ExpenseEntry, FinancePayment, Loan, PawnedItem,
   SavingsGoal, Letter, Agreement, Company, MedicalExpense, Document, Reminder,
   BusinessBranch, EmploymentProfile, WorkMode, OwnerDraw,
+  BankAccount, Card, Transaction,
 } from './types';
 
 const SEP_2026 = '2026-09';
@@ -51,6 +52,9 @@ const initialState: AppState = {
     { id: 'fp1', lender: "People's Bank", amount: 25000, dueDay: 10, monthsRemaining: 18 },
   ],
   loans: [],
+  bankAccounts: [],
+  cards: [],
+  transactions: [],
   pawnedItems: [
     { id: 'p1', description: 'Gold chain (22g)', amountReceived: 85000, interestRate: 2, nextDue: '2026-10-05', redemptionDate: '2027-01-05' },
   ],
@@ -125,14 +129,14 @@ const emptyInitialState: AppState = {
   currentPage: 'dashboard',
   selectedMonth: new Date().toISOString().slice(0, 7),
   profile: { ...initialState.profile, name: '', email: '' },
-  income: [], expenses: [], financePayments: [], loans: [], pawnedItems: [], savingsGoals: [],
+  income: [], expenses: [], financePayments: [], loans: [], bankAccounts: [], cards: [], transactions: [], pawnedItems: [], savingsGoals: [],
   personalSpendingBudget: 0, letters: [], agreements: [], companies: [], businessBranches: [],
   employmentProfiles: [], ownerDraws: [], medicalExpenses: [], documents: [], reminders: [],
 };
 
 type Action =
   | { type: 'HYDRATE'; data: Partial<AppState> }
-  | { type: 'REPLACE_RECORD_ID'; collection: 'income' | 'expenses' | 'financePayments' | 'loans' | 'pawnedItems' | 'savingsGoals' | 'letters' | 'agreements' | 'companies' | 'businessBranches' | 'employmentProfiles' | 'ownerDraws' | 'medicalExpenses' | 'documents' | 'reminders'; localId: string; serverId: string }
+  | { type: 'REPLACE_RECORD_ID'; collection: 'income' | 'expenses' | 'financePayments' | 'loans' | 'bankAccounts' | 'cards' | 'transactions' | 'pawnedItems' | 'savingsGoals' | 'letters' | 'agreements' | 'companies' | 'businessBranches' | 'employmentProfiles' | 'ownerDraws' | 'medicalExpenses' | 'documents' | 'reminders'; localId: string; serverId: string }
   | { type: 'SET_PAGE'; page: Page }
   | { type: 'SET_PLAN'; plan: 'basic' | 'business'; workMode: WorkMode; name: string }
   | { type: 'SET_SETUP_COMPLETE' }
@@ -144,17 +148,27 @@ type Action =
   | { type: 'UPDATE_EXPENSE'; entry: ExpenseEntry }
   | { type: 'DELETE_EXPENSE'; id: string }
   | { type: 'ADD_FINANCE_PAYMENT'; entry: FinancePayment }
+  | { type: 'UPDATE_FINANCE_PAYMENT'; entry: FinancePayment }
   | { type: 'DELETE_FINANCE_PAYMENT'; id: string }
+  | { type: 'ADD_BANK_ACCOUNT'; entry: BankAccount }
+  | { type: 'UPDATE_BANK_ACCOUNT'; entry: BankAccount }
+  | { type: 'DELETE_BANK_ACCOUNT'; id: string }
+  | { type: 'ADD_CARD'; entry: Card }
+  | { type: 'UPDATE_CARD'; entry: Card }
+  | { type: 'DELETE_CARD'; id: string }
+  | { type: 'ADD_TRANSACTION'; entry: Transaction }
+  | { type: 'DELETE_TRANSACTION'; id: string }
   | { type: 'ADD_LOAN'; entry: Loan }
-  | { type: 'RECORD_LOAN_REPAYMENT'; id: string; amount: number }
+  | { type: 'UPDATE_LOAN'; entry: Loan }
+  | { type: 'RECORD_LOAN_REPAYMENT'; id: string; amount: number; note?: string; date?: string }
   | { type: 'DELETE_LOAN'; id: string }
   | { type: 'ADD_PAWNED'; entry: PawnedItem }
   | { type: 'RECORD_PAWN_PAYMENT'; id: string }
   | { type: 'DELETE_PAWNED'; id: string }
   | { type: 'ADD_GOAL'; entry: SavingsGoal }
-  | { type: 'UPDATE_GOAL'; id: string; dailyAmount: number; monthlyTarget: number }
+  | { type: 'UPDATE_GOAL'; id: string; dailyAmount?: number; monthlyTarget?: number; targetAmount?: number; targetDate?: string; savedAmount?: number }
   | { type: 'DELETE_GOAL'; id: string }
-  | { type: 'ADD_SAVING_CONTRIBUTION'; goalId: string; amount: number; date: string }
+  | { type: 'ADD_SAVING_CONTRIBUTION'; goalId: string; amount: number; date: string; note?: string }
   | { type: 'SET_PERSONAL_SPENDING_BUDGET'; budget: number }
   | { type: 'ADD_LETTER'; entry: Letter }
   | { type: 'DELETE_LETTER'; id: string }
@@ -179,12 +193,14 @@ type Action =
   | { type: 'UPDATE_REMINDER'; id: string; status: Reminder['status'] }
   | { type: 'DELETE_REMINDER'; id: string }
   | { type: 'ADD_LOAN_FROM_SHORTFALL'; amount: number; month: string }
-  | { type: 'SET_MONTH'; month: string };
+  | { type: 'SET_MONTH'; month: string }
+  | { type: 'ROLLBACK'; previousState: AppState };
 
 type PersistedCollection = Extract<Action, { type: 'REPLACE_RECORD_ID' }>['collection'];
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    case 'ROLLBACK': return action.previousState;
     case 'HYDRATE': return { ...state, ...action.data, profile: { ...state.profile, ...action.data.profile } };
     case 'REPLACE_RECORD_ID': return {
       ...state,
@@ -201,11 +217,28 @@ function reducer(state: AppState, action: Action): AppState {
     case 'UPDATE_EXPENSE': return { ...state, expenses: state.expenses.map(e => e.id === action.entry.id ? action.entry : e) };
     case 'DELETE_EXPENSE': return { ...state, expenses: state.expenses.filter(e => e.id !== action.id) };
     case 'ADD_FINANCE_PAYMENT': return { ...state, financePayments: [...state.financePayments, action.entry] };
+    case 'UPDATE_FINANCE_PAYMENT': return { ...state, financePayments: state.financePayments.map(f => f.id === action.entry.id ? action.entry : f) };
     case 'DELETE_FINANCE_PAYMENT': return { ...state, financePayments: state.financePayments.filter(f => f.id !== action.id) };
+    case 'ADD_BANK_ACCOUNT': return { ...state, bankAccounts: [...state.bankAccounts, action.entry] };
+    case 'UPDATE_BANK_ACCOUNT': return { ...state, bankAccounts: state.bankAccounts.map(b => b.id === action.entry.id ? action.entry : b) };
+    case 'DELETE_BANK_ACCOUNT': return { ...state, bankAccounts: state.bankAccounts.filter(b => b.id !== action.id) };
+    case 'ADD_CARD': return { ...state, cards: [...state.cards, action.entry] };
+    case 'UPDATE_CARD': return { ...state, cards: state.cards.map(c => c.id === action.entry.id ? action.entry : c) };
+    case 'DELETE_CARD': return { ...state, cards: state.cards.filter(c => c.id !== action.id) };
+    case 'ADD_TRANSACTION': return { ...state, transactions: [action.entry, ...state.transactions] };
+    case 'DELETE_TRANSACTION': return { ...state, transactions: state.transactions.filter(t => t.id !== action.id) };
     case 'ADD_LOAN': return { ...state, loans: [...state.loans, action.entry] };
+    case 'UPDATE_LOAN': return { ...state, loans: state.loans.map(l => l.id === action.entry.id ? action.entry : l) };
     case 'RECORD_LOAN_REPAYMENT': return {
       ...state,
-      loans: state.loans.map(l => l.id === action.id ? { ...l, balance: Math.max(0, l.balance - action.amount) } : l),
+      loans: state.loans.map(l => l.id === action.id ? {
+        ...l,
+        balance: Math.max(0, l.balance - action.amount),
+        repayments: [
+          ...(l.repayments || []),
+          { date: action.date || new Date().toISOString().slice(0, 10), amount: action.amount, note: action.note },
+        ],
+      } : l),
     };
     case 'DELETE_LOAN': return { ...state, loans: state.loans.filter(l => l.id !== action.id) };
     case 'ADD_PAWNED': return { ...state, pawnedItems: [...state.pawnedItems, action.entry] };
@@ -225,13 +258,24 @@ function reducer(state: AppState, action: Action): AppState {
     case 'UPDATE_GOAL': return {
       ...state,
       savingsGoals: state.savingsGoals.map(g => g.id === action.id
-        ? { ...g, dailyAmount: action.dailyAmount, monthlyTarget: action.monthlyTarget } : g),
+        ? {
+            ...g,
+            dailyAmount: action.dailyAmount !== undefined ? action.dailyAmount : g.dailyAmount,
+            monthlyTarget: action.monthlyTarget !== undefined ? action.monthlyTarget : g.monthlyTarget,
+            targetAmount: action.targetAmount !== undefined ? action.targetAmount : g.targetAmount,
+            targetDate: action.targetDate !== undefined ? action.targetDate : g.targetDate,
+            savedAmount: action.savedAmount !== undefined ? action.savedAmount : g.savedAmount,
+          } : g),
     };
     case 'DELETE_GOAL': return { ...state, savingsGoals: state.savingsGoals.filter(g => g.id !== action.id) };
     case 'ADD_SAVING_CONTRIBUTION': return {
       ...state,
       savingsGoals: state.savingsGoals.map(g => g.id === action.goalId
-        ? { ...g, savedAmount: g.savedAmount + action.amount, contributions: [...g.contributions, { date: action.date, amount: action.amount }] }
+        ? {
+            ...g,
+            savedAmount: g.savedAmount + action.amount,
+            contributions: [...(g.contributions || []), { date: action.date, amount: action.amount, note: action.note }],
+          }
         : g),
     };
     case 'SET_PERSONAL_SPENDING_BUDGET': return { ...state, personalSpendingBudget: action.budget };
@@ -278,13 +322,29 @@ function reducer(state: AppState, action: Action): AppState {
   }
 }
 
-const AppContext = createContext<{ state: AppState; dispatch: (action: Action) => Promise<string | undefined> } | null>(null);
+export type Toast = { id: string; message: string; tone: 'success' | 'error' | 'info' };
+
+const AppContext = createContext<{
+  state: AppState;
+  dispatch: (action: Action) => Promise<string | undefined>;
+  showToast: (message: string, tone?: 'success' | 'error' | 'info') => void;
+} | null>(null);
 
 export function AppProvider({ children, initialProfile = {} }: { children: ReactNode; initialProfile?: Partial<AppState['profile']> }) {
   const [state, reduce] = useReducer(reducer, {
     ...emptyInitialState,
     profile: { ...emptyInitialState.profile, ...initialProfile },
   });
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const showToast = (message: string, tone: 'success' | 'error' | 'info' = 'info') => {
+    const id = 't_' + Date.now();
+    setToasts((prev: Toast[]) => [...prev, { id, message, tone }]);
+    setTimeout(() => setToasts((prev: Toast[]) => prev.filter((t: Toast) => t.id !== id)), 4000);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -297,12 +357,14 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
   }, []);
 
   const dispatch = async (action: Action): Promise<string | undefined> => {
+    const prevState = stateRef.current;
     reduce(action);
-    if (action.type === 'HYDRATE' || action.type === 'REPLACE_RECORD_ID') return undefined;
+    if (action.type === 'HYDRATE' || action.type === 'REPLACE_RECORD_ID' || action.type === 'ROLLBACK') return undefined;
     try {
       const serverId = await persistStoreAction(action);
       const collectionByAction: Record<string, PersistedCollection> = {
         ADD_INCOME: 'income', ADD_EXPENSE: 'expenses', ADD_FINANCE_PAYMENT: 'financePayments', ADD_LOAN: 'loans',
+        ADD_BANK_ACCOUNT: 'bankAccounts', ADD_CARD: 'cards', ADD_TRANSACTION: 'transactions',
         ADD_PAWNED: 'pawnedItems', ADD_GOAL: 'savingsGoals', ADD_LETTER: 'letters', ADD_AGREEMENT: 'agreements',
         ADD_COMPANY: 'companies', ADD_BRANCH: 'businessBranches', ADD_EMPLOYMENT: 'employmentProfiles',
         ADD_OWNER_DRAW: 'ownerDraws', ADD_MEDICAL_EXPENSE: 'medicalExpenses', ADD_DOCUMENT: 'documents', ADD_REMINDER: 'reminders',
@@ -311,13 +373,38 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
       const localId = 'entry' in action && action.entry && 'id' in action.entry ? String(action.entry.id) : undefined;
       if (serverId && collection && localId) reduce({ type: 'REPLACE_RECORD_ID', collection, localId, serverId });
       return serverId;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unable to save account change', error);
+      reduce({ type: 'ROLLBACK', previousState: prevState });
+      showToast(error?.message || 'Failed to save changes. Reverting...', 'error');
       return undefined;
     }
   };
 
-  return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={{ state, dispatch, showToast }}>
+      {children}
+      {toasts.length > 0 && (
+        <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none" aria-live="polite">
+          {toasts.map((t: Toast) => (
+            <div
+              key={t.id}
+              className={`pointer-events-auto px-4 py-3 rounded-xl shadow-lg border text-xs font-medium flex items-center gap-2 transition-all ${
+                t.tone === 'error'
+                  ? 'bg-danger-tint border-danger-solid/40 text-danger-text'
+                  : t.tone === 'success'
+                  ? 'bg-success-tint border-success-solid/40 text-success-text'
+                  : 'bg-surface border-border text-text'
+              }`}
+            >
+              <span>{t.tone === 'error' ? '⚠' : t.tone === 'success' ? '✓' : 'ℹ'}</span>
+              <span>{t.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </AppContext.Provider>
+  );
 }
 
 export function useApp() {

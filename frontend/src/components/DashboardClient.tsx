@@ -25,8 +25,6 @@ export default function DashboardClient() {
   const monthlyIncome = calcMonthlyIncome(state.income, selectedMonth);
   const monthlyExpenses = calcMonthlyExpenses(state.expenses, selectedMonth);
   const netPosition = monthlyIncome - monthlyExpenses;
-  const totalGoals = state.savingsGoals.length;
-  const activeGoals = state.savingsGoals.filter(goal => goal.savedAmount < goal.monthlyTarget).length;
   const upNext = state.reminders.slice(0, 3);
   const hasFinancialData = monthlyIncome > 0 || monthlyExpenses > 0;
 
@@ -39,9 +37,16 @@ export default function DashboardClient() {
   const burnRate = monthlyIncome > 0 ? Math.min(100, Math.round((monthlyExpenses / monthlyIncome) * 100)) : 0;
   const userName = state.profile?.name?.trim();
 
-  // Determine goals detail
-  const goalsDetail = totalGoals === 0 ? 'No goals yet' : activeGoals === 0 ? 'All completed' : `${activeGoals} in progress`;
-  const goalsTone = totalGoals === 0 ? 'default' : activeGoals === 0 ? 'success' : 'default';
+  // Liquidity and daily budget calculations
+  const totalBankLiquidity = state.bankAccounts.reduce((s, a) => s + (a.currentBalance || 0), 0);
+  const today = new Date();
+  const [yStr, mStr] = selectedMonth.split('-');
+  const isCurrentMonth = Number(yStr) === today.getFullYear() && Number(mStr) === (today.getMonth() + 1);
+  const daysInMonth = new Date(Number(yStr) || today.getFullYear(), Number(mStr) || (today.getMonth() + 1), 0).getDate();
+  const daysLeft = isCurrentMonth ? Math.max(1, daysInMonth - today.getDate() + 1) : daysInMonth;
+  const recurringObligations = state.financePayments.reduce((s, f) => s + f.amount, 0);
+  const freeCashLeft = Math.max(0, monthlyIncome - recurringObligations - monthlyExpenses);
+  const dailyBudget = Math.round(freeCashLeft / daysLeft);
 
   // Determine net position detail
   const netDetail = !hasFinancialData
@@ -75,7 +80,14 @@ export default function DashboardClient() {
       />
 
       {/* Primary Key Metrics */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <StatCard
+          label="Bank Liquidity"
+          value={formatRs(totalBankLiquidity)}
+          detail={`${state.bankAccounts.length} accounts connected`}
+          tone="default"
+          icon={<Icon name="bank" size={18} />}
+        />
         <StatCard
           label="Total Income"
           value={formatRs(monthlyIncome)}
@@ -91,18 +103,18 @@ export default function DashboardClient() {
           icon={<Icon name="arrow-down" size={18} />}
         />
         <StatCard
+          label="Daily Budget Left"
+          value={formatRs(dailyBudget)}
+          detail={`${daysLeft} days left in month`}
+          tone={dailyBudget > 0 ? 'success' : 'danger'}
+          icon={<Icon name="bolt" size={18} />}
+        />
+        <StatCard
           label="Net Position"
           value={formatRs(netPosition)}
           detail={netDetail}
           tone={netTone}
           icon={<Icon name="wallet" size={18} />}
-        />
-        <StatCard
-          label="Active Goals"
-          value={String(activeGoals)}
-          detail={goalsDetail}
-          tone={goalsTone}
-          icon={<Icon name="target" size={18} />}
         />
       </div>
 
@@ -189,8 +201,41 @@ export default function DashboardClient() {
           </Card>
         </div>
 
-        {/* Right Column: Reminders & Quick Actions */}
+        {/* Right Column: Accounts, Reminders & Quick Actions */}
         <div className="space-y-6">
+          {/* Connected Accounts Glance */}
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-bold text-text flex items-center gap-2">
+                <Icon name="bank" size={16} className="text-primary-text" />
+                <span>Connected Accounts</span>
+              </div>
+              <Link href="/financial" className="text-xs text-primary-text font-semibold hover:underline">
+                Manage
+              </Link>
+            </div>
+            {state.bankAccounts.length === 0 ? (
+              <div className="text-xs text-muted py-2">
+                No bank accounts linked yet.{' '}
+                <Link href="/financial" className="text-primary-text hover:underline">Add an account</Link> to track balances.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {state.bankAccounts.slice(0, 3).map(acc => (
+                  <div key={acc.id} className="flex items-center justify-between p-2.5 rounded-xl border border-border bg-surface-hover/30">
+                    <div className="min-w-0 pr-2">
+                      <div className="text-xs font-semibold text-text truncate">{acc.name}</div>
+                      <div className="text-[11px] text-muted truncate">
+                        {acc.bankName} · •••• {acc.accountNumber ? acc.accountNumber.slice(-4) : '----'}
+                      </div>
+                    </div>
+                    <div className="text-xs font-bold text-text num flex-shrink-0">{formatRs(acc.currentBalance)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
           {/* Next Up Reminders */}
           <Card className="p-5">
             <div className="flex items-center justify-between mb-4">

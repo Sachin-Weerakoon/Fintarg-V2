@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "test": "tsx --test src/**/*.test.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "db:drop-locked-until-ttl": "tsx src/scripts/dropLockedUntilTtlIndex.ts"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",

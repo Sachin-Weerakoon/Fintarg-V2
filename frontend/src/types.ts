@@ -24,6 +24,7 @@ export interface UserProfile {
   bankBranch: string;
   accountName: string;
   accountNumber: string;
+  profilePictureFileId?: string;
 }
 
 export interface Contact {
@@ -33,6 +34,55 @@ export interface Contact {
   number: string;
 }
 
+export type PaymentMethod =
+  | 'cash'
+  | 'bank_transfer'
+  | 'card'
+  | 'cheque'
+  | 'standing_order'
+  | 'online'
+  | 'other';
+
+export interface BankAccount {
+  id: string;
+  name: string;
+  accountNumber: string;
+  bankName: string;
+  branch?: string;
+  accountType?: 'savings' | 'checking' | 'current' | 'other';
+  currentBalance: number;
+  currency?: string;
+  notes?: string;
+}
+
+export interface Card {
+  id: string;
+  name: string;
+  bankAccountId?: string;
+  cardType: 'credit' | 'debit';
+  lastFourDigits: string;
+  cardNetwork?: 'visa' | 'mastercard' | 'amex' | 'other';
+  creditLimit?: number;
+  currentBalance?: number;
+  billingDay?: number;
+  dueDay?: number;
+}
+
+export interface Transaction {
+  id: string;
+  type: 'income' | 'expense' | 'transfer';
+  amount: number;
+  date: string;
+  category?: string;
+  description?: string;
+  paymentMethod: PaymentMethod;
+  bankAccountId?: string;
+  cardId?: string;
+  sourceRecordId?: string;
+  sourceRecordKind?: string;
+  balanceAfter?: number;
+}
+
 export interface IncomeEntry {
   id: string;
   source: string;
@@ -40,6 +90,8 @@ export interface IncomeEntry {
   amount: number;
   frequency: 'monthly' | 'weekly' | 'daily' | 'one-time';
   date: string;
+  paymentMethod?: PaymentMethod;
+  bankAccountId?: string;
 }
 
 export interface ExpenseEntry {
@@ -49,6 +101,9 @@ export interface ExpenseEntry {
   category: string;
   note: string;
   recurring: boolean;
+  paymentMethod?: PaymentMethod;
+  bankAccountId?: string;
+  cardId?: string;
 }
 
 export interface FinancePayment {
@@ -57,6 +112,12 @@ export interface FinancePayment {
   amount: number;
   dueDay: number;
   monthsRemaining: number;
+  paymentKind?: 'instalment' | 'lease' | 'cheque' | 'standing_order';
+  chequeNumber?: string;
+  bankAccountId?: string;
+  payee?: string;
+  frequency?: 'monthly' | 'weekly' | 'quarterly' | 'annually' | 'one-time';
+  status?: 'active' | 'cleared' | 'cancelled' | 'pending';
 }
 
 export interface Loan {
@@ -64,10 +125,15 @@ export interface Loan {
   lender: string;
   principal: number;
   rate: number;
-  method: 'simple' | 'compound';
+  method: 'simple' | 'compound' | 'reducing_balance';
   startDate: string;
   dueDate: string;
   balance: number;
+  interestBasis?: 'annual' | 'monthly';
+  tenureMonths?: number;
+  monthlyPayment?: number;
+  totalInterest?: number;
+  repayments?: { date: string; amount: number; note?: string }[];
 }
 
 export interface PawnedItem {
@@ -86,7 +152,9 @@ export interface SavingsGoal {
   monthlyTarget: number;
   endDate: string;
   savedAmount: number;
-  contributions: { date: string; amount: number }[];
+  targetAmount?: number;
+  targetDate?: string;
+  contributions: { date: string; amount: number; note?: string }[];
 }
 
 export interface Letter {
@@ -198,6 +266,9 @@ export interface AppState {
   expenses: ExpenseEntry[];
   financePayments: FinancePayment[];
   loans: Loan[];
+  bankAccounts: BankAccount[];
+  cards: Card[];
+  transactions: Transaction[];
   pawnedItems: PawnedItem[];
   savingsGoals: SavingsGoal[];
   personalSpendingBudget: number;

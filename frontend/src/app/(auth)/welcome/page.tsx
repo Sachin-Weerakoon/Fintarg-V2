@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
-import { Icon } from '@/components/ui/Icon';
+import { PasswordField } from '@/components/ui/PasswordField';
 
 type WorkMode = 'salary' | 'business' | 'both';
 
@@ -54,6 +54,7 @@ export default function Welcome() {
   };
 
   const continueToApp = async () => {
+    if (submitting) return;
     setError('');
     if (authMode === 'signup' && !form.name.trim()) {
       setError('Please enter your name.');
@@ -107,11 +108,8 @@ export default function Welcome() {
         <div className="absolute bottom-1/4 right-0 w-96 h-96 rounded-full bg-primary-700/10 blur-3xl pointer-events-none" />
 
         <div className="flex items-center gap-3 relative z-10">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg"
-            style={{ background: 'linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700))' }}
-          >
-            <Icon name="bolt" size={22} className="text-white" />
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/10 p-1.5 shadow-lg border border-white/10 flex-shrink-0">
+            <img src="/brand/fintarg-logo.svg" alt="Fintarg logo" className="w-7 h-7 object-contain" />
           </div>
           <div>
             <div className="text-white font-extrabold text-xl tracking-tight flex items-center gap-2">
@@ -162,7 +160,10 @@ export default function Welcome() {
 
       <section className="flex-1 flex items-center justify-center p-4 sm:p-8">
         <div className={`onboarding-card${authMode === 'signup' && signupStep === 'mode' ? ' onboarding-card-wide' : ''}`}>
-          <div className="md:hidden font-bold text-base mb-8 text-primary-text">Fintarg</div>
+          <div className="md:hidden flex items-center gap-2 mb-6">
+            <img src="/brand/fintarg-logo.svg" alt="Fintarg logo" className="w-6 h-6 object-contain" />
+            <span className="font-bold text-lg text-text tracking-tight">Fintarg</span>
+          </div>
           <div className="mb-6">
             <h2 className="text-2xl font-semibold text-text">
               {authMode === 'signin'
@@ -259,9 +260,8 @@ export default function Welcome() {
                       </a>
                     )}
                   </div>
-                  <Input
+                  <PasswordField
                     id="signup-password"
-                    type="password"
                     autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
                     placeholder="At least 8 characters"
                     value={form.password}

@@ -7,18 +7,28 @@ import { hashPassword, verifyPassword } from '../utils/password';
 export type RegisterInput = { name: string; email: string; password: string; workMode: 'salary' | 'business' | 'both' };
 
 export async function registerUser(input: RegisterInput) {
-  if (await UserModel.exists({ email: input.email })) throw new HttpError(409, 'Email already registered');
+  const email = input.email.trim().toLowerCase();
+  if (await UserModel.exists({ email })) throw new HttpError(409, 'Email already registered');
 
   const credentials = await hashPassword(input.password, randomBytes(16).toString('hex'));
   const plan = input.workMode === 'salary' ? 'basic' : 'business';
-  const user = await UserModel.create({
-    email: input.email,
-    name: input.name,
-    passwordHash: credentials.hash,
-    salt: credentials.salt,
-    plan,
-    workMode: input.workMode,
-  });
+
+  let user;
+  try {
+    user = await UserModel.create({
+      email,
+      name: input.name.trim(),
+      passwordHash: credentials.hash,
+      salt: credentials.salt,
+      plan,
+      workMode: input.workMode,
+    });
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && ('code' in err) && (err as { code: unknown }).code === 11000) {
+      throw new HttpError(409, 'Email already registered');
+    }
+    throw err;
+  }
 
   try {
     const profile = await ProfileModel.create({ userId: user._id, name: user.name, email: user.email, plan, workMode: user.workMode });
@@ -30,7 +40,8 @@ export async function registerUser(input: RegisterInput) {
 }
 
 export async function authenticateUser(email: string, password: string) {
-  const user = await UserModel.findOne({ email });
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await UserModel.findOne({ email: normalizedEmail });
   if (!user) throw new HttpError(401, 'Invalid email or password');
   if (user.lockedUntil && user.lockedUntil > new Date()) throw new HttpError(429, 'Account temporarily locked. Try again later.');
 

@@ -27,6 +27,7 @@ const profileSchema = z.object({
   bankBranch: z.string().max(120).optional(),
   accountName: z.string().max(120).optional(),
   accountNumber: z.string().max(80).optional(),
+  profilePictureFileId: z.string().max(64).optional().nullable(),
 });
 
 export const updateProfile: RequestHandler = asyncHandler(async (request, response) => {
@@ -41,15 +42,23 @@ export const updateProfile: RequestHandler = asyncHandler(async (request, respon
   response.json({ profile });
 });
 
+export const getPersonalBudget: RequestHandler = asyncHandler(async (request, response) => {
+  const userId = request.auth?.userId;
+  if (!userId) throw new HttpError(401, 'Authentication required');
+  const month = (request.query.month as string) || new Date().toISOString().slice(0, 7);
+  const record = await PersonalBudgetModel.findOne({ userId: new mongoose.Types.ObjectId(userId), month });
+  response.json({ budget: record ? record.budgetCents / 100 : 0 });
+});
+
 export const setPersonalBudget: RequestHandler = asyncHandler(async (request, response) => {
   const userId = request.auth?.userId;
   if (!userId) throw new HttpError(401, 'Authentication required');
   const { budget } = z.object({ budget: z.coerce.number().finite().min(0).max(1_000_000_000) }).parse(request.body);
-  const month = new Date().toISOString().slice(0, 7);
+  const month = (request.body.month as string) || new Date().toISOString().slice(0, 7);
   const record = await PersonalBudgetModel.findOneAndUpdate(
     { userId: new mongoose.Types.ObjectId(userId), month },
     { $set: { budgetCents: Math.round(budget * 100) } },
     { upsert: true, new: true, runValidators: true },
   );
-  response.json({ data: record });
+  response.json({ ok: true, budget, data: record });
 });

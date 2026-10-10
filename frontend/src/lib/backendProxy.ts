@@ -7,9 +7,13 @@ export async function proxyBackend(request: NextRequest, path: string, body?: un
   const cookie = request.headers.get('cookie');
   const authorization = request.headers.get('authorization');
   const cronSecret = request.headers.get('x-cron-secret');
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  const realIp = request.headers.get('x-real-ip');
   if (cookie) headers.set('cookie', cookie);
   if (authorization) headers.set('authorization', authorization);
   if (cronSecret) headers.set('x-cron-secret', cronSecret);
+  if (forwardedFor) headers.set('x-forwarded-for', forwardedFor);
+  if (realIp) headers.set('x-real-ip', realIp);
   if (body !== undefined) headers.set('content-type', 'application/json');
 
   const upstream = await fetch(new URL(path, backendUrl), {
@@ -28,7 +32,7 @@ export async function proxyBackend(request: NextRequest, path: string, body?: un
 export async function proxyBackendRequest(request: NextRequest, path: string) {
   try {
     const headers = new Headers();
-    for (const name of ['cookie', 'authorization', 'x-cron-secret', 'content-type']) {
+    for (const name of ['cookie', 'authorization', 'x-cron-secret', 'content-type', 'x-forwarded-for', 'x-real-ip']) {
       const value = request.headers.get(name);
       if (value) headers.set(name, value);
     }

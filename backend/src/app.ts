@@ -17,19 +17,27 @@ import { fileRoutes } from './routes/fileRoutes';
 import { healthRoutes } from './routes/healthRoutes';
 import { profileRoutes } from './routes/profileRoutes';
 import { recordRoutes } from './routes/recordRoutes';
+import { transactionHistory } from './controllers/recordController';
 
 export const app = express();
 
 app.disable('x-powered-by');
-app.set('trust proxy', env.NODE_ENV === 'production' ? 1 : false);
+app.set('trust proxy', 1);
 app.use(helmet());
+
+const allowedOrigins = [env.FRONTEND_ORIGIN, env.APP_ORIGIN].filter(Boolean);
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (origin === env.FRONTEND_ORIGIN || origin === env.APP_ORIGIN || origin.endsWith('.vercel.app')) {
+    const isAllowed =
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      (env.NODE_ENV !== 'production' && origin.startsWith('http://localhost:'));
+    if (isAllowed) {
       return callback(null, true);
     }
-    return callback(null, true);
+    return callback(new Error('Origin not allowed by CORS'));
   },
   credentials: true,
 }));
@@ -151,19 +159,29 @@ app.get('/api', (_request, response) => {
 
 app.use('/health', healthRoutes);
 app.use('/api/health', healthRoutes);
-app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: 'draft-7', legacyHeaders: false }));
-app.use('/api/auth/register', ensureDatabase);
-app.use('/api/auth/login', ensureDatabase);
-app.use('/api/auth/forgot-password', ensureDatabase);
-app.use('/api/auth/reset-password', ensureDatabase);
+
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+app.use('/api/auth/register', authRateLimiter, ensureDatabase);
+app.use('/api/auth/login', authRateLimiter, ensureDatabase);
+app.use('/api/auth/forgot-password', authRateLimiter, ensureDatabase);
+app.use('/api/auth/reset-password', authRateLimiter, ensureDatabase);
 app.use('/api/auth/me', requireAuth, ensureDatabase);
 app.use('/api/profile', ensureDatabase);
 app.use('/api/records', ensureDatabase);
+app.use('/api/transactions', ensureDatabase);
 app.use('/api/files', ensureDatabase);
 app.use('/api/cron', ensureDatabase);
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/records', recordRoutes);
+app.use('/api/transactions/history', requireAuth, transactionHistory);
 app.use('/api/files', fileRoutes);
 app.use('/api/cron', cronRoutes);
 app.use((_request, response) => response.status(404).json({ error: 'Route not found' }));

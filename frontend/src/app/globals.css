@@ -678,6 +678,15 @@ body:has(.dark-mode) {
   background: var(--color-surface-hover);
 }
 
+/* Hide scrollbar while preserving scroll functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Motion reduction */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

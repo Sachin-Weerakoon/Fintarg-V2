@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
 import { useApp } from '@/store';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { THEME_COLORS, LIGHT_DEFAULTS, validateCustomOverrides } from '@/lib/theme';
 import type { Document } from '@/types';
 
@@ -20,26 +21,26 @@ export default function Settings() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <div className="pb-2 border-b border-slate-200/80 dark:border-slate-800">
-        <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Account Settings</h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Customize your appearance, profile parameters, document vault, and notifications.</p>
+      <div className="pb-2 border-b border-border">
+        <h2 className="text-xl font-bold tracking-tight text-text">Account Settings</h2>
+        <p className="text-xs text-muted mt-0.5">Customize your appearance, profile parameters, document vault, and notifications.</p>
       </div>
 
       <div className="grid md:grid-cols-4 gap-6">
         {/* Settings nav */}
         <div className="md:col-span-1">
-          <div className="card p-2 space-y-1 border-slate-200/80 dark:border-slate-800">
+          <div className="card p-2 space-y-1 border-border">
             {SETTING_TABS.map(t => (
               <button
                 key={t.id}
                 className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                   tab === t.id
-                    ? 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 shadow-sm border border-cyan-200/60 dark:border-cyan-800/40'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                    ? 'bg-primary-tint text-primary-text shadow-sm border border-primary-500/30'
+                    : 'text-text-2 hover:text-text hover:bg-surface-hover'
                 }`}
                 onClick={() => setTab(t.id)}
               >
-                <span className={tab === t.id ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-400'}>{t.icon}</span>
+                <span className={tab === t.id ? 'text-primary-text' : 'text-muted'}>{t.icon}</span>
                 <span>{t.label}</span>
               </button>
             ))}
@@ -227,7 +228,7 @@ function AppearanceTab() {
           <button
             onClick={() => update({ darkMode: !profile.darkMode })}
             className="relative w-12 h-6 rounded-full transition-colors"
-            style={{ background: profile.darkMode ? 'var(--color-primary)' : '#d1d5db' }}
+            style={{ background: profile.darkMode ? 'var(--color-primary)' : 'var(--color-border-input)' }}
           >
             <span
               className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform"
@@ -285,16 +286,114 @@ function AppearanceTab() {
   );
 }
 
+import { Button } from '@/components/ui/Button';
+
 function ProfileTab() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, showToast } = useApp();
   const { profile } = state;
   const [form, setForm] = useState({ ...profile });
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  const save = () => dispatch({ type: 'UPDATE_PROFILE', profile: form });
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/jpg', 'image/webp'].includes(file.type)) {
+      showToast('Accepted photo formats: JPG, PNG, WEBP', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Profile image must be less than 5 MB', 'error');
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const res = await fetch('/api/backend/files', {
+        method: 'POST',
+        headers: { 'content-type': file.type },
+        body: file,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.id) {
+        throw new Error(data.error || 'Upload failed');
+      }
+      setForm(f => ({ ...f, profilePictureFileId: data.id }));
+      await dispatch({ type: 'UPDATE_PROFILE', profile: { profilePictureFileId: data.id } });
+      showToast('Profile photo updated successfully', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to upload photo', 'error');
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeAvatar = async () => {
+    setForm(f => ({ ...f, profilePictureFileId: '' }));
+    await dispatch({ type: 'UPDATE_PROFILE', profile: { profilePictureFileId: '' } });
+    showToast('Profile photo removed', 'info');
+  };
+
+  const save = async () => {
+    await dispatch({ type: 'UPDATE_PROFILE', profile: form });
+    showToast('Profile details saved', 'success');
+  };
 
   return (
     <div className="card">
       <div className="font-semibold text-base mb-5" style={{ color: 'var(--color-text)' }}>Profile</div>
+
+      {/* Avatar upload section */}
+      <div className="flex items-center gap-5 p-4 rounded-xl border border-border bg-surface-hover/30 mb-6">
+        <div className="relative flex-shrink-0">
+          {form.profilePictureFileId ? (
+            <img
+              src={`/api/files/${encodeURIComponent(form.profilePictureFileId)}`}
+              alt={form.name || 'User profile'}
+              className="w-16 h-16 rounded-2xl object-cover border-2 border-primary-500 shadow-md"
+            />
+          ) : (
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold text-white shadow-md"
+              style={{ background: 'linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700))' }}
+            >
+              {form.name ? form.name[0].toUpperCase() : 'U'}
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-text">Profile Picture</div>
+          <p className="text-xs text-muted mt-0.5">JPG, PNG, or WEBP up to 5 MB</p>
+          <div className="flex items-center gap-2 mt-2.5">
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/jpg,image/webp"
+              className="hidden"
+              onChange={handleAvatarUpload}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => avatarInputRef.current?.click()}
+              loading={uploadingAvatar}
+            >
+              {form.profilePictureFileId ? 'Change photo' : 'Upload photo'}
+            </Button>
+            {form.profilePictureFileId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={removeAvatar}
+                className="text-danger-text hover:bg-danger-tint"
+              >
+                Remove
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="grid md:grid-cols-2 gap-4">
         <div><label className="form-label">Full name</label><input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
         <div><label className="form-label">Mobile</label><input className="form-input" value={form.mobile} onChange={e => setForm(f => ({ ...f, mobile: e.target.value }))} placeholder="07X XXX XXXX" /></div>
@@ -303,13 +402,41 @@ function ProfileTab() {
         <div className="md:col-span-2"><label className="form-label">Address</label><input className="form-input" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="No. 1, Main Street, Colombo" /></div>
         <div><label className="form-label">NIC number</label><input className="form-input" value={form.nicNumber} onChange={e => setForm(f => ({ ...f, nicNumber: e.target.value }))} placeholder="200012345678" /></div>
         <div><label className="form-label">Portfolio link</label><input className="form-input" value={form.portfolioLink} onChange={e => setForm(f => ({ ...f, portfolioLink: e.target.value }))} /></div>
-        <div className="border-t pt-4 md:col-span-2" style={{ borderColor: '#e0e7ef' }}>
-          <div className="font-semibold text-sm mb-3" style={{ color: 'var(--color-text)' }}>Bank details (for letters)</div>
+        <div className="border-t border-border pt-4 md:col-span-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+            <div className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>Bank details (for letters & defaults)</div>
+            {state.bankAccounts.length > 0 && (
+              <div className="text-xs text-muted flex items-center gap-2">
+                <span>Link from connected:</span>
+                <select
+                  className="form-input !py-1 !px-2 !text-xs !w-auto"
+                  onChange={e => {
+                    const acc = state.bankAccounts.find(a => a.id === e.target.value);
+                    if (acc) {
+                      setForm(f => ({
+                        ...f,
+                        bankName: acc.bankName,
+                        bankBranch: acc.branch || '',
+                        accountName: acc.name,
+                        accountNumber: acc.accountNumber,
+                      }));
+                    }
+                  }}
+                  defaultValue=""
+                >
+                  <option value="" disabled>Select account...</option>
+                  {state.bankAccounts.map(a => (
+                    <option key={a.id} value={a.id}>{a.bankName} - {a.name} (•••• {a.accountNumber ? a.accountNumber.slice(-4) : '----'})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
           <div className="grid md:grid-cols-2 gap-3">
-            <div><label className="form-label">Bank name</label><input className="form-input" value={form.bankName} onChange={e => setForm(f => ({ ...f, bankName: e.target.value }))} /></div>
-            <div><label className="form-label">Branch</label><input className="form-input" value={form.bankBranch} onChange={e => setForm(f => ({ ...f, bankBranch: e.target.value }))} /></div>
-            <div><label className="form-label">Account name</label><input className="form-input" value={form.accountName} onChange={e => setForm(f => ({ ...f, accountName: e.target.value }))} /></div>
-            <div><label className="form-label">Account number</label><input className="form-input" value={form.accountNumber} onChange={e => setForm(f => ({ ...f, accountNumber: e.target.value }))} /></div>
+            <div><label className="form-label">Bank name</label><input className="form-input" value={form.bankName} onChange={e => setForm(f => ({ ...f, bankName: e.target.value }))} placeholder="e.g. Commercial Bank" /></div>
+            <div><label className="form-label">Branch</label><input className="form-input" value={form.bankBranch} onChange={e => setForm(f => ({ ...f, bankBranch: e.target.value }))} placeholder="e.g. Kollupitiya" /></div>
+            <div><label className="form-label">Account name</label><input className="form-input" value={form.accountName} onChange={e => setForm(f => ({ ...f, accountName: e.target.value }))} placeholder="e.g. Personal Account" /></div>
+            <div><label className="form-label">Account number</label><input className="form-input" value={form.accountNumber} onChange={e => setForm(f => ({ ...f, accountNumber: e.target.value }))} placeholder="e.g. 8001234567" /></div>
           </div>
         </div>
       </div>
@@ -356,7 +483,7 @@ function ContactsTab() {
         </div>
       )}
 
-      <div className="border-t pt-4" style={{ borderColor: '#e0e7ef' }}>
+      <div className="border-t border-border pt-4">
         <div className="font-semibold text-sm mb-3" style={{ color: 'var(--color-text)' }}>Add contact</div>
         {error && <p className="text-xs mb-2" style={{ color: 'var(--color-danger)' }}>{error}</p>}
         <div className="grid md:grid-cols-3 gap-3">
@@ -380,7 +507,8 @@ const DOC_TYPES: { value: Document['type']; label: string }[] = [
 ];
 
 function DocumentsTab() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, showToast } = useApp();
+  const confirmModal = useConfirm();
   const [form, setForm] = useState({ type: 'cv' as Document['type'], label: '', note: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -388,8 +516,8 @@ function DocumentsTab() {
     const file = e.target.files?.[0];
     if (!file) return;
     const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowed.includes(file.type)) { alert('Accepted: PDF, JPG, PNG, DOCX'); return; }
-    if (file.size > 10 * 1024 * 1024) { alert('Max file size is 10 MB'); return; }
+    if (!allowed.includes(file.type)) { showToast('Accepted: PDF, JPG, PNG, DOCX', 'error'); return; }
+    if (file.size > 10 * 1024 * 1024) { showToast('Max file size is 10 MB', 'error'); return; }
     dispatch({
       type: 'ADD_DOCUMENT',
       entry: {
@@ -423,14 +551,14 @@ function DocumentsTab() {
               </div>
               <div className="flex gap-3">
                 <button className="text-xs" style={{ color: 'var(--color-primary)' }}>View</button>
-                <button onClick={() => { if (confirm('Delete document?')) dispatch({ type: 'DELETE_DOCUMENT', id: d.id }); }} style={{ color: 'var(--color-danger)', fontSize: 12 }}>✕</button>
+                <button onClick={async () => { if (await confirmModal('Delete document?')) dispatch({ type: 'DELETE_DOCUMENT', id: d.id }); }} style={{ color: 'var(--color-danger)', fontSize: 12 }}>✕</button>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      <div className="border-t pt-4" style={{ borderColor: '#e0e7ef' }}>
+      <div className="border-t border-border pt-4">
         <div className="font-semibold text-sm mb-3" style={{ color: 'var(--color-text)' }}>Upload document</div>
         <div className="grid md:grid-cols-3 gap-3 mb-3">
           <div>
@@ -498,7 +626,8 @@ function RemindersTab() {
 }
 
 function PlanTab() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, showToast } = useApp();
+  const confirmModal = useConfirm();
   const labels = { salary: 'Salary', business: 'Business', both: 'Job + Business' };
   const setMode = (workMode: 'salary' | 'business' | 'both') => {
     dispatch({ type: 'UPDATE_PROFILE', profile: { workMode, plan: workMode === 'salary' ? 'basic' : 'business' } });
@@ -521,9 +650,9 @@ function PlanTab() {
           </button>
         ))}
       </div>
-      <div className="mt-5 pt-5 border-t" style={{ borderColor: '#e0e7ef' }}>
+      <div className="mt-5 pt-5 border-t border-border">
         <div className="font-semibold text-sm mb-2" style={{ color: 'var(--color-danger)' }}>Danger zone</div>
-        <button className="btn-danger text-sm" onClick={() => { if (confirm('Delete your account and all data? This cannot be undone.')) alert('Account deletion requested.'); }}>Delete my account</button>
+        <button className="btn-danger text-sm" onClick={async () => { if (await confirmModal('Delete your account and all data? This cannot be undone.')) showToast('Account deletion requested.', 'info'); }}>Delete my account</button>
       </div>
     </div>
   );
