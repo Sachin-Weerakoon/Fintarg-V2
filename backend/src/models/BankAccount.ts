@@ -6,7 +6,9 @@ export interface IBankAccount extends Document {
   accountNumber: string;
   accountName: string;
   branch: string;
-  accountType: 'savings' | 'current' | 'other';
+  branchCode?: string;
+  swiftCode?: string;
+  accountType: 'savings' | 'current' | 'checking' | 'business' | 'other';
   balanceCents: number;
   currency: string;
   isDefault: boolean;
@@ -20,7 +22,9 @@ const BankAccountSchema = new Schema<IBankAccount>({
   accountNumber: { type: String, required: true, trim: true },
   accountName: { type: String, required: true, trim: true },
   branch: { type: String, default: '', trim: true },
-  accountType: { type: String, enum: ['savings', 'current', 'other'], default: 'savings' },
+  branchCode: { type: String, default: '', trim: true },
+  swiftCode: { type: String, default: '', trim: true },
+  accountType: { type: String, enum: ['savings', 'current', 'checking', 'business', 'other'], default: 'savings' },
   balanceCents: { type: Number, default: 0 },
   currency: { type: String, default: 'LKR', trim: true },
   isDefault: { type: Boolean, default: false },

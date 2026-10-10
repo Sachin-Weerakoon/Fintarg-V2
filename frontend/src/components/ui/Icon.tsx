@@ -45,7 +45,8 @@ export type IconName =
   | 'briefcase'
   | 'eye'
   | 'eye-off'
-  | 'bank';
+  | 'bank'
+  | 'copy';
 
 export type IconSize = 12 | 14 | 15 | 16 | 18 | 20 | 22 | 24 | 28 | 32 | number;
 
@@ -340,6 +341,12 @@ const ICONS: Record<IconName, React.ReactNode> = {
       <rect x="10.5" y="10" width="3" height="9" />
       <rect x="17" y="10" width="3" height="9" />
       <line x1="2" y1="21" x2="22" y2="21" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
     </>
   ),
 };

@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/Select';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { Sheet } from '@/components/ui/Sheet';
+import { Modal } from '@/components/ui/Modal';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { PaymentMethodField, PaymentMethod } from '@/components/ui/PaymentMethodField';
 import { BankSelect } from '@/components/ui/BankSelect';
@@ -50,6 +51,45 @@ const SRI_LANKAN_BANKS = [
   'HSBC Sri Lanka',
   'Other / Custom Bank',
 ];
+
+const SRI_LANKAN_BANK_DETAILS: Record<string, { swift: string; code: string }> = {
+  'Commercial Bank of Ceylon': { swift: 'COMB-LK-LX', code: '7083' },
+  'Sampath Bank': { swift: 'BSAM-LK-LX', code: '7278' },
+  'Bank of Ceylon (BOC)': { swift: 'BCEY-LK-LX', code: '7010' },
+  'Hatton National Bank (HNB)': { swift: 'HBLI-LK-LX', code: '7056' },
+  'People\'s Bank': { swift: 'PSB-LK-LX', code: '7135' },
+  'Nations Trust Bank (NTB)': { swift: 'NTBL-LK-LX', code: '7162' },
+  'Seylan Bank': { swift: 'SEYB-LK-LX', code: '7287' },
+  'National Development Bank (NDB)': { swift: 'NDBE-LK-LX', code: '7214' },
+  'DFCC Bank': { swift: 'DFCC-LK-LX', code: '7461' },
+  'Pan Asia Bank': { swift: 'PABC-LK-LX', code: '7302' },
+  'Union Bank of Colombo': { swift: 'UBC-LK-LX', code: '7311' },
+  'Amana Bank': { swift: 'AMNB-LK-LX', code: '7470' },
+  'Cargills Bank': { swift: 'CAGB-LK-LX', code: '7489' },
+  'Standard Chartered Bank': { swift: 'SCBL-LK-LX', code: '7038' },
+  'HSBC Sri Lanka': { swift: 'HSBC-LK-LX', code: '7047' },
+};
+
+function detectCardNetwork(numberStr: string): 'visa' | 'mastercard' | 'amex' | 'other' {
+  const clean = numberStr.replace(/\D/g, '');
+  if (/^4/.test(clean)) return 'visa';
+  if (/^(5[1-5]|2[2-7])/.test(clean)) return 'mastercard';
+  if (/^3[47]/.test(clean)) return 'amex';
+  return 'other';
+}
+
+function formatCardNumberInput(val: string): string {
+  const digits = val.replace(/\D/g, '').slice(0, 19);
+  return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+
+function formatExpiryInput(val: string): string {
+  const digits = val.replace(/\D/g, '').slice(0, 4);
+  if (digits.length >= 3) {
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  }
+  return digits;
+}
 
 type Tab = 'accounts' | 'transactions' | 'expenses' | 'income' | 'finance' | 'loans' | 'pawned';
 
@@ -129,18 +169,24 @@ function AccountsTab() {
     bankName: '',
     accountNumber: '',
     branch: '',
+    branchCode: '',
+    swiftCode: '',
     accountType: 'savings' as BankAccount['accountType'],
     currentBalance: '',
     notes: '',
   });
   const [editAccountId, setEditAccountId] = useState<string | null>(null);
   const [accountError, setAccountError] = useState('');
+  const [viewAccountDetails, setViewAccountDetails] = useState<BankAccount | null>(null);
 
   // Card Form
   const [cardForm, setCardForm] = useState({
     name: '',
     bankAccountId: '',
     cardType: 'debit' as CardType['cardType'],
+    cardNumber: '',
+    expiryDate: '',
+    cvv: '',
     lastFourDigits: '',
     cardNetwork: 'visa' as CardType['cardNetwork'],
     creditLimit: '',
@@ -150,6 +196,10 @@ function AccountsTab() {
   });
   const [editCardId, setEditCardId] = useState<string | null>(null);
   const [cardError, setCardError] = useState('');
+  const [viewCardDetails, setViewCardDetails] = useState<CardType | null>(null);
+
+  // Clipboard copy state
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Delete confirmations
   const [deleteAccountConfirmId, setDeleteAccountConfirmId] = useState<string | null>(null);
@@ -157,9 +207,38 @@ function AccountsTab() {
 
   const totalBankBalance = state.bankAccounts.reduce((s, a) => s + (a.currentBalance || 0), 0);
 
+  const copyToClipboard = async (text: string, id: string) => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2200);
+      }
+    } catch {
+      // Fallback
+    }
+  };
+
+  const handleBankSelectChange = (val: string) => {
+    if (val === 'Other / Custom Bank') {
+      if (SRI_LANKAN_BANKS.includes(accountForm.bankName)) {
+        setAccountForm(f => ({ ...f, bankName: '', branchCode: '', swiftCode: '' }));
+      }
+    } else {
+      const preset = SRI_LANKAN_BANK_DETAILS[val];
+      setAccountForm(f => ({
+        ...f,
+        bankName: val,
+        branchCode: preset ? preset.code : f.branchCode,
+        swiftCode: preset ? preset.swift : f.swiftCode,
+      }));
+    }
+    if (accountError) setAccountError('');
+  };
+
   const submitAccount = () => {
     if (!accountForm.name.trim()) {
-      setAccountError('Account nickname is required (e.g. Primary Savings).');
+      setAccountError('Account nickname is required (e.g. Primary Savings, Business Ops).');
       return;
     }
     if (!accountForm.bankName.trim()) {
@@ -178,6 +257,8 @@ function AccountsTab() {
       bankName: accountForm.bankName.trim(),
       accountNumber: sanitizedNumber,
       branch: accountForm.branch.trim(),
+      branchCode: accountForm.branchCode.trim(),
+      swiftCode: accountForm.swiftCode.trim(),
       accountType: accountForm.accountType,
       currentBalance: balance,
       currency: 'LKR',
@@ -195,6 +276,8 @@ function AccountsTab() {
       bankName: '',
       accountNumber: '',
       branch: '',
+      branchCode: '',
+      swiftCode: '',
       accountType: 'savings',
       currentBalance: '',
       notes: '',
@@ -203,21 +286,48 @@ function AccountsTab() {
   };
 
   const submitCard = () => {
-    if (!cardForm.name || !cardForm.lastFourDigits) {
-      setCardError('Card name and last 4 digits are required.');
+    if (!cardForm.name.trim()) {
+      setCardError('Card label is required (e.g. Commercial Visa Platinum).');
       return;
     }
-    if (cardForm.lastFourDigits.length !== 4) {
-      setCardError('Last 4 digits must be exactly 4 numbers.');
+    const cleanNumber = cardForm.cardNumber.replace(/\s+/g, '');
+    if (!editCardId && !cleanNumber && !cardForm.lastFourDigits) {
+      setCardError('Card number is required.');
       return;
     }
+    if (cleanNumber && (cleanNumber.length < 12 || cleanNumber.length > 19)) {
+      setCardError('Please enter a valid card number (12 to 19 digits).');
+      return;
+    }
+    if (cardForm.expiryDate) {
+      const match = cardForm.expiryDate.match(/^(\d{2})\/(\d{2})$/);
+      if (!match) {
+        setCardError('Expiry date must be in MM/YY format (e.g. 12/28).');
+        return;
+      }
+      const month = parseInt(match[1], 10);
+      if (month < 1 || month > 12) {
+        setCardError('Expiry month must be between 01 and 12.');
+        return;
+      }
+    }
+    if (cardForm.cvv && (cardForm.cvv.length < 3 || cardForm.cvv.length > 4)) {
+      setCardError('CVV / CVC must be 3 or 4 digits.');
+      return;
+    }
+
+    const lastFour = cleanNumber ? cleanNumber.slice(-4) : (cardForm.lastFourDigits || '0000');
+
     const entry: CardType = {
       id: editCardId || 'cd_' + Date.now(),
-      name: cardForm.name,
+      name: cardForm.name.trim(),
       bankAccountId: cardForm.bankAccountId || undefined,
       cardType: cardForm.cardType,
-      lastFourDigits: cardForm.lastFourDigits,
+      cardNumber: cardForm.cardNumber,
+      lastFourDigits: lastFour,
       cardNetwork: cardForm.cardNetwork,
+      expiryDate: cardForm.expiryDate,
+      cvv: cardForm.cvv,
       creditLimit: cardForm.creditLimit ? Number(cardForm.creditLimit) : undefined,
       currentBalance: cardForm.currentBalance ? Number(cardForm.currentBalance) : undefined,
       billingDay: cardForm.billingDay ? Number(cardForm.billingDay) : undefined,
@@ -234,6 +344,9 @@ function AccountsTab() {
       name: '',
       bankAccountId: '',
       cardType: 'debit',
+      cardNumber: '',
+      expiryDate: '',
+      cvv: '',
       lastFourDigits: '',
       cardNetwork: 'visa',
       creditLimit: '',
@@ -263,8 +376,8 @@ function AccountsTab() {
           <div className="text-sm font-bold text-text truncate">
             {state.profile?.bankName || (state.bankAccounts[0]?.bankName ?? 'Not configured')}
           </div>
-          <div className="text-xs text-muted mt-1 truncate">
-            {state.profile?.accountNumber ? `•••• ${state.profile.accountNumber.slice(-4)}` : 'Set default in settings'}
+          <div className="text-xs text-muted mt-1 truncate font-mono">
+            {state.profile?.accountNumber ? `A/C: ${state.profile.accountNumber}` : 'Set default in settings'}
           </div>
         </Card>
       </div>
@@ -289,61 +402,126 @@ function AccountsTab() {
               <EmptyState
                 icon={<Icon name="bank" size={24} />}
                 title="No bank accounts connected"
-                helper="Add your savings, checking, or current accounts to track balances and link payments."
+                helper="Add your savings, current, or business accounts with standard banking details."
               />
             ) : (
               <div className="grid sm:grid-cols-2 gap-3.5">
                 {state.bankAccounts.map(acc => {
-                  const lastFour = acc.accountNumber ? acc.accountNumber.slice(-4) : '••••';
                   return (
-                    <Card key={acc.id} className="p-4 flex flex-col justify-between border-border hover:border-primary-500/40 transition-colors">
+                    <Card
+                      key={acc.id}
+                      className="p-4 flex flex-col justify-between border-border hover:border-primary-500/40 transition-all shadow-sm"
+                    >
                       <div>
+                        {/* Header */}
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <div>
-                            <div className="font-semibold text-sm text-text">{acc.name}</div>
-                            <div className="text-xs text-muted font-medium">{acc.bankName} {acc.branch ? `· ${acc.branch}` : ''}</div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-sm text-text truncate">{acc.name}</div>
+                            <div className="text-xs text-muted font-medium truncate">
+                              {acc.bankName} {acc.branch ? `· ${acc.branch}` : ''}
+                            </div>
                           </div>
-                          <Badge tone="primary" size="sm" className="uppercase text-[10px]">
+                          <Badge tone="primary" size="sm" className="uppercase text-[10px] shrink-0">
                             {acc.accountType || 'savings'}
                           </Badge>
                         </div>
-                        <div className="text-xs text-muted font-mono tracking-wider mt-3">
-                          •••• •••• •••• {lastFour}
+
+                        {/* Visible Account Number Section with Copy Button */}
+                        <div className="my-2.5 px-3 py-2 rounded-lg bg-surface-hover/80 border border-border flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-semibold text-muted uppercase tracking-wider block">
+                              Account Number
+                            </span>
+                            <span className="font-mono text-sm font-bold text-text tracking-wide truncate block">
+                              {acc.accountNumber}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(acc.accountNumber, `acc_${acc.id}`)}
+                            className="p-1.5 rounded-md text-muted hover:text-primary-text hover:bg-surface transition-colors shrink-0"
+                            title="Copy account number"
+                            aria-label="Copy account number"
+                          >
+                            <Icon
+                              name={copiedId === `acc_${acc.id}` ? 'check' : 'copy'}
+                              size={14}
+                              className={copiedId === `acc_${acc.id}` ? 'text-primary-text' : ''}
+                            />
+                          </button>
                         </div>
-                        <div className="text-xl font-bold text-text mt-1 num">
-                          {formatRs(acc.currentBalance)}
+
+                        {/* Industry Banking Specifications */}
+                        <div className="grid grid-cols-2 gap-2 text-[11px] text-muted py-1 border-t border-border/50">
+                          {acc.branchCode && (
+                            <div>
+                              <span className="text-muted/70 text-[10px] uppercase block">Branch Code</span>
+                              <span className="font-medium font-mono text-text">{acc.branchCode}</span>
+                            </div>
+                          )}
+                          {acc.swiftCode && (
+                            <div>
+                              <span className="text-muted/70 text-[10px] uppercase block">SWIFT / BIC</span>
+                              <span className="font-medium font-mono text-text">{acc.swiftCode}</span>
+                            </div>
+                          )}
                         </div>
+
+                        {/* Balance */}
+                        <div className="mt-2">
+                          <span className="text-[10px] uppercase text-muted block">Available Balance</span>
+                          <div className="text-xl font-bold text-text num">
+                            {formatRs(acc.currentBalance)}
+                          </div>
+                        </div>
+
                         {acc.notes && <p className="text-[11px] text-muted mt-1 truncate">{acc.notes}</p>}
                       </div>
-                      <div className="flex items-center justify-end gap-1 mt-4 pt-3 border-t border-border/60">
+
+                      {/* Actions: View Details, Edit, Delete */}
+                      <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-border/60">
                         <Button
-                          variant="ghost"
+                          variant="secondary"
                           size="sm"
-                          onClick={() => {
-                            setEditAccountId(acc.id);
-                            setAccountForm({
-                              name: acc.name,
-                              bankName: acc.bankName,
-                              accountNumber: acc.accountNumber,
-                              branch: acc.branch || '',
-                              accountType: acc.accountType || 'savings',
-                              currentBalance: String(acc.currentBalance),
-                              notes: acc.notes || '',
-                            });
-                          }}
-                          aria-label="Edit account"
+                          onClick={() => setViewAccountDetails(acc)}
+                          className="gap-1.5 text-xs flex-1 sm:flex-initial"
                         >
-                          <Icon name="edit" size={14} />
+                          <Icon name="eye" size={13} />
+                          <span>View Details</span>
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-danger-text hover:text-danger-text"
-                          onClick={() => setDeleteAccountConfirmId(acc.id)}
-                          aria-label="Delete account"
-                        >
-                          <Icon name="trash" size={14} />
-                        </Button>
+
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditAccountId(acc.id);
+                              setAccountForm({
+                                name: acc.name,
+                                bankName: acc.bankName,
+                                accountNumber: acc.accountNumber,
+                                branch: acc.branch || '',
+                                branchCode: acc.branchCode || '',
+                                swiftCode: acc.swiftCode || '',
+                                accountType: acc.accountType || 'savings',
+                                currentBalance: String(acc.currentBalance),
+                                notes: acc.notes || '',
+                              });
+                            }}
+                            aria-label="Edit account"
+                          >
+                            <Icon name="edit" size={14} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-danger-text hover:text-danger-text"
+                            onClick={() => setDeleteAccountConfirmId(acc.id)}
+                            aria-label="Delete account"
+                          >
+                            <Icon name="trash" size={14} />
+                          </Button>
+                        </div>
                       </div>
                     </Card>
                   );
@@ -377,24 +555,14 @@ function AccountsTab() {
                 />
               </Field>
 
-              <Field id="acc-bank" label="Bank Name" hint="Select from standard banks or specify custom">
+              <Field id="acc-bank" label="Bank Name" hint="Select standard preset or enter custom bank">
                 <Select
                   value={
                     SRI_LANKAN_BANKS.includes(accountForm.bankName)
                       ? accountForm.bankName
                       : 'Other / Custom Bank'
                   }
-                  onChange={e => {
-                    const val = e.target.value;
-                    if (val === 'Other / Custom Bank') {
-                      if (SRI_LANKAN_BANKS.includes(accountForm.bankName)) {
-                        setAccountForm(f => ({ ...f, bankName: '' }));
-                      }
-                    } else {
-                      setAccountForm(f => ({ ...f, bankName: val }));
-                    }
-                    if (accountError) setAccountError('');
-                  }}
+                  onChange={e => handleBankSelectChange(e.target.value)}
                 >
                   {SRI_LANKAN_BANKS.map(bank => (
                     <option key={bank} value={bank}>{bank}</option>
@@ -408,12 +576,12 @@ function AccountsTab() {
                       setAccountForm(f => ({ ...f, bankName: e.target.value }));
                       if (accountError) setAccountError('');
                     }}
-                    placeholder="Enter custom bank name (e.g. Foreign bank, Credit union)"
+                    placeholder="Enter custom bank name (e.g. Foreign bank, Union)"
                   />
                 )}
               </Field>
 
-              <Field id="acc-number" label="Account Number" hint="Only last 4 digits are shown in public views">
+              <Field id="acc-number" label="Account Number" hint="Full account number will be visible on your account details">
                 <Input
                   value={accountForm.accountNumber}
                   onChange={e => {
@@ -442,6 +610,23 @@ function AccountsTab() {
                     value={accountForm.branch}
                     onChange={e => setAccountForm(f => ({ ...f, branch: e.target.value }))}
                     placeholder="e.g. Kollupitiya"
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field id="acc-branchcode" label="Branch Code" hint="e.g. 034">
+                  <Input
+                    value={accountForm.branchCode}
+                    onChange={e => setAccountForm(f => ({ ...f, branchCode: e.target.value }))}
+                    placeholder="034"
+                  />
+                </Field>
+                <Field id="acc-swift" label="SWIFT / BIC" hint="e.g. COMB-LK-LX">
+                  <Input
+                    value={accountForm.swiftCode}
+                    onChange={e => setAccountForm(f => ({ ...f, swiftCode: e.target.value }))}
+                    placeholder="COMB-LK-LX"
                   />
                 </Field>
               </div>
@@ -477,6 +662,8 @@ function AccountsTab() {
                         bankName: '',
                         accountNumber: '',
                         branch: '',
+                        branchCode: '',
+                        swiftCode: '',
                         accountType: 'savings',
                         currentBalance: '',
                         notes: '',
@@ -497,9 +684,9 @@ function AccountsTab() {
           <div className="md:col-span-2 space-y-3">
             {state.cards.length === 0 ? (
               <EmptyState
-                icon={<Icon name="wallet" size={24} />}
+                icon={<Icon name="credit-card" size={24} />}
                 title="No payment cards connected"
-                helper="Add your debit and credit cards to quickly categorize spending and bill due dates."
+                helper="Add your debit and credit cards using standard bank card specifications."
               />
             ) : (
               <div className="grid sm:grid-cols-2 gap-3.5">
@@ -508,32 +695,50 @@ function AccountsTab() {
                   return (
                     <Card
                       key={c.id}
-                      className="p-4 flex flex-col justify-between border-border relative overflow-hidden"
+                      className="p-4 flex flex-col justify-between border-border relative overflow-hidden shadow-sm"
                       style={{
                         background: c.cardType === 'credit'
-                          ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.2))'
+                          ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.25))'
                           : undefined,
                       }}
                     >
                       <div>
+                        {/* Header */}
                         <div className="flex items-start justify-between gap-2 mb-3">
-                          <div>
-                            <div className="font-semibold text-sm text-text">{c.name}</div>
-                            <div className="text-xs text-muted uppercase font-medium">{c.cardNetwork || 'Card'} · {c.cardType}</div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-sm text-text truncate">{c.name}</div>
+                            <div className="text-xs text-muted uppercase font-medium">
+                              {c.cardNetwork || 'Card'} · {c.cardType}
+                            </div>
                           </div>
-                          <Badge tone={c.cardType === 'credit' ? 'warning' : 'primary'} size="sm" className="uppercase text-[10px]">
+                          <Badge tone={c.cardType === 'credit' ? 'warning' : 'primary'} size="sm" className="uppercase text-[10px] shrink-0">
                             {c.cardType}
                           </Badge>
                         </div>
-                        <div className="text-base font-mono tracking-widest text-text my-2">
-                          •••• •••• •••• {c.lastFourDigits}
+
+                        {/* Masked Card Number */}
+                        <div className="p-2.5 rounded-lg bg-surface-hover/80 border border-border/80 my-2">
+                          <div className="text-[10px] uppercase tracking-wider text-muted font-semibold">Card Number</div>
+                          <div className="text-base font-mono tracking-widest text-text font-bold">
+                            •••• •••• •••• {c.lastFourDigits}
+                          </div>
                         </div>
+
+                        {/* Expiry Date */}
+                        {c.expiryDate && (
+                          <div className="text-xs text-muted font-mono flex items-center gap-1.5 mt-1">
+                            <span className="text-[10px] uppercase tracking-wider text-muted/70">EXP:</span>
+                            <span className="text-text font-semibold">{c.expiryDate}</span>
+                          </div>
+                        )}
+
                         {linkedAcc && (
                           <div className="text-xs text-muted flex items-center gap-1.5 mt-2">
                             <Icon name="bank" size={12} />
-                            <span>Linked: {linkedAcc.name}</span>
+                            <span className="truncate">Linked: {linkedAcc.name} ({linkedAcc.bankName})</span>
                           </div>
                         )}
+
                         {c.cardType === 'credit' && (
                           <div className="grid grid-cols-2 gap-2 mt-3 pt-2 border-t border-border/50 text-xs">
                             <div>
@@ -547,37 +752,54 @@ function AccountsTab() {
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center justify-end gap-1 mt-4 pt-2 border-t border-border/60">
+
+                      {/* Card Actions: View Details, Edit, Delete */}
+                      <div className="flex items-center justify-between gap-2 mt-4 pt-2 border-t border-border/60">
                         <Button
-                          variant="ghost"
+                          variant="secondary"
                           size="sm"
-                          onClick={() => {
-                            setEditCardId(c.id);
-                            setCardForm({
-                              name: c.name,
-                              bankAccountId: c.bankAccountId || '',
-                              cardType: c.cardType,
-                              lastFourDigits: c.lastFourDigits,
-                              cardNetwork: c.cardNetwork || 'visa',
-                              creditLimit: c.creditLimit ? String(c.creditLimit) : '',
-                              currentBalance: c.currentBalance ? String(c.currentBalance) : '',
-                              billingDay: c.billingDay ? String(c.billingDay) : '',
-                              dueDay: c.dueDay ? String(c.dueDay) : '',
-                            });
-                          }}
-                          aria-label="Edit card"
+                          onClick={() => setViewCardDetails(c)}
+                          className="gap-1.5 text-xs flex-1 sm:flex-initial"
                         >
-                          <Icon name="edit" size={14} />
+                          <Icon name="eye" size={13} />
+                          <span>View Details</span>
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-danger-text hover:text-danger-text"
-                          onClick={() => setDeleteCardConfirmId(c.id)}
-                          aria-label="Delete card"
-                        >
-                          <Icon name="trash" size={14} />
-                        </Button>
+
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditCardId(c.id);
+                              setCardForm({
+                                name: c.name,
+                                bankAccountId: c.bankAccountId || '',
+                                cardType: c.cardType,
+                                cardNumber: c.cardNumber || `•••• •••• •••• ${c.lastFourDigits}`,
+                                expiryDate: c.expiryDate || '',
+                                cvv: c.cvv || '',
+                                lastFourDigits: c.lastFourDigits,
+                                cardNetwork: c.cardNetwork || 'visa',
+                                creditLimit: c.creditLimit ? String(c.creditLimit) : '',
+                                currentBalance: c.currentBalance ? String(c.currentBalance) : '',
+                                billingDay: c.billingDay ? String(c.billingDay) : '',
+                                dueDay: c.dueDay ? String(c.dueDay) : '',
+                              });
+                            }}
+                            aria-label="Edit card"
+                          >
+                            <Icon name="edit" size={14} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-danger-text hover:text-danger-text"
+                            onClick={() => setDeleteCardConfirmId(c.id)}
+                            aria-label="Delete card"
+                          >
+                            <Icon name="trash" size={14} />
+                          </Button>
+                        </div>
                       </div>
                     </Card>
                   );
@@ -588,9 +810,56 @@ function AccountsTab() {
 
           {/* Add / Edit Card Form */}
           <Card className="p-5 h-fit">
-            <h3 className="font-semibold text-sm mb-4 text-text">
-              {editCardId ? 'Edit Card' : 'Add Card'}
+            <h3 className="font-semibold text-sm mb-4 text-text flex items-center justify-between">
+              <span>{editCardId ? 'Edit Card' : 'Add Bank Card'}</span>
+              <span className="text-[11px] font-normal text-muted">Card Standards</span>
             </h3>
+
+            {/* Live Interactive Visual Card Preview */}
+            <div
+              className="mb-4 p-4 rounded-xl relative overflow-hidden border border-border/80 shadow-md transition-all text-white"
+              style={{
+                background: cardForm.cardType === 'credit'
+                  ? 'linear-gradient(135deg, #0B1626 0%, #152A4A 60%, #0FA3B1 140%)'
+                  : 'linear-gradient(135deg, #0F1D32 0%, #0B1626 70%, #0FA3B1 150%)',
+              }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-6 rounded bg-amber-400/90 border border-amber-300/40 flex items-center justify-center">
+                    <div className="w-4 h-3 border border-amber-800/40 rounded-sm" />
+                  </div>
+                  <svg className="w-4 h-4 text-white/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M8.5 16.5a5 5 0 0 1 0-7" />
+                    <path d="M12 19a8.5 8.5 0 0 1 0-12" />
+                  </svg>
+                </div>
+                <Badge tone="primary" size="sm" className="uppercase text-[10px] font-bold tracking-wider">
+                  {cardForm.cardNetwork || 'CARD'} · {cardForm.cardType}
+                </Badge>
+              </div>
+
+              {/* Formatted Number Preview */}
+              <div className="font-mono text-base tracking-widest text-white font-bold my-2 select-all">
+                {cardForm.cardNumber || (cardForm.lastFourDigits ? `•••• •••• •••• ${cardForm.lastFourDigits}` : '•••• •••• •••• ••••')}
+              </div>
+
+              {/* Bottom Row */}
+              <div className="flex items-end justify-between mt-3 text-xs">
+                <div>
+                  <span className="text-[9px] uppercase tracking-wider text-white/60 block">Card Label</span>
+                  <span className="font-semibold text-white truncate max-w-[150px] block">
+                    {cardForm.name || 'CARD MEMBER'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[9px] uppercase tracking-wider text-white/60 block">Expires</span>
+                  <span className="font-mono font-semibold text-white">
+                    {cardForm.expiryDate || 'MM/YY'}
+                  </span>
+                </div>
+              </div>
+            </div>
 
             {cardError && (
               <Alert tone="danger" className="mb-4" onDismiss={() => setCardError('')}>
@@ -599,7 +868,7 @@ function AccountsTab() {
             )}
 
             <div className="space-y-3.5">
-              <Field id="card-name" label="Card Label">
+              <Field id="card-name" label="Card Label" hint="e.g. Commercial Visa Platinum, BOC Debit">
                 <Input
                   value={cardForm.name}
                   onChange={e => {
@@ -609,6 +878,60 @@ function AccountsTab() {
                   placeholder="e.g. Commercial Visa Platinum"
                 />
               </Field>
+
+              {/* Standard 4-digit Spacing Card Number Input */}
+              <Field
+                id="card-number"
+                label="Card Number"
+                hint="Auto-spaced 4 digits (standard banking format)"
+              >
+                <Input
+                  maxLength={19}
+                  value={cardForm.cardNumber}
+                  onChange={e => {
+                    const formatted = formatCardNumberInput(e.target.value);
+                    const cleanDigits = formatted.replace(/\s+/g, '');
+                    const detectedNet = detectCardNetwork(cleanDigits);
+                    setCardForm(f => ({
+                      ...f,
+                      cardNumber: formatted,
+                      lastFourDigits: cleanDigits.length >= 4 ? cleanDigits.slice(-4) : f.lastFourDigits,
+                      cardNetwork: detectedNet !== 'other' ? detectedNet : f.cardNetwork,
+                    }));
+                    if (cardError) setCardError('');
+                  }}
+                  placeholder="4532 1100 2345 6789"
+                />
+              </Field>
+
+              {/* Expiry Date (MM/YY) and CVC / CVV */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field id="card-expiry" label="Expiry Date" hint="MM/YY">
+                  <Input
+                    maxLength={5}
+                    value={cardForm.expiryDate}
+                    onChange={e => {
+                      const formatted = formatExpiryInput(e.target.value);
+                      setCardForm(f => ({ ...f, expiryDate: formatted }));
+                      if (cardError) setCardError('');
+                    }}
+                    placeholder="MM/YY"
+                  />
+                </Field>
+                <Field id="card-cvv" label="CVC / CVV" hint="3-4 digits">
+                  <Input
+                    type="password"
+                    maxLength={4}
+                    value={cardForm.cvv}
+                    onChange={e => {
+                      setCardForm(f => ({ ...f, cvv: e.target.value.replace(/\D/g, '') }));
+                      if (cardError) setCardError('');
+                    }}
+                    placeholder="•••"
+                  />
+                </Field>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <Field id="card-type" label="Type">
                   <Select
@@ -631,14 +954,7 @@ function AccountsTab() {
                   </Select>
                 </Field>
               </div>
-              <Field id="card-lastfour" label="Last 4 Digits">
-                <Input
-                  maxLength={4}
-                  value={cardForm.lastFourDigits}
-                  onChange={e => setCardForm(f => ({ ...f, lastFourDigits: e.target.value.replace(/\D/g, '') }))}
-                  placeholder="1234"
-                />
-              </Field>
+
               <BankSelect
                 id="card-bank-account"
                 label="Linked Bank Account (optional)"
@@ -646,6 +962,7 @@ function AccountsTab() {
                 onChange={id => setCardForm(f => ({ ...f, bankAccountId: id }))}
                 bankAccounts={state.bankAccounts}
               />
+
               {cardForm.cardType === 'credit' && (
                 <>
                   <Field id="card-limit" label="Credit Limit (Rs.)">
@@ -680,6 +997,7 @@ function AccountsTab() {
                   </div>
                 </>
               )}
+
               <div className="flex gap-2 pt-1">
                 <Button variant="primary" className="flex-1" onClick={submitCard}>
                   {editCardId ? 'Update Card' : 'Save Card'}
@@ -693,6 +1011,9 @@ function AccountsTab() {
                         name: '',
                         bankAccountId: '',
                         cardType: 'debit',
+                        cardNumber: '',
+                        expiryDate: '',
+                        cvv: '',
                         lastFourDigits: '',
                         cardNetwork: 'visa',
                         creditLimit: '',
@@ -700,6 +1021,7 @@ function AccountsTab() {
                         billingDay: '',
                         dueDay: '',
                       });
+                      setCardError('');
                     }}
                   >
                     Cancel
@@ -709,6 +1031,324 @@ function AccountsTab() {
             </div>
           </Card>
         </div>
+      )}
+
+      {/* 1. View Bank Account Details Modal */}
+      {viewAccountDetails && (
+        <Modal
+          isOpen={!!viewAccountDetails}
+          onClose={() => setViewAccountDetails(null)}
+          title="Bank Account Specifications"
+          size="md"
+        >
+          <div className="space-y-4">
+            {/* Visual Passbook / Digital Account Card */}
+            <div
+              className="p-5 rounded-xl border border-primary-500/40 text-white shadow-lg relative overflow-hidden"
+              style={{
+                background: 'linear-gradient(135deg, #0B1626 0%, #10263E 60%, #0FA3B1 140%)',
+              }}
+            >
+              <div className="flex items-start justify-between gap-2 mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-lg bg-primary-500/20 border border-primary-400/40 flex items-center justify-center text-primary-text">
+                    <Icon name="bank" size={20} />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm tracking-tight text-white">{viewAccountDetails.bankName}</div>
+                    <div className="text-[11px] text-white/70">{viewAccountDetails.name}</div>
+                  </div>
+                </div>
+                <Badge tone="primary" size="sm" className="uppercase text-[10px] font-bold">
+                  {viewAccountDetails.accountType || 'savings'}
+                </Badge>
+              </div>
+
+              {/* Large prominent account number with 1-click copy */}
+              <div className="my-3 p-3 rounded-lg bg-black/40 border border-white/10 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-white/60 block mb-0.5">
+                    Official Account Number
+                  </span>
+                  <span className="font-mono text-base sm:text-lg font-bold text-white tracking-widest truncate block">
+                    {viewAccountDetails.accountNumber}
+                  </span>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => copyToClipboard(viewAccountDetails.accountNumber, 'modal_acc')}
+                  className="bg-white/10 hover:bg-white/20 border-white/20 text-white gap-1.5 shrink-0"
+                >
+                  <Icon name={copiedId === 'modal_acc' ? 'check' : 'copy'} size={13} />
+                  <span>{copiedId === 'modal_acc' ? 'Copied' : 'Copy'}</span>
+                </Button>
+              </div>
+
+              <div className="flex items-end justify-between mt-4 pt-3 border-t border-white/15 text-xs">
+                <div>
+                  <span className="text-[10px] uppercase text-white/60 block">Available Liquidity</span>
+                  <span className="text-base font-bold text-white num">{formatRs(viewAccountDetails.currentBalance)}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase text-white/60 block">Currency</span>
+                  <span className="font-semibold text-white">{viewAccountDetails.currency || 'LKR'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Industry Banking Specifications Grid */}
+            <div className="bg-surface rounded-xl border border-border p-3.5 space-y-2.5 text-xs">
+              <div className="font-semibold text-text text-[11px] uppercase tracking-wider text-muted pb-1 border-b border-border">
+                Standard Banking Details
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-muted block text-[11px]">Bank Name</span>
+                  <span className="font-medium text-text">{viewAccountDetails.bankName}</span>
+                </div>
+                <div>
+                  <span className="text-muted block text-[11px]">Account Type</span>
+                  <span className="font-medium text-text capitalize">{viewAccountDetails.accountType || 'Savings'}</span>
+                </div>
+                <div>
+                  <span className="text-muted block text-[11px]">Branch Name</span>
+                  <span className="font-medium text-text">{viewAccountDetails.branch || 'Main Branch'}</span>
+                </div>
+                <div>
+                  <span className="text-muted block text-[11px]">Branch Code</span>
+                  <span className="font-medium text-text font-mono">{viewAccountDetails.branchCode || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-muted block text-[11px]">SWIFT / BIC Code</span>
+                  <span className="font-medium text-text font-mono">{viewAccountDetails.swiftCode || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-muted block text-[11px]">Account Holder</span>
+                  <span className="font-medium text-text">{viewAccountDetails.name}</span>
+                </div>
+              </div>
+              {viewAccountDetails.notes && (
+                <div className="pt-2 border-t border-border/60">
+                  <span className="text-muted block text-[11px]">Notes / Instructions</span>
+                  <span className="font-normal text-text">{viewAccountDetails.notes}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Connected Cards */}
+            {(() => {
+              const linked = state.cards.filter(c => c.bankAccountId === viewAccountDetails.id);
+              if (linked.length === 0) return null;
+              return (
+                <div className="bg-surface rounded-xl border border-border p-3.5 text-xs">
+                  <div className="font-semibold text-text text-[11px] uppercase tracking-wider text-muted mb-2">
+                    Linked Payment Cards ({linked.length})
+                  </div>
+                  <div className="space-y-1.5">
+                    {linked.map(c => (
+                      <div key={c.id} className="flex items-center justify-between p-2 rounded-lg bg-surface-hover border border-border/60">
+                        <div className="flex items-center gap-2">
+                          <Icon name="credit-card" size={14} className="text-primary-text" />
+                          <span className="font-medium text-text">{c.name}</span>
+                          <span className="text-[10px] text-muted uppercase font-mono">•••• {c.lastFourDigits}</span>
+                        </div>
+                        <Badge tone="primary" size="sm" className="uppercase text-[9px]">{c.cardType}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
+              <Button
+                variant="primary"
+                className="w-full sm:flex-1 gap-1.5 text-xs"
+                onClick={() => {
+                  const slip = [
+                    `Bank: ${viewAccountDetails.bankName}`,
+                    `Account Holder: ${viewAccountDetails.name}`,
+                    `Account Number: ${viewAccountDetails.accountNumber}`,
+                    viewAccountDetails.branch ? `Branch: ${viewAccountDetails.branch}` : '',
+                    viewAccountDetails.branchCode ? `Branch Code: ${viewAccountDetails.branchCode}` : '',
+                    viewAccountDetails.swiftCode ? `SWIFT / BIC: ${viewAccountDetails.swiftCode}` : '',
+                  ].filter(Boolean).join('\n');
+                  copyToClipboard(slip, 'transfer_slip');
+                }}
+              >
+                <Icon name={copiedId === 'transfer_slip' ? 'check' : 'copy'} size={14} />
+                <span>{copiedId === 'transfer_slip' ? 'Details Copied!' : 'Copy Transfer Details'}</span>
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full sm:w-auto text-xs"
+                onClick={() => {
+                  setEditAccountId(viewAccountDetails.id);
+                  setAccountForm({
+                    name: viewAccountDetails.name,
+                    bankName: viewAccountDetails.bankName,
+                    accountNumber: viewAccountDetails.accountNumber,
+                    branch: viewAccountDetails.branch || '',
+                    branchCode: viewAccountDetails.branchCode || '',
+                    swiftCode: viewAccountDetails.swiftCode || '',
+                    accountType: viewAccountDetails.accountType || 'savings',
+                    currentBalance: String(viewAccountDetails.currentBalance),
+                    notes: viewAccountDetails.notes || '',
+                  });
+                  setViewAccountDetails(null);
+                }}
+              >
+                Edit Account
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full sm:w-auto text-xs"
+                onClick={() => setViewAccountDetails(null)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 2. View Card Details Modal */}
+      {viewCardDetails && (
+        <Modal
+          isOpen={!!viewCardDetails}
+          onClose={() => setViewCardDetails(null)}
+          title="Payment Card Specifications"
+          size="md"
+        >
+          <div className="space-y-4">
+            {/* Card Mockup */}
+            <div
+              className="p-5 rounded-xl border border-primary-500/40 text-white shadow-lg relative overflow-hidden"
+              style={{
+                background: viewCardDetails.cardType === 'credit'
+                  ? 'linear-gradient(135deg, #0B1626 0%, #152A4A 60%, #0FA3B1 140%)'
+                  : 'linear-gradient(135deg, #0F1D32 0%, #0B1626 70%, #0FA3B1 150%)',
+              }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-6 rounded bg-amber-400/90 border border-amber-300/40 flex items-center justify-center">
+                    <div className="w-4 h-3 border border-amber-800/40 rounded-sm" />
+                  </div>
+                  <svg className="w-4 h-4 text-white/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M8.5 16.5a5 5 0 0 1 0-7" />
+                    <path d="M12 19a8.5 8.5 0 0 1 0-12" />
+                  </svg>
+                </div>
+                <Badge tone="primary" size="sm" className="uppercase text-[10px] font-bold tracking-wider">
+                  {viewCardDetails.cardNetwork || 'CARD'} · {viewCardDetails.cardType}
+                </Badge>
+              </div>
+
+              <div className="font-mono text-base tracking-widest text-white font-bold my-2 select-all">
+                •••• •••• •••• {viewCardDetails.lastFourDigits}
+              </div>
+
+              <div className="flex items-end justify-between mt-3 text-xs">
+                <div>
+                  <span className="text-[9px] uppercase tracking-wider text-white/60 block">Cardholder Label</span>
+                  <span className="font-semibold text-white truncate max-w-[150px] block">
+                    {viewCardDetails.name}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[9px] uppercase tracking-wider text-white/60 block">Expires</span>
+                  <span className="font-mono font-semibold text-white">
+                    {viewCardDetails.expiryDate || '••/••'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card Specifications Table */}
+            <div className="bg-surface rounded-xl border border-border p-3.5 space-y-2.5 text-xs">
+              <div className="font-semibold text-text text-[11px] uppercase tracking-wider text-muted pb-1 border-b border-border">
+                Card Attributes
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-muted block text-[11px]">Card Name</span>
+                  <span className="font-medium text-text">{viewCardDetails.name}</span>
+                </div>
+                <div>
+                  <span className="text-muted block text-[11px]">Card Type</span>
+                  <span className="font-medium text-text capitalize">{viewCardDetails.cardType}</span>
+                </div>
+                <div>
+                  <span className="text-muted block text-[11px]">Network</span>
+                  <span className="font-medium text-text capitalize">{viewCardDetails.cardNetwork || 'Visa'}</span>
+                </div>
+                <div>
+                  <span className="text-muted block text-[11px]">Last 4 Digits</span>
+                  <span className="font-medium font-mono text-text">•••• {viewCardDetails.lastFourDigits}</span>
+                </div>
+                {viewCardDetails.expiryDate && (
+                  <div>
+                    <span className="text-muted block text-[11px]">Expiry Date</span>
+                    <span className="font-medium font-mono text-text">{viewCardDetails.expiryDate}</span>
+                  </div>
+                )}
+                {viewCardDetails.cardType === 'credit' && (
+                  <>
+                    <div>
+                      <span className="text-muted block text-[11px]">Credit Limit</span>
+                      <span className="font-medium text-text num">{viewCardDetails.creditLimit ? formatRs(viewCardDetails.creditLimit) : '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted block text-[11px]">Billing Day</span>
+                      <span className="font-medium text-text">{viewCardDetails.billingDay ? `Day ${viewCardDetails.billingDay}` : '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted block text-[11px]">Payment Due Day</span>
+                      <span className="font-medium text-text">{viewCardDetails.dueDay ? `Day ${viewCardDetails.dueDay}` : '—'}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setEditCardId(viewCardDetails.id);
+                  setCardForm({
+                    name: viewCardDetails.name,
+                    bankAccountId: viewCardDetails.bankAccountId || '',
+                    cardType: viewCardDetails.cardType,
+                    cardNumber: viewCardDetails.cardNumber || `•••• •••• •••• ${viewCardDetails.lastFourDigits}`,
+                    expiryDate: viewCardDetails.expiryDate || '',
+                    cvv: viewCardDetails.cvv || '',
+                    lastFourDigits: viewCardDetails.lastFourDigits,
+                    cardNetwork: viewCardDetails.cardNetwork || 'visa',
+                    creditLimit: viewCardDetails.creditLimit ? String(viewCardDetails.creditLimit) : '',
+                    currentBalance: viewCardDetails.currentBalance ? String(viewCardDetails.currentBalance) : '',
+                    billingDay: viewCardDetails.billingDay ? String(viewCardDetails.billingDay) : '',
+                    dueDay: viewCardDetails.dueDay ? String(viewCardDetails.dueDay) : '',
+                  });
+                  setViewCardDetails(null);
+                }}
+              >
+                Edit Card
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewCardDetails(null)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Delete Bank Account Dialog */}

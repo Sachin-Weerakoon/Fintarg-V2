@@ -138,11 +138,23 @@ function toStored(kind: RecordKind, input: Record<string, unknown>, isCreate = f
     if (!stored.cardName) {
       stored.cardName = 'Payment Card';
     }
+    if ('cardNumber' in stored && stored.cardNumber && !stored.last4) {
+      stored.last4 = String(stored.cardNumber).replace(/\D/g, '').slice(-4);
+      stored.lastFourDigits = stored.last4;
+    }
     if ('lastFourDigits' in stored && !('last4' in stored)) {
       stored.last4 = String(stored.lastFourDigits).slice(-4);
     }
     if (!stored.last4) {
       stored.last4 = '0000';
+    }
+    if ('expiryDate' in stored && stored.expiryDate && (!stored.expiryMonth || !stored.expiryYear)) {
+      const match = String(stored.expiryDate).match(/^(\d{1,2})\/(\d{2,4})$/);
+      if (match) {
+        stored.expiryMonth = parseInt(match[1], 10);
+        const yr = parseInt(match[2], 10);
+        stored.expiryYear = yr < 100 ? 2000 + yr : yr;
+      }
     }
   }
   if ('bankAccountId' in stored && stored.bankAccountId) {

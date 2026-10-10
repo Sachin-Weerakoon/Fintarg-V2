@@ -49,7 +49,9 @@ export interface BankAccount {
   accountNumber: string;
   bankName: string;
   branch?: string;
-  accountType?: 'savings' | 'checking' | 'current' | 'other';
+  branchCode?: string;
+  swiftCode?: string;
+  accountType?: 'savings' | 'checking' | 'current' | 'business' | 'other';
   currentBalance: number;
   currency?: string;
   notes?: string;
@@ -60,8 +62,14 @@ export interface Card {
   name: string;
   bankAccountId?: string;
   cardType: 'credit' | 'debit';
+  cardNumber?: string;
+  cardHolder?: string;
   lastFourDigits: string;
-  cardNetwork?: 'visa' | 'mastercard' | 'amex' | 'other';
+  cardNetwork?: 'visa' | 'mastercard' | 'amex' | 'discover' | 'other';
+  expiryDate?: string;
+  expiryMonth?: number;
+  expiryYear?: number;
+  cvv?: string;
   creditLimit?: number;
   currentBalance?: number;
   billingDay?: number;
