@@ -418,6 +418,16 @@ body:has(.dark-mode) {
   color: var(--color-placeholder);
 }
 
+select option {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.dark-mode select option {
+  background-color: #111A2B;
+  color: #E8EEF7;
+}
+
 /* Badges: chips fully rounded per spec */
 .badge-success {
   background: var(--color-success-tint);
