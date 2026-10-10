@@ -199,7 +199,7 @@ export default function AppLayout({
               </div>
               <div className="pt-2 px-1 flex items-center justify-between text-[11px] text-chrome-text">
                 <a
-                  href="https://raxwo.com"
+                  href="https://raxwo.net"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-white transition-colors flex items-center gap-1 opacity-75 hover:opacity-100"
