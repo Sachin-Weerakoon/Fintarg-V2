@@ -6,24 +6,54 @@ const optionalText = z.string().trim().max(2000).default('');
 
 export const recordSchemas = {
   bankAccounts: z.object({
-    bankName: z.string().trim().min(1).max(120),
-    accountNumber: z.string().trim().min(1).max(64),
-    accountName: z.string().trim().min(1).max(120),
+    bankName: z.string().trim().min(1, 'Bank name is required').max(120),
+    accountNumber: z.string().trim().min(1, 'Account number is required').max(64),
+    accountName: z.string().trim().max(120).optional(),
+    name: z.string().trim().max(120).optional(),
     branch: optionalText,
-    accountType: z.enum(['savings', 'current', 'other']).default('savings'),
+    accountType: z.enum(['savings', 'current', 'checking', 'business', 'other']).default('savings'),
     balance: z.coerce.number().finite().min(0).max(1_000_000_000).default(0),
+    currentBalance: z.coerce.number().finite().min(0).max(1_000_000_000).optional(),
     currency: z.string().trim().max(10).default('LKR'),
+    notes: optionalText,
     isDefault: z.boolean().default(false),
+  }).transform(data => {
+    const accName = (data.accountName || data.name || 'Main Account').trim();
+    const balance = data.balance ?? data.currentBalance ?? 0;
+    const accountType = data.accountType === 'checking' ? 'current' : data.accountType;
+    return {
+      ...data,
+      accountName: accName,
+      name: accName,
+      balance,
+      accountType,
+    };
   }),
   cards: z.object({
     bankAccountId: z.string().optional().nullable(),
-    cardName: z.string().trim().min(1).max(120),
+    cardName: z.string().trim().max(120).optional(),
+    name: z.string().trim().max(120).optional(),
     cardType: z.enum(['debit', 'credit']).default('debit'),
-    last4: z.string().trim().length(4),
+    last4: z.string().trim().optional(),
+    lastFourDigits: z.string().trim().optional(),
     expiryMonth: z.coerce.number().int().min(1).max(12).optional(),
     expiryYear: z.coerce.number().int().min(2020).max(2100).optional(),
     creditLimit: z.coerce.number().finite().min(0).max(1_000_000_000).default(0),
     balance: z.coerce.number().finite().min(0).max(1_000_000_000).default(0),
+    currentBalance: z.coerce.number().finite().min(0).max(1_000_000_000).optional(),
+    billingDay: z.coerce.number().int().min(1).max(31).optional(),
+    dueDay: z.coerce.number().int().min(1).max(31).optional(),
+  }).transform(data => {
+    const cardName = (data.cardName || data.name || 'Payment Card').trim();
+    const rawL4 = data.last4 || data.lastFourDigits || '0000';
+    const last4 = rawL4.replace(/\D/g, '').slice(-4).padStart(4, '0');
+    return {
+      ...data,
+      cardName,
+      name: cardName,
+      last4,
+      balance: data.balance ?? data.currentBalance ?? 0,
+    };
   }),
   transactions: z.object({
     bankAccountId: z.string().optional().nullable(),

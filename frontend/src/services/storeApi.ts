@@ -298,18 +298,56 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
 
     case 'ADD_BANK_ACCOUNT':
       return create('/api/backend/records/bankAccounts', {
-        ...action.entry,
-        currentBalance: action.entry.currentBalance,
+        name: action.entry.name,
+        accountName: action.entry.name,
+        bankName: action.entry.bankName,
+        accountNumber: action.entry.accountNumber,
+        branch: action.entry.branch || '',
+        accountType: action.entry.accountType === 'checking' ? 'current' : action.entry.accountType || 'savings',
+        balance: Number(action.entry.currentBalance || 0),
+        currentBalance: Number(action.entry.currentBalance || 0),
+        currency: action.entry.currency || 'LKR',
+        notes: action.entry.notes || '',
+        isDefault: false,
       });
     case 'UPDATE_BANK_ACCOUNT':
-      return void (await send(`/api/backend/records/bankAccounts/${id}`, 'PATCH', action.entry));
+      return void (await send(`/api/backend/records/bankAccounts/${id}`, 'PATCH', {
+        name: action.entry.name,
+        accountName: action.entry.name,
+        bankName: action.entry.bankName,
+        accountNumber: action.entry.accountNumber,
+        branch: action.entry.branch || '',
+        accountType: action.entry.accountType === 'checking' ? 'current' : action.entry.accountType || 'savings',
+        balance: Number(action.entry.currentBalance || 0),
+        currentBalance: Number(action.entry.currentBalance || 0),
+        currency: action.entry.currency || 'LKR',
+        notes: action.entry.notes || '',
+      }));
     case 'DELETE_BANK_ACCOUNT':
       return void (await send(`/api/backend/records/bankAccounts/${id}`, 'DELETE'));
 
     case 'ADD_CARD':
-      return create('/api/backend/records/cards', action.entry);
+      return create('/api/backend/records/cards', {
+        name: action.entry.name,
+        cardName: action.entry.name,
+        bankAccountId: action.entry.bankAccountId || null,
+        cardType: action.entry.cardType || 'debit',
+        last4: (action.entry.lastFourDigits || '0000').slice(-4),
+        lastFourDigits: action.entry.lastFourDigits,
+        creditLimit: Number(action.entry.creditLimit || 0),
+        balance: Number(action.entry.currentBalance || 0),
+      });
     case 'UPDATE_CARD':
-      return void (await send(`/api/backend/records/cards/${id}`, 'PATCH', action.entry));
+      return void (await send(`/api/backend/records/cards/${id}`, 'PATCH', {
+        name: action.entry.name,
+        cardName: action.entry.name,
+        bankAccountId: action.entry.bankAccountId || null,
+        cardType: action.entry.cardType || 'debit',
+        last4: (action.entry.lastFourDigits || '0000').slice(-4),
+        lastFourDigits: action.entry.lastFourDigits,
+        creditLimit: Number(action.entry.creditLimit || 0),
+        balance: Number(action.entry.currentBalance || 0),
+      }));
     case 'DELETE_CARD':
       return void (await send(`/api/backend/records/cards/${id}`, 'DELETE'));
 

@@ -110,6 +110,28 @@ function toStored(kind: RecordKind, input: Record<string, unknown>, isCreate = f
     stored.interestRatePercent = Number(stored.interestRate);
     delete stored.interestRate;
   }
+  if (kind === 'bankAccounts') {
+    if ('name' in stored && !('accountName' in stored)) {
+      stored.accountName = stored.name;
+    }
+    if ('accountName' in stored && !('name' in stored)) {
+      stored.name = stored.accountName;
+    }
+    if (stored.accountType === 'checking') {
+      stored.accountType = 'current';
+    }
+  }
+  if (kind === 'cards') {
+    if ('name' in stored && !('cardName' in stored)) {
+      stored.cardName = stored.name;
+    }
+    if ('cardName' in stored && !('name' in stored)) {
+      stored.name = stored.cardName;
+    }
+    if ('lastFourDigits' in stored && !('last4' in stored)) {
+      stored.last4 = String(stored.lastFourDigits).slice(-4);
+    }
+  }
   if ('bankAccountId' in stored && stored.bankAccountId) {
     if (mongoose.isValidObjectId(stored.bankAccountId)) {
       stored.bankAccountId = new mongoose.Types.ObjectId(String(stored.bankAccountId));
@@ -129,6 +151,27 @@ function toStored(kind: RecordKind, input: Record<string, unknown>, isCreate = f
 
 export async function listRecords(kind: RecordKind, userId: string) {
   const records = await models[kind].find({ userId }).sort({ createdAt: -1 }).lean();
+  if (kind === 'bankAccounts') {
+    return records.map((acc: any) => ({
+      ...acc,
+      id: acc._id.toString(),
+      name: acc.accountName || acc.name || 'Main Account',
+      accountName: acc.accountName || acc.name || 'Main Account',
+      currentBalance: (acc.balanceCents || 0) / 100,
+      balance: (acc.balanceCents || 0) / 100,
+    }));
+  }
+  if (kind === 'cards') {
+    return records.map((card: any) => ({
+      ...card,
+      id: card._id.toString(),
+      name: card.cardName || card.name || 'Payment Card',
+      cardName: card.cardName || card.name || 'Payment Card',
+      lastFourDigits: card.last4 || '0000',
+      currentBalance: (card.balanceCents || 0) / 100,
+      creditLimit: (card.creditLimitCents || 0) / 100,
+    }));
+  }
   if (kind !== 'businessBranches') return records;
   const branchIds = records.map((branch: any) => branch._id);
   const entries = await BranchEntryModel.find({ userId, branchId: { $in: branchIds } }).sort({ date: -1 }).lean();

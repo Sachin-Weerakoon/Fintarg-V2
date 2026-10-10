@@ -22,3 +22,4 @@ export * from './ToastProvider';
 export * from './ConfirmProvider';
 export * from './PaymentMethodField';
 export * from './BankSelect';
+export * from './Alert';

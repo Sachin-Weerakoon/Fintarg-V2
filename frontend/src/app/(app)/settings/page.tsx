@@ -402,43 +402,6 @@ function ProfileTab() {
         <div className="md:col-span-2"><label className="form-label">Address</label><input className="form-input" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="No. 1, Main Street, Colombo" /></div>
         <div><label className="form-label">NIC number</label><input className="form-input" value={form.nicNumber} onChange={e => setForm(f => ({ ...f, nicNumber: e.target.value }))} placeholder="200012345678" /></div>
         <div><label className="form-label">Portfolio link</label><input className="form-input" value={form.portfolioLink} onChange={e => setForm(f => ({ ...f, portfolioLink: e.target.value }))} /></div>
-        <div className="border-t border-border pt-4 md:col-span-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-            <div className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>Bank details (for letters & defaults)</div>
-            {state.bankAccounts.length > 0 && (
-              <div className="text-xs text-muted flex items-center gap-2">
-                <span>Link from connected:</span>
-                <select
-                  className="form-input !py-1 !px-2 !text-xs !w-auto"
-                  onChange={e => {
-                    const acc = state.bankAccounts.find(a => a.id === e.target.value);
-                    if (acc) {
-                      setForm(f => ({
-                        ...f,
-                        bankName: acc.bankName,
-                        bankBranch: acc.branch || '',
-                        accountName: acc.name,
-                        accountNumber: acc.accountNumber,
-                      }));
-                    }
-                  }}
-                  defaultValue=""
-                >
-                  <option value="" disabled>Select account...</option>
-                  {state.bankAccounts.map(a => (
-                    <option key={a.id} value={a.id}>{a.bankName} - {a.name} (•••• {a.accountNumber ? a.accountNumber.slice(-4) : '----'})</option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-          <div className="grid md:grid-cols-2 gap-3">
-            <div><label className="form-label">Bank name</label><input className="form-input" value={form.bankName} onChange={e => setForm(f => ({ ...f, bankName: e.target.value }))} placeholder="e.g. Commercial Bank" /></div>
-            <div><label className="form-label">Branch</label><input className="form-input" value={form.bankBranch} onChange={e => setForm(f => ({ ...f, bankBranch: e.target.value }))} placeholder="e.g. Kollupitiya" /></div>
-            <div><label className="form-label">Account name</label><input className="form-input" value={form.accountName} onChange={e => setForm(f => ({ ...f, accountName: e.target.value }))} placeholder="e.g. Personal Account" /></div>
-            <div><label className="form-label">Account number</label><input className="form-input" value={form.accountNumber} onChange={e => setForm(f => ({ ...f, accountNumber: e.target.value }))} placeholder="e.g. 8001234567" /></div>
-          </div>
-        </div>
       </div>
       <button className="btn-primary mt-5" onClick={save}>Save profile</button>
     </div>

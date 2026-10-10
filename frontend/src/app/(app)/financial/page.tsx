@@ -17,6 +17,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { PaymentMethodField, PaymentMethod } from '@/components/ui/PaymentMethodField';
 import { BankSelect } from '@/components/ui/BankSelect';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import { Alert } from '@/components/ui/Alert';
 import { fetchTransactionHistory } from '@/services/storeApi';
 import {
   calculateLoan,
@@ -30,6 +31,25 @@ import type {
   FinancePayment,
   Loan,
 } from '@/types';
+
+const SRI_LANKAN_BANKS = [
+  'Commercial Bank of Ceylon',
+  'Sampath Bank',
+  'Bank of Ceylon (BOC)',
+  'Hatton National Bank (HNB)',
+  'People\'s Bank',
+  'Nations Trust Bank (NTB)',
+  'Seylan Bank',
+  'National Development Bank (NDB)',
+  'DFCC Bank',
+  'Pan Asia Bank',
+  'Union Bank of Colombo',
+  'Amana Bank',
+  'Cargills Bank',
+  'Standard Chartered Bank',
+  'HSBC Sri Lanka',
+  'Other / Custom Bank',
+];
 
 type Tab = 'accounts' | 'transactions' | 'expenses' | 'income' | 'finance' | 'loans' | 'pawned';
 
@@ -138,21 +158,30 @@ function AccountsTab() {
   const totalBankBalance = state.bankAccounts.reduce((s, a) => s + (a.currentBalance || 0), 0);
 
   const submitAccount = () => {
-    if (!accountForm.name || !accountForm.bankName || !accountForm.accountNumber) {
-      setAccountError('Account name, bank name, and account number are required.');
+    if (!accountForm.name.trim()) {
+      setAccountError('Account nickname is required (e.g. Primary Savings).');
+      return;
+    }
+    if (!accountForm.bankName.trim()) {
+      setAccountError('Bank name is required. Please select or enter your bank.');
+      return;
+    }
+    const sanitizedNumber = accountForm.accountNumber.replace(/\s+/g, '');
+    if (!sanitizedNumber || sanitizedNumber.length < 4) {
+      setAccountError('Valid bank account number is required (at least 4 digits).');
       return;
     }
     const balance = Number(accountForm.currentBalance) || 0;
     const entry: BankAccount = {
       id: editAccountId || 'ba_' + Date.now(),
-      name: accountForm.name,
-      bankName: accountForm.bankName,
-      accountNumber: accountForm.accountNumber,
-      branch: accountForm.branch,
+      name: accountForm.name.trim(),
+      bankName: accountForm.bankName.trim(),
+      accountNumber: sanitizedNumber,
+      branch: accountForm.branch.trim(),
       accountType: accountForm.accountType,
       currentBalance: balance,
       currency: 'LKR',
-      notes: accountForm.notes,
+      notes: accountForm.notes.trim(),
     };
 
     if (editAccountId) {
@@ -325,49 +354,98 @@ function AccountsTab() {
 
           {/* Add / Edit Bank Account Form */}
           <Card className="p-5 h-fit">
-            <h3 className="font-semibold text-sm mb-4 text-text">
-              {editAccountId ? 'Edit Bank Account' : 'Add Bank Account'}
+            <h3 className="font-semibold text-sm mb-4 text-text flex items-center justify-between">
+              <span>{editAccountId ? 'Edit Bank Account' : 'Add Bank Account'}</span>
+              <span className="text-[11px] font-normal text-muted">Banking Standards</span>
             </h3>
+
+            {accountError && (
+              <Alert tone="danger" className="mb-4" onDismiss={() => setAccountError('')}>
+                {accountError}
+              </Alert>
+            )}
+
             <div className="space-y-3.5">
-              <Field id="acc-name" label="Account Nickname" error={accountError}>
+              <Field id="acc-name" label="Account Nickname" hint="e.g. Primary Savings, Business Operations">
                 <Input
                   value={accountForm.name}
-                  onChange={e => setAccountForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Primary Savings, Business Current"
+                  onChange={e => {
+                    setAccountForm(f => ({ ...f, name: e.target.value }));
+                    if (accountError) setAccountError('');
+                  }}
+                  placeholder="e.g. Primary Savings"
                 />
               </Field>
-              <Field id="acc-bank" label="Bank Name">
-                <Input
-                  value={accountForm.bankName}
-                  onChange={e => setAccountForm(f => ({ ...f, bankName: e.target.value }))}
-                  placeholder="e.g. Commercial Bank, Sampath Bank"
-                />
+
+              <Field id="acc-bank" label="Bank Name" hint="Select from standard banks or specify custom">
+                <Select
+                  value={
+                    SRI_LANKAN_BANKS.includes(accountForm.bankName)
+                      ? accountForm.bankName
+                      : 'Other / Custom Bank'
+                  }
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === 'Other / Custom Bank') {
+                      if (SRI_LANKAN_BANKS.includes(accountForm.bankName)) {
+                        setAccountForm(f => ({ ...f, bankName: '' }));
+                      }
+                    } else {
+                      setAccountForm(f => ({ ...f, bankName: val }));
+                    }
+                    if (accountError) setAccountError('');
+                  }}
+                >
+                  {SRI_LANKAN_BANKS.map(bank => (
+                    <option key={bank} value={bank}>{bank}</option>
+                  ))}
+                </Select>
+                {(!SRI_LANKAN_BANKS.includes(accountForm.bankName) || accountForm.bankName === '') && (
+                  <Input
+                    className="mt-2"
+                    value={accountForm.bankName}
+                    onChange={e => {
+                      setAccountForm(f => ({ ...f, bankName: e.target.value }));
+                      if (accountError) setAccountError('');
+                    }}
+                    placeholder="Enter custom bank name (e.g. Foreign bank, Credit union)"
+                  />
+                )}
               </Field>
-              <Field id="acc-number" label="Account Number">
+
+              <Field id="acc-number" label="Account Number" hint="Only last 4 digits are shown in public views">
                 <Input
                   value={accountForm.accountNumber}
-                  onChange={e => setAccountForm(f => ({ ...f, accountNumber: e.target.value }))}
+                  onChange={e => {
+                    const cleaned = e.target.value.replace(/[^a-zA-Z0-9-]/g, '');
+                    setAccountForm(f => ({ ...f, accountNumber: cleaned }));
+                    if (accountError) setAccountError('');
+                  }}
                   placeholder="e.g. 8001234567"
                 />
               </Field>
-              <Field id="acc-branch" label="Branch (optional)">
-                <Input
-                  value={accountForm.branch}
-                  onChange={e => setAccountForm(f => ({ ...f, branch: e.target.value }))}
-                  placeholder="e.g. Kollupitiya, Fort"
-                />
-              </Field>
-              <Field id="acc-type" label="Account Type">
-                <Select
-                  value={accountForm.accountType}
-                  onChange={e => setAccountForm(f => ({ ...f, accountType: e.target.value as any }))}
-                >
-                  <option value="savings">Savings</option>
-                  <option value="checking">Checking</option>
-                  <option value="current">Current</option>
-                  <option value="other">Other</option>
-                </Select>
-              </Field>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field id="acc-type" label="Account Type">
+                  <Select
+                    value={accountForm.accountType}
+                    onChange={e => setAccountForm(f => ({ ...f, accountType: e.target.value as any }))}
+                  >
+                    <option value="savings">Savings Account</option>
+                    <option value="current">Current / Checking</option>
+                    <option value="business">Business Account</option>
+                    <option value="other">Fixed Deposit / Other</option>
+                  </Select>
+                </Field>
+                <Field id="acc-branch" label="Branch (optional)">
+                  <Input
+                    value={accountForm.branch}
+                    onChange={e => setAccountForm(f => ({ ...f, branch: e.target.value }))}
+                    placeholder="e.g. Kollupitiya"
+                  />
+                </Field>
+              </div>
+
               <Field id="acc-balance" label="Current Balance (Rs.)">
                 <Input
                   type="number"
@@ -376,6 +454,7 @@ function AccountsTab() {
                   placeholder="150,000"
                 />
               </Field>
+
               <Field id="acc-notes" label="Notes (optional)">
                 <Input
                   value={accountForm.notes}
@@ -383,6 +462,7 @@ function AccountsTab() {
                   placeholder="Salary credit account"
                 />
               </Field>
+
               <div className="flex gap-2 pt-1">
                 <Button variant="primary" className="flex-1" onClick={submitAccount}>
                   {editAccountId ? 'Update Account' : 'Save Account'}
@@ -401,6 +481,7 @@ function AccountsTab() {
                         currentBalance: '',
                         notes: '',
                       });
+                      setAccountError('');
                     }}
                   >
                     Cancel
@@ -510,11 +591,21 @@ function AccountsTab() {
             <h3 className="font-semibold text-sm mb-4 text-text">
               {editCardId ? 'Edit Card' : 'Add Card'}
             </h3>
+
+            {cardError && (
+              <Alert tone="danger" className="mb-4" onDismiss={() => setCardError('')}>
+                {cardError}
+              </Alert>
+            )}
+
             <div className="space-y-3.5">
-              <Field id="card-name" label="Card Label" error={cardError}>
+              <Field id="card-name" label="Card Label">
                 <Input
                   value={cardForm.name}
-                  onChange={e => setCardForm(f => ({ ...f, name: e.target.value }))}
+                  onChange={e => {
+                    setCardForm(f => ({ ...f, name: e.target.value }));
+                    if (cardError) setCardError('');
+                  }}
                   placeholder="e.g. Commercial Visa Platinum"
                 />
               </Field>
