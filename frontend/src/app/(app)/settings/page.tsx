@@ -2,10 +2,11 @@
 import { useState, useRef } from 'react';
 import { useApp } from '@/store';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { Button } from '@/components/ui/Button';
 import { THEME_COLORS, LIGHT_DEFAULTS, validateCustomOverrides } from '@/lib/theme';
 import type { Document } from '@/types';
 
-type Tab = 'appearance' | 'profile' | 'contacts' | 'documents' | 'reminders' | 'plan';
+type Tab = 'appearance' | 'profile' | 'contacts' | 'documents' | 'reminders' | 'account';
 
 const SETTING_TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'appearance', label: 'Appearance', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20v-4a6 6 0 0 0 0-12V2z"/></svg> },
@@ -13,7 +14,7 @@ const SETTING_TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'contacts', label: 'Contacts', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg> },
   { id: 'documents', label: 'Documents', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> },
   { id: 'reminders', label: 'Reminders', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
-  { id: 'plan', label: 'Plan & Tier', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> },
+  { id: 'account', label: 'Account', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
 ];
 
 export default function Settings() {
@@ -54,7 +55,7 @@ export default function Settings() {
           {tab === 'contacts' && <ContactsTab />}
           {tab === 'documents' && <DocumentsTab />}
           {tab === 'reminders' && <RemindersTab />}
-          {tab === 'plan' && <PlanTab />}
+          {tab === 'account' && <AccountTab />}
         </div>
       </div>
     </div>
@@ -286,8 +287,6 @@ function AppearanceTab() {
   );
 }
 
-import { Button } from '@/components/ui/Button';
-
 function ProfileTab() {
   const { state, dispatch, showToast } = useApp();
   const { profile } = state;
@@ -402,6 +401,19 @@ function ProfileTab() {
         <div className="md:col-span-2"><label className="form-label">Address</label><input className="form-input" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="No. 1, Main Street, Colombo" /></div>
         <div><label className="form-label">NIC number</label><input className="form-input" value={form.nicNumber} onChange={e => setForm(f => ({ ...f, nicNumber: e.target.value }))} placeholder="200012345678" /></div>
         <div><label className="form-label">Portfolio link</label><input className="form-input" value={form.portfolioLink} onChange={e => setForm(f => ({ ...f, portfolioLink: e.target.value }))} /></div>
+        <div className="md:col-span-2">
+          <label className="form-label">Income / Earning Profile</label>
+          <select
+            className="form-input"
+            value={form.workMode || 'salary'}
+            onChange={e => setForm(f => ({ ...f, workMode: e.target.value as 'salary' | 'business' | 'both' }))}
+          >
+            <option value="salary">Salary / Employed</option>
+            <option value="business">Business / Entrepreneur</option>
+            <option value="both">Both (Salary + Business)</option>
+          </select>
+          <p className="text-xs text-muted mt-1">Configures advanced tracking features for individual and business records.</p>
+        </div>
       </div>
       <button className="btn-primary mt-5" onClick={save}>Save profile</button>
     </div>
@@ -588,34 +600,59 @@ function RemindersTab() {
   );
 }
 
-function PlanTab() {
-  const { state, dispatch, showToast } = useApp();
+function AccountTab() {
+  const { showToast } = useApp();
   const confirmModal = useConfirm();
-  const labels = { salary: 'Salary', business: 'Business', both: 'Job + Business' };
-  const setMode = (workMode: 'salary' | 'business' | 'both') => {
-    dispatch({ type: 'UPDATE_PROFILE', profile: { workMode, plan: workMode === 'salary' ? 'basic' : 'business' } });
+
+  const handleDeleteAccount = async () => {
+    const confirmed = await confirmModal({
+      title: 'Delete Account',
+      message: 'Are you sure you want to permanently delete your account? All financial records, bank links, goals, and uploaded documents will be permanently wiped. This cannot be undone.',
+      confirmLabel: 'Yes, Delete Account',
+      cancelLabel: 'Keep Account',
+      tone: 'danger',
+    });
+
+    if (confirmed) {
+      showToast('Account deletion request registered. Your session data will be cleared.', 'info');
+    }
   };
 
   return (
-    <div className="card">
-      <div className="font-semibold text-base mb-1" style={{ color: 'var(--color-text)' }}>Work profile</div>
-      <p className="text-sm mb-4" style={{ color: 'var(--color-muted)' }}>Choose how you earn so Advanced Features can keep each income source clear.</p>
-      <div className="p-4 rounded-xl mb-5" style={{ background: 'var(--color-primary-tint)' }}>
-        <div className="text-sm font-semibold mb-1" style={{ color: 'var(--color-primary)' }}>Current profile: {labels[state.profile.workMode]}</div>
-        <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-          Your existing records stay available when you change this setting.
+    <div className="card space-y-6 border-border">
+      <div className="border-b border-border pb-4">
+        <h3 className="text-base font-bold text-text tracking-tight">Account Deletion</h3>
+        <p className="text-xs text-muted mt-1 leading-relaxed">
+          Manage permanent data removal and account decommissioning in accordance with privacy standards.
         </p>
       </div>
-      <div className="grid sm:grid-cols-3 gap-3">
-        {(['salary', 'business', 'both'] as const).map(mode => (
-          <button key={mode} className={state.profile.workMode === mode ? 'btn-primary' : 'btn-secondary'} onClick={() => setMode(mode)}>
-            {labels[mode]}
-          </button>
-        ))}
+
+      <div className="p-4 rounded-xl border border-border/80 bg-surface-alt/40 space-y-2">
+        <div className="flex items-center gap-2 text-xs font-semibold text-text">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          Permanent Data Erasure Notice
+        </div>
+        <p className="text-xs text-muted leading-relaxed">
+          Deleting your account will permanently wipe your transaction ledger, linked bank accounts, financial goals, and cloud documents. Once executed, this data cannot be recovered.
+        </p>
       </div>
-      <div className="mt-5 pt-5 border-t border-border">
-        <div className="font-semibold text-sm mb-2" style={{ color: 'var(--color-danger)' }}>Danger zone</div>
-        <button className="btn-danger text-sm" onClick={async () => { if (await confirmModal('Delete your account and all data? This cannot be undone.')) showToast('Account deletion requested.', 'info'); }}>Delete my account</button>
+
+      <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="text-sm font-semibold text-text">Delete account</div>
+          <div className="text-xs text-muted">Permanently purge your account and all associated financial records.</div>
+        </div>
+        <Button
+          variant="danger"
+          size="sm"
+          onClick={handleDeleteAccount}
+        >
+          Delete Account
+        </Button>
       </div>
     </div>
   );
