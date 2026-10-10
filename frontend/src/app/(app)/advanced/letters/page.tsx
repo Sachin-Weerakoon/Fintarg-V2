@@ -316,8 +316,7 @@ export default function LettersClient() {
                 />
               ) : (
                 <div
-                  className="flex-1 rounded-xl p-6 text-xs whitespace-pre-wrap leading-relaxed border border-border bg-surface text-text font-mono"
-                  style={{ minHeight: 360 }}
+                  className="flex-1 rounded-xl p-6 text-xs whitespace-pre-wrap leading-relaxed border border-border bg-surface text-text font-mono min-h-[360px]"
                 >
                   {editing ? editBody : generated}
                 </div>
