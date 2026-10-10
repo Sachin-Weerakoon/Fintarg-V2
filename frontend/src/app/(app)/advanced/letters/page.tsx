@@ -343,7 +343,8 @@ export default function LettersClient() {
         <ConfirmDialog
           title="Delete Letter"
           message="Are you sure you want to delete this letter record from your history?"
-          confirmLabel="Delete"
+          confirmLabel="Yes, Delete"
+          cancelLabel="No, Keep"
           tone="danger"
           onConfirm={() => {
             dispatch({ type: 'DELETE_LETTER', id: deleteConfirmId });

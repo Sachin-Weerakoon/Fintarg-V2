@@ -117,6 +117,13 @@ function toStored(kind: RecordKind, input: Record<string, unknown>, isCreate = f
     if ('accountName' in stored && !('name' in stored)) {
       stored.name = stored.accountName;
     }
+    if (!stored.accountName) {
+      stored.accountName = 'Main Account';
+    }
+    if ('currentBalance' in stored && !('balance' in stored) && !('balanceCents' in stored)) {
+      stored.balanceCents = Math.round(Number(stored.currentBalance || 0) * 100);
+      delete stored.currentBalance;
+    }
     if (stored.accountType === 'checking') {
       stored.accountType = 'current';
     }
@@ -128,8 +135,14 @@ function toStored(kind: RecordKind, input: Record<string, unknown>, isCreate = f
     if ('cardName' in stored && !('name' in stored)) {
       stored.name = stored.cardName;
     }
+    if (!stored.cardName) {
+      stored.cardName = 'Payment Card';
+    }
     if ('lastFourDigits' in stored && !('last4' in stored)) {
       stored.last4 = String(stored.lastFourDigits).slice(-4);
+    }
+    if (!stored.last4) {
+      stored.last4 = '0000';
     }
   }
   if ('bankAccountId' in stored && stored.bankAccountId) {

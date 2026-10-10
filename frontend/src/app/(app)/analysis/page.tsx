@@ -84,6 +84,34 @@ export default function Analysis() {
         }
       />
 
+      {/* Financial Health & Position Guidance Banner */}
+      <div className={`p-4 rounded-2xl border transition-all no-print mb-6 ${
+        netPosition < 0
+          ? 'bg-danger-tint/30 border-danger-solid/30'
+          : 'bg-primary-tint/30 border-primary-500/25'
+      }`}>
+        <div className="flex items-start gap-3">
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
+            netPosition < 0 ? 'bg-danger-solid text-white' : 'bg-primary-500 text-white'
+          }`}>
+            <Icon name={netPosition < 0 ? 'alert' : 'wallet'} size={18} />
+          </div>
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-2">
+              <span>{netPosition < 0 ? 'Position Alert · Deficit Warning' : 'Position Guidance · Surplus Buffer'}</span>
+              <Badge tone={netPosition < 0 ? 'danger' : 'success'} size="sm">
+                {netPosition < 0 ? 'Overspending' : 'Healthy Buffer'}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted mt-1 leading-relaxed">
+              {netPosition < 0
+                ? `You have a negative net position of ${formatRs(Math.abs(netPosition))} for ${MONTH_LABELS[month] || month}. Total outflow of ${formatRs(totalOutflow)} exceeds your ${formatRs(totalIncome)} revenue. Trim discretionary expenses to protect your reserves.`
+                : `You maintain a positive net buffer of ${formatRs(netPosition)} after all living expenses, debt servicing, and goal allocations. Your financial trajectory is on track.`}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid md:grid-cols-2 gap-5">
         {/* Monthly summary */}
         <Card className="p-6">
@@ -184,8 +212,8 @@ export default function Analysis() {
                 </span>
               </div>
             </div>
-            <Link href="/print/analysis" className="w-full mt-4 block text-center no-print">
-              <Button variant="secondary" size="sm" className="w-full">
+            <Link href="/print/analysis" target="_blank" className="w-full mt-4 block text-center no-print">
+              <Button variant="secondary" size="sm" className="w-full" iconLeft={<Icon name="download" size={14} />}>
                 Export Analysis as PDF
               </Button>
             </Link>

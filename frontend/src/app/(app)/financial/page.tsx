@@ -716,7 +716,8 @@ function AccountsTab() {
         <ConfirmDialog
           title="Delete Bank Account"
           message="Are you sure you want to remove this bank account? Cards and transactions linked to this account may lose their reference."
-          confirmLabel="Delete"
+          confirmLabel="Yes, Delete"
+          cancelLabel="No, Keep"
           tone="danger"
           onConfirm={() => {
             dispatch({ type: 'DELETE_BANK_ACCOUNT', id: deleteAccountConfirmId });
@@ -731,7 +732,8 @@ function AccountsTab() {
         <ConfirmDialog
           title="Delete Payment Card"
           message="Are you sure you want to remove this payment card record?"
-          confirmLabel="Delete"
+          confirmLabel="Yes, Delete"
+          cancelLabel="No, Keep"
           tone="danger"
           onConfirm={() => {
             dispatch({ type: 'DELETE_CARD', id: deleteCardConfirmId });
@@ -1211,7 +1213,8 @@ function ExpensesTab({ month }: { month: string }) {
         <ConfirmDialog
           title="Delete Expense"
           message="Are you sure you want to delete this expense record?"
-          confirmLabel="Delete"
+          confirmLabel="Yes, Delete"
+          cancelLabel="No, Keep"
           tone="danger"
           onConfirm={() => {
             dispatch({ type: 'DELETE_EXPENSE', id: deleteConfirmId });
@@ -1446,7 +1449,8 @@ function IncomeTab({ month }: { month: string }) {
         <ConfirmDialog
           title="Delete Income Source"
           message="Are you sure you want to remove this income source from your ledger?"
-          confirmLabel="Delete"
+          confirmLabel="Yes, Delete"
+          cancelLabel="No, Keep"
           tone="danger"
           onConfirm={() => {
             dispatch({ type: 'DELETE_INCOME', id: deleteConfirmId });
@@ -1762,7 +1766,8 @@ function FinanceTab() {
         <ConfirmDialog
           title="Delete Finance Payment"
           message="Are you sure you want to remove this finance payment?"
-          confirmLabel="Delete"
+          confirmLabel="Yes, Delete"
+          cancelLabel="No, Keep"
           tone="danger"
           onConfirm={() => {
             dispatch({ type: 'DELETE_FINANCE_PAYMENT', id: deleteConfirmId });
@@ -2166,7 +2171,8 @@ function LoansTab() {
         <ConfirmDialog
           title="Delete Loan"
           message="Are you sure you want to remove this loan record?"
-          confirmLabel="Delete"
+          confirmLabel="Yes, Delete"
+          cancelLabel="No, Keep"
           tone="danger"
           onConfirm={() => {
             dispatch({ type: 'DELETE_LOAN', id: deleteConfirmId });
@@ -2315,7 +2321,8 @@ function PawnedTab() {
         <ConfirmDialog
           title="Delete Pawned Item"
           message="Are you sure you want to remove this pawned item record?"
-          confirmLabel="Delete"
+          confirmLabel="Yes, Delete"
+          cancelLabel="No, Keep"
           tone="danger"
           onConfirm={() => {
             dispatch({ type: 'DELETE_PAWNED', id: deleteConfirmId });

@@ -17,17 +17,6 @@ export const recordSchemas = {
     currency: z.string().trim().max(10).default('LKR'),
     notes: optionalText,
     isDefault: z.boolean().default(false),
-  }).transform(data => {
-    const accName = (data.accountName || data.name || 'Main Account').trim();
-    const balance = data.balance ?? data.currentBalance ?? 0;
-    const accountType = data.accountType === 'checking' ? 'current' : data.accountType;
-    return {
-      ...data,
-      accountName: accName,
-      name: accName,
-      balance,
-      accountType,
-    };
   }),
   cards: z.object({
     bankAccountId: z.string().optional().nullable(),
@@ -43,17 +32,6 @@ export const recordSchemas = {
     currentBalance: z.coerce.number().finite().min(0).max(1_000_000_000).optional(),
     billingDay: z.coerce.number().int().min(1).max(31).optional(),
     dueDay: z.coerce.number().int().min(1).max(31).optional(),
-  }).transform(data => {
-    const cardName = (data.cardName || data.name || 'Payment Card').trim();
-    const rawL4 = data.last4 || data.lastFourDigits || '0000';
-    const last4 = rawL4.replace(/\D/g, '').slice(-4).padStart(4, '0');
-    return {
-      ...data,
-      cardName,
-      name: cardName,
-      last4,
-      balance: data.balance ?? data.currentBalance ?? 0,
-    };
   }),
   transactions: z.object({
     bankAccountId: z.string().optional().nullable(),
@@ -117,7 +95,19 @@ export const recordSchemas = {
   }),
   medicalExpenses: z.object({ date, type: z.string().trim().min(1).max(120), amount: money, note: optionalText }),
   reminders: z.object({ type: z.enum(['finance', 'loan', 'pawn', 'agreement', 'appointment', 'custom']), relatedId: z.string().default(''), label: z.string().trim().min(1).max(180), dueDate: date, channel: z.enum(['email', 'in-app']).default('in-app') }),
-  companies: z.object({ name: z.string().trim().min(1).max(160), address: optionalText, contact: z.string().max(120).default(''), logo: z.string().max(1000).default(''), businessType: z.string().max(120).default(''), openingDate: z.string().max(32).default('') }),
+  companies: z.object({
+    name: z.string().trim().min(1).max(160),
+    address: optionalText,
+    contact: z.string().max(120).default(''),
+    logo: z.string().max(1000).default(''),
+    businessType: z.string().max(120).default(''),
+    openingDate: z.string().max(32).default(''),
+    brNumber: z.string().max(60).default(''),
+    tinNumber: z.string().max(60).default(''),
+    entityType: z.string().max(60).default(''),
+    sector: z.string().max(120).default(''),
+    email: z.string().max(120).default(''),
+  }),
   businessBranches: z.object({ companyId: z.string().min(1), name: z.string().trim().min(1).max(160), location: z.string().max(300).default(''), branchType: z.string().max(120).default(''), openingDate: z.string().max(32).default(''), logo: z.string().max(1000).default(''), monthlyTarget: z.coerce.number().min(0), annualTarget: z.coerce.number().min(0), entries: z.array(z.object({ id: z.string().optional(), date, type: z.enum(['revenue', 'utility', 'other-cost']), category: z.string().max(120), amount: money, note: optionalText })).default([]) }),
   branchEntries: z.object({ branchId: z.string().min(1), date, type: z.enum(['revenue', 'utility', 'other-cost']), category: z.string().trim().min(1).max(120), amount: money, note: optionalText }),
   employmentProfiles: z.object({ employer: z.string().trim().min(1).max(180), role: z.string().max(180).default(''), monthlyGross: money, payday: z.coerce.number().int().min(1).max(31), monthlyDeductions: z.coerce.number().min(0), monthlySavingsTarget: z.coerce.number().min(0), careerGoal: z.string().max(1000).default('') }),

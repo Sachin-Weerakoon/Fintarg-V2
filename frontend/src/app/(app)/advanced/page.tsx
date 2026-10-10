@@ -510,8 +510,23 @@ function Medical() {
                         {daysAway < 0 && <span className="ml-2 badge-muted">Past</span>}
                       </div>
                     </div>
-                    <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }}
-                      onClick={() => dispatch({ type: 'DELETE_REMINDER', id: r.id })}>✕</button>
+                    <button
+                      className="btn-ghost text-xs"
+                      style={{ color: 'var(--color-danger)' }}
+                      onClick={async () => {
+                        if (await confirmModal({
+                          title: 'Delete Reminder',
+                          message: `Are you sure you want to delete "${r.label}"?`,
+                          confirmLabel: 'Yes, Delete',
+                          cancelLabel: 'No, Keep',
+                          tone: 'danger',
+                        })) {
+                          dispatch({ type: 'DELETE_REMINDER', id: r.id });
+                        }
+                      }}
+                    >
+                      ✕
+                    </button>
                   </div>
                 );
               })}
@@ -704,7 +719,18 @@ function BusinessWorkspace() {
   const [costAmount, setCostAmount] = useState('');
   const [costCategory, setCostCategory] = useState('Electricity');
   const [loadingCompany, setLoadingCompany] = useState(false);
-  const [businessForm, setBusinessForm] = useState({ name: '', address: '', contact: '', businessType: '', openingDate: '' });
+  const [businessForm, setBusinessForm] = useState({
+    name: '',
+    brNumber: '',
+    tinNumber: '',
+    entityType: 'pvt_ltd',
+    sector: 'Technology & IT',
+    address: '',
+    contact: '',
+    email: '',
+    openingDate: '',
+    businessType: '',
+  });
   const [branchForm, setBranchForm] = useState({ name: '', branchType: '', location: '', openingDate: '', monthlyTarget: '' });
 
   const selectCompany = (id: string) => {
@@ -719,7 +745,18 @@ function BusinessWorkspace() {
     const serverId = await dispatch({ type: 'ADD_COMPANY', entry: { id: localId, ...businessForm, logo: '' } });
     setCompanyId(serverId || localId);
     setBranchId('');
-    setBusinessForm({ name: '', address: '', contact: '', businessType: '', openingDate: '' });
+    setBusinessForm({
+      name: '',
+      brNumber: '',
+      tinNumber: '',
+      entityType: 'pvt_ltd',
+      sector: 'Technology & IT',
+      address: '',
+      contact: '',
+      email: '',
+      openingDate: '',
+      businessType: '',
+    });
     setShowBusinessForm(false);
   };
   const addBranch = async () => {
@@ -827,14 +864,112 @@ function BusinessWorkspace() {
           <button className="btn-secondary" onClick={() => setShowBusinessForm(value => !value)}>Add business</button>
         </div>
         {showBusinessForm && (
-          <div className="grid md:grid-cols-3 gap-3 mt-4">
-            <input className="form-input" placeholder="Business name" value={businessForm.name} onChange={event => setBusinessForm(form => ({ ...form, name: event.target.value }))} />
-            <input className="form-input" placeholder="Business type" value={businessForm.businessType} onChange={event => setBusinessForm(form => ({ ...form, businessType: event.target.value }))} />
-            <input className="form-input" placeholder="Address" value={businessForm.address} onChange={event => setBusinessForm(form => ({ ...form, address: event.target.value }))} />
-            <input className="form-input" type="date" aria-label="Opening date" value={businessForm.openingDate} onChange={event => setBusinessForm(form => ({ ...form, openingDate: event.target.value }))} />
-            <input className="form-input" placeholder="Contact" value={businessForm.contact} onChange={event => setBusinessForm(form => ({ ...form, contact: event.target.value }))} />
-            <input className="form-input" type="file" accept="image/*" aria-label="Optional business logo" />
-            <button className="btn-primary" onClick={addBusiness}>Save business</button>
+          <div className="mt-4 p-4 rounded-xl border border-border bg-surface-hover/20 space-y-3">
+            <div className="text-xs font-bold uppercase tracking-wider text-muted">
+              Sri Lankan Business Entity Standards
+            </div>
+            <div className="grid md:grid-cols-3 gap-3">
+              <div>
+                <label className="form-label">Business Name *</label>
+                <input
+                  className="form-input"
+                  placeholder="e.g. Apex Lanka Solutions (Pvt) Ltd"
+                  value={businessForm.name}
+                  onChange={event => setBusinessForm(form => ({ ...form, name: event.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="form-label">BR Number (Business Reg.)</label>
+                <input
+                  className="form-input"
+                  placeholder="e.g. PV 00234190 or W/A/4567"
+                  value={businessForm.brNumber}
+                  onChange={event => setBusinessForm(form => ({ ...form, brNumber: event.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="form-label">Tax ID (TIN Number)</label>
+                <input
+                  className="form-input"
+                  placeholder="e.g. 109876543"
+                  value={businessForm.tinNumber}
+                  onChange={event => setBusinessForm(form => ({ ...form, tinNumber: event.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="form-label">Entity Type</label>
+                <select
+                  className="form-input"
+                  value={businessForm.entityType}
+                  onChange={event => setBusinessForm(form => ({ ...form, entityType: event.target.value }))}
+                >
+                  <option value="pvt_ltd">Private Limited (Pvt Ltd)</option>
+                  <option value="sole_proprietorship">Sole Proprietorship</option>
+                  <option value="partnership">Partnership</option>
+                  <option value="public_ltd">Public Limited (PLC)</option>
+                  <option value="other">Other / Association</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Industry Sector</label>
+                <select
+                  className="form-input"
+                  value={businessForm.sector}
+                  onChange={event => setBusinessForm(form => ({ ...form, sector: event.target.value }))}
+                >
+                  <option value="Technology & IT">Technology & IT</option>
+                  <option value="Retail & Trade">Retail & Wholesale Trade</option>
+                  <option value="Tourism & Hospitality">Tourism & Hospitality</option>
+                  <option value="Manufacturing">Manufacturing & Production</option>
+                  <option value="Agriculture & Export">Agriculture & Plantation Export</option>
+                  <option value="Finance & Professional">Financial & Legal Services</option>
+                  <option value="Healthcare & Wellness">Healthcare & Pharmaceuticals</option>
+                  <option value="Construction & Engineering">Construction & Real Estate</option>
+                  <option value="Logistics & Transport">Logistics & Transportation</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Commencement Date</label>
+                <input
+                  className="form-input"
+                  type="date"
+                  aria-label="Opening date"
+                  value={businessForm.openingDate}
+                  onChange={event => setBusinessForm(form => ({ ...form, openingDate: event.target.value }))}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="form-label">Registered Office Address</label>
+                <input
+                  className="form-input"
+                  placeholder="e.g. No. 45, Galle Road, Colombo 03"
+                  value={businessForm.address}
+                  onChange={event => setBusinessForm(form => ({ ...form, address: event.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="form-label">Primary Contact Number</label>
+                <input
+                  className="form-input"
+                  placeholder="e.g. 011 234 5678 / 077 123 4567"
+                  value={businessForm.contact}
+                  onChange={event => setBusinessForm(form => ({ ...form, contact: event.target.value }))}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="form-label">Official Email Address</label>
+                <input
+                  className="form-input"
+                  type="email"
+                  placeholder="e.g. info@company.lk"
+                  value={businessForm.email}
+                  onChange={event => setBusinessForm(form => ({ ...form, email: event.target.value }))}
+                />
+              </div>
+              <div className="flex items-end">
+                <button className="btn-primary w-full" onClick={addBusiness}>Save Business</button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -845,8 +980,28 @@ function BusinessWorkspace() {
           <div className="card">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
               <div>
-                <div className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>{state.companies.find(company => company.id === companyId)?.name} overview</div>
-                <p className="text-sm mt-1" style={{ color: 'var(--color-muted)' }}>Revenue, costs, profit, and branch performance.</p>
+                {(() => {
+                  const comp = state.companies.find(company => company.id === companyId);
+                  return (
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>{comp?.name} overview</div>
+                        {comp?.brNumber && (
+                          <span className="badge-muted text-[11px] font-mono">BR: {comp.brNumber}</span>
+                        )}
+                        {comp?.tinNumber && (
+                          <span className="badge-muted text-[11px] font-mono">TIN: {comp.tinNumber}</span>
+                        )}
+                        {comp?.entityType && (
+                          <span className="badge-success text-[11px] uppercase">{comp.entityType.replace('_', ' ')}</span>
+                        )}
+                      </div>
+                      <p className="text-xs mt-1" style={{ color: 'var(--color-muted)' }}>
+                        {comp?.sector ? `${comp.sector} · ` : ''}{comp?.address || 'Revenue, costs, profit, and branch performance.'}
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="workspace-switcher">
                 {(['today', 'month', 'year'] as const).map(value => (
@@ -1366,14 +1521,41 @@ function AgreementsTab() {
 function CompaniesTab() {
   const { state, dispatch, showToast } = useApp();
   const confirmModal = useConfirm();
-  const [form, setForm] = useState({ name: '', address: '', contact: '', logo: '' });
+  const [form, setForm] = useState({
+    name: '',
+    brNumber: '',
+    tinNumber: '',
+    entityType: 'pvt_ltd',
+    sector: 'Technology & IT',
+    address: '',
+    contact: '',
+    email: '',
+    logo: '',
+  });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', address: '', contact: '' });
+  const [editForm, setEditForm] = useState({
+    name: '',
+    brNumber: '',
+    tinNumber: '',
+    address: '',
+    contact: '',
+  });
 
   const submit = () => {
     if (!form.name) { showToast('Company name required.', 'error'); return; }
     dispatch({ type: 'ADD_COMPANY', entry: { id: 'co_' + Date.now(), ...form } });
-    setForm({ name: '', address: '', contact: '', logo: '' });
+    setForm({
+      name: '',
+      brNumber: '',
+      tinNumber: '',
+      entityType: 'pvt_ltd',
+      sector: 'Technology & IT',
+      address: '',
+      contact: '',
+      email: '',
+      logo: '',
+    });
+    showToast('Company saved successfully.', 'success');
   };
 
   return (
@@ -1388,6 +1570,10 @@ function CompaniesTab() {
                 {editingId === c.id ? (
                   <div className="space-y-2">
                     <input className="form-input" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} placeholder="Company name" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input className="form-input" value={editForm.brNumber} onChange={e => setEditForm(f => ({ ...f, brNumber: e.target.value }))} placeholder="BR number" />
+                      <input className="form-input" value={editForm.tinNumber} onChange={e => setEditForm(f => ({ ...f, tinNumber: e.target.value }))} placeholder="TIN number" />
+                    </div>
                     <input className="form-input" value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} placeholder="Address" />
                     <input className="form-input" value={editForm.contact} onChange={e => setEditForm(f => ({ ...f, contact: e.target.value }))} placeholder="Contact" />
                     <div className="flex gap-2">
@@ -1401,13 +1587,17 @@ function CompaniesTab() {
                 ) : (
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>{c.name}</div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>{c.name}</span>
+                        {c.brNumber && <span className="badge-muted text-[10px] font-mono">BR: {c.brNumber}</span>}
+                        {c.tinNumber && <span className="badge-muted text-[10px] font-mono">TIN: {c.tinNumber}</span>}
+                      </div>
                       {c.address && <div className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>{c.address}</div>}
                       {c.contact && <div className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>{c.contact}</div>}
                     </div>
                     <div className="flex gap-2 shrink-0">
-                      <button className="btn-ghost text-xs" onClick={() => { setEditingId(c.id); setEditForm({ name: c.name, address: c.address, contact: c.contact }); }}>✎</button>
-                      <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }} onClick={async () => { if (await confirmModal('Delete company?')) dispatch({ type: 'DELETE_COMPANY', id: c.id }); }}>✕</button>
+                      <button className="btn-ghost text-xs" onClick={() => { setEditingId(c.id); setEditForm({ name: c.name, brNumber: c.brNumber || '', tinNumber: c.tinNumber || '', address: c.address, contact: c.contact }); }}>✎</button>
+                      <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }} onClick={async () => { if (await confirmModal({ title: 'Delete Company', message: `Delete ${c.name}? This cannot be undone.`, confirmLabel: 'Yes, Delete', tone: 'danger' })) dispatch({ type: 'DELETE_COMPANY', id: c.id }); }}>✕</button>
                     </div>
                   </div>
                 )}
@@ -1419,7 +1609,21 @@ function CompaniesTab() {
       <div className="card h-fit">
         <div className="font-semibold text-sm mb-4" style={{ color: 'var(--color-text)' }}>Add company</div>
         <div className="space-y-3">
-          <div><label className="form-label">Company name</label><input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+          <div><label className="form-label">Company name *</label><input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Apex Lanka Solutions" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="form-label">BR Number</label><input className="form-input" value={form.brNumber} onChange={e => setForm(f => ({ ...f, brNumber: e.target.value }))} placeholder="PV 00234190" /></div>
+            <div><label className="form-label">TIN Number</label><input className="form-input" value={form.tinNumber} onChange={e => setForm(f => ({ ...f, tinNumber: e.target.value }))} placeholder="109876543" /></div>
+          </div>
+          <div>
+            <label className="form-label">Entity Type</label>
+            <select className="form-input" value={form.entityType} onChange={e => setForm(f => ({ ...f, entityType: e.target.value }))}>
+              <option value="pvt_ltd">Private Limited (Pvt Ltd)</option>
+              <option value="sole_proprietorship">Sole Proprietorship</option>
+              <option value="partnership">Partnership</option>
+              <option value="public_ltd">Public Limited (PLC)</option>
+              <option value="other">Other / Association</option>
+            </select>
+          </div>
           <div><label className="form-label">Address</label><input className="form-input" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} /></div>
           <div><label className="form-label">Contact</label><input className="form-input" value={form.contact} onChange={e => setForm(f => ({ ...f, contact: e.target.value }))} /></div>
           <button className="btn-primary w-full" onClick={submit}>Save company</button>

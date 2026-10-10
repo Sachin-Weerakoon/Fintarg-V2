@@ -188,6 +188,11 @@ export interface Company {
   logo: string;
   businessType?: string;
   openingDate?: string;
+  brNumber?: string;
+  tinNumber?: string;
+  entityType?: 'sole_proprietorship' | 'partnership' | 'pvt_ltd' | 'public_ltd' | 'other' | string;
+  sector?: string;
+  email?: string;
 }
 
 export interface BranchEntry {

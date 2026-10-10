@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useApp, calcMonthlyIncome, calcMonthlyExpenses, formatRs } from '@/store';
 import { StatCard } from '@/components/ui/StatCard';
@@ -25,7 +25,6 @@ export default function DashboardClient() {
   const monthlyIncome = calcMonthlyIncome(state.income, selectedMonth);
   const monthlyExpenses = calcMonthlyExpenses(state.expenses, selectedMonth);
   const netPosition = monthlyIncome - monthlyExpenses;
-  const upNext = state.reminders.slice(0, 3);
   const hasFinancialData = monthlyIncome > 0 || monthlyExpenses > 0;
 
   const recommendations = [
@@ -56,6 +55,78 @@ export default function DashboardClient() {
     : 'Deficit shortfall';
   const netTone = !hasFinancialData ? 'default' : netPosition >= 0 ? 'success' : 'danger';
 
+  // Aggregated upcoming bills & recurring commitments
+  const upcomingBills = useMemo(() => {
+    const today = new Date();
+    const list: {
+      id: string;
+      title: string;
+      category: string;
+      amount: number;
+      dueDate: string;
+      daysAway: number;
+    }[] = [];
+
+    state.reminders
+      .filter(r => r.status === 'pending')
+      .forEach(r => {
+        const d = new Date(r.dueDate);
+        const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+        list.push({
+          id: 'rem_' + r.id,
+          title: r.label,
+          category: r.type,
+          amount: 0,
+          dueDate: r.dueDate,
+          daysAway: diff,
+        });
+      });
+
+    state.financePayments.forEach(fp => {
+      const dueDay = fp.dueDay || 1;
+      const targetDate = new Date(today.getFullYear(), today.getMonth(), dueDay);
+      const diff = Math.round((targetDate.getTime() - today.getTime()) / 86400000);
+      list.push({
+        id: 'fp_' + fp.id,
+        title: `${fp.lender} · ${fp.paymentKind || 'Installment'}`,
+        category: 'Lease / Finance',
+        amount: fp.amount,
+        dueDate: targetDate.toISOString().slice(0, 10),
+        daysAway: diff,
+      });
+    });
+
+    state.pawnedItems.forEach(p => {
+      const d = new Date(p.nextDue);
+      const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+      const interestAmt = Math.round((p.amountReceived * p.interestRate) / 100);
+      list.push({
+        id: 'pawn_' + p.id,
+        title: `Pawn Interest · ${p.description}`,
+        category: 'Pawn Ticket',
+        amount: interestAmt,
+        dueDate: p.nextDue,
+        daysAway: diff,
+      });
+    });
+
+    state.expenses
+      .filter(e => e.recurring)
+      .slice(0, 3)
+      .forEach(e => {
+        list.push({
+          id: 'rec_exp_' + e.id,
+          title: `${e.category} · ${e.note || 'Recurring'}`,
+          category: 'Bills & Utilities',
+          amount: e.amount,
+          dueDate: e.date,
+          daysAway: 0,
+        });
+      });
+
+    return list.sort((a, b) => a.daysAway - b.daysAway);
+  }, [state]);
+
   return (
     <PageContainer>
       {/* Page Header */}
@@ -78,6 +149,59 @@ export default function DashboardClient() {
           </div>
         }
       />
+
+      {/* Financial Position Guidance Notification Banner */}
+      <div className={`p-4 rounded-2xl border transition-all ${
+        !hasFinancialData
+          ? 'bg-surface border-border'
+          : netPosition < 0
+          ? 'bg-danger-tint/30 border-danger-solid/30'
+          : 'bg-primary-tint/30 border-primary-500/25'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
+              !hasFinancialData
+                ? 'bg-surface-hover text-muted'
+                : netPosition < 0
+                ? 'bg-danger-solid text-white'
+                : 'bg-primary-500 text-white'
+            }`}>
+              <Icon name={!hasFinancialData ? 'info' : netPosition < 0 ? 'alert' : 'wallet'} size={18} />
+            </div>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-2">
+                <span>
+                  {!hasFinancialData
+                    ? 'Financial Intelligence · Setup Required'
+                    : netPosition < 0
+                    ? 'Financial Guidance · Deficit Risk Warning'
+                    : 'Financial Guidance · Positive Cash Runway'}
+                </span>
+                <Badge
+                  tone={!hasFinancialData ? 'neutral' : netPosition < 0 ? 'danger' : 'success'}
+                  size="sm"
+                  dot={hasFinancialData}
+                >
+                  {!hasFinancialData ? 'Pending Setup' : netPosition < 0 ? 'Shortfall' : 'Healthy Buffer'}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted mt-1 leading-relaxed">
+                {!hasFinancialData
+                  ? 'Connect your bank accounts or enter your income and expense records to unlock automated daily burn rate tracking and cashflow advice.'
+                  : netPosition < 0
+                  ? `Your monthly outflows exceed income by ${formatRs(Math.abs(netPosition))}. At an active burn rate of ${burnRate}%, your spending pace exceeds inbound revenue. Consider deferring non-essential purchases to preserve liquidity.`
+                  : `You maintain a positive buffer of ${formatRs(netPosition)} for ${selectedMonth}. Your recommended safe-to-spend budget is ${formatRs(dailyBudget)}/day across the remaining ${daysLeft} days.`}
+              </p>
+            </div>
+          </div>
+          <Link href="/analysis" className="shrink-0 self-end sm:self-center">
+            <Button variant={netPosition < 0 ? 'danger' : 'secondary'} size="sm">
+              View Position Analysis
+            </Button>
+          </Link>
+        </div>
+      </div>
 
       {/* Primary Key Metrics */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -237,35 +361,50 @@ export default function DashboardClient() {
           </Card>
 
           {/* Next Up Reminders */}
+          {/* Upcoming Bills & Recurring Commitments */}
           <Card className="p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="text-sm font-bold text-text flex items-center gap-2">
                 <Icon name="bell" size={16} className="text-primary-text" />
-                <span>Upcoming Reminders</span>
+                <span>Upcoming Bills & Reminders</span>
               </div>
               <Badge tone="neutral" size="sm">
-                {upNext.length} items
+                {upcomingBills.length} items
               </Badge>
             </div>
 
             <div className="space-y-2.5">
-              {upNext.length > 0 ? (
-                upNext.map(item => (
+              {upcomingBills.length > 0 ? (
+                upcomingBills.slice(0, 5).map(item => (
                   <div key={item.id} className="flex items-center justify-between p-3 rounded-xl border border-border bg-surface-hover/40 hover:bg-surface-hover transition-colors">
                     <div className="min-w-0 pr-2">
-                      <div className="text-xs font-semibold text-text truncate">{item.label}</div>
-                      <div className="text-[11px] text-muted mt-0.5 flex items-center gap-1">
-                        <span>Due:</span>
-                        <span className="font-medium text-primary-text">{item.dueDate}</span>
+                      <div className="text-xs font-semibold text-text truncate">{item.title}</div>
+                      <div className="text-[11px] text-muted mt-0.5 flex items-center gap-1.5">
+                        <span className="capitalize">{item.category}</span>
+                        <span>·</span>
+                        <span>Due {item.dueDate}</span>
                       </div>
                     </div>
-                    <Badge tone="primary" size="sm">Pending</Badge>
+                    <div className="text-right flex-shrink-0">
+                      {item.amount > 0 && (
+                        <div className="text-xs font-bold text-text num">{formatRs(item.amount)}</div>
+                      )}
+                      <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full mt-0.5 ${
+                        item.daysAway <= 0
+                          ? 'bg-danger-tint text-danger-text'
+                          : item.daysAway <= 5
+                          ? 'bg-warning-tint text-warning-text'
+                          : 'bg-surface-hover text-muted'
+                      }`}>
+                        {item.daysAway === 0 ? 'Today' : item.daysAway < 0 ? 'Overdue' : `In ${item.daysAway}d`}
+                      </span>
+                    </div>
                   </div>
                 ))
               ) : (
                 <EmptyState
-                  title="No scheduled reminders"
-                  helper="Add key bill dates in Settings to get notified."
+                  title="No upcoming obligations"
+                  helper="Scheduled recurring expenses and lease payments will appear here."
                   className="py-6"
                 />
               )}

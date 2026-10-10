@@ -1,3 +1,5 @@
+'use client';
+
 import React, { createContext, useContext, useEffect, useReducer, useRef, useState, ReactNode } from 'react';
 import { loadPersistedData, persistStoreAction } from '@/services/storeApi';
 import type {
