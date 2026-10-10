@@ -17,17 +17,6 @@ export const recordSchemas = {
     currency: z.string().trim().max(10).default('LKR'),
     notes: optionalText,
     isDefault: z.boolean().default(false),
-  }).transform(data => {
-    const accName = (data.accountName || data.name || 'Main Account').trim();
-    const balance = data.balance ?? data.currentBalance ?? 0;
-    const accountType = data.accountType === 'checking' ? 'current' : data.accountType;
-    return {
-      ...data,
-      accountName: accName,
-      name: accName,
-      balance,
-      accountType,
-    };
   }),
   cards: z.object({
     bankAccountId: z.string().optional().nullable(),
@@ -43,17 +32,6 @@ export const recordSchemas = {
     currentBalance: z.coerce.number().finite().min(0).max(1_000_000_000).optional(),
     billingDay: z.coerce.number().int().min(1).max(31).optional(),
     dueDay: z.coerce.number().int().min(1).max(31).optional(),
-  }).transform(data => {
-    const cardName = (data.cardName || data.name || 'Payment Card').trim();
-    const rawL4 = data.last4 || data.lastFourDigits || '0000';
-    const last4 = rawL4.replace(/\D/g, '').slice(-4).padStart(4, '0');
-    return {
-      ...data,
-      cardName,
-      name: cardName,
-      last4,
-      balance: data.balance ?? data.currentBalance ?? 0,
-    };
   }),
   transactions: z.object({
     bankAccountId: z.string().optional().nullable(),
