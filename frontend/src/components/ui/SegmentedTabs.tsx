@@ -52,7 +52,7 @@ export function SegmentedTabs<T extends string = string>({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={`inline-flex items-center rounded-xl bg-surface-hover border border-border ${sizeClasses[size]} ${className}`.trim()}
+      className={`inline-flex items-center rounded-xl bg-surface-hover border border-border max-w-full overflow-x-auto no-scrollbar scroll-smooth ${sizeClasses[size]} ${className}`.trim()}
     >
       {options.map((opt, idx) => {
         const isSelected = value === opt.id;
@@ -66,7 +66,7 @@ export function SegmentedTabs<T extends string = string>({
             disabled={opt.disabled}
             onClick={() => onChange(opt.id)}
             onKeyDown={e => handleKeyDown(e, idx)}
-            className={`flex items-center justify-center font-medium transition-all duration-200 select-none ${
+            className={`flex items-center justify-center font-medium transition-all duration-200 select-none flex-shrink-0 whitespace-nowrap ${
               itemSizeClasses[size]
             } ${
               isSelected

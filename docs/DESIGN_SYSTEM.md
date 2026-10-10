@@ -90,6 +90,12 @@ Unified Design System and Component Specification based on `UIX-001`, `SRS-001`,
 11. **`Skeleton`**: Accessible pulse placeholder for loading states.
 12. **`PageContainer`**: Unified page width constraint (`max-w-6xl` default, `max-w-4xl` for focused documents/forms).
 13. **`Icon`**: Single outline SVG icon set (stroke 1.9, rounded caps).
+14. **`PasswordField`**: Accessible password input with show/hide toggle and keyboard support.
+15. **`Sheet`**: Responsive side or bottom drawer modal with focus trapping and ESC support.
+16. **`ToastProvider` / `useToast`**: Non-blocking toast notifications replacing disruptive alerts.
+17. **`ConfirmProvider` / `useConfirm`**: Accessible promise-based confirmation modal replacing browser `window.confirm`.
+18. **`PaymentMethodField`**: Semantic payment method dropdown supporting cash, transfer, cards, cheques, and standing orders.
+19. **`BankSelect`**: Dropdown for selecting connected bank accounts with masked account numbers.
 
 ---
 
