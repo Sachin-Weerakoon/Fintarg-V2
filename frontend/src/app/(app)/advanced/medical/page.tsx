@@ -32,6 +32,7 @@ export default function MedicalClient() {
   const [activeTab, setActiveTab] = useState<'expenses' | 'documents' | 'reminders'>('expenses');
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
   const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
+  const [deleteReminderId, setDeleteReminderId] = useState<string | null>(null);
 
   const monthExpenses = state.medicalExpenses.filter(m => m.date.startsWith(month));
   const monthTotal = monthExpenses.reduce((s, m) => s + m.amount, 0);
@@ -364,7 +365,7 @@ export default function MedicalClient() {
                       variant="ghost"
                       size="sm"
                       className="text-danger-text hover:text-danger-text !p-1.5"
-                      onClick={() => dispatch({ type: 'DELETE_REMINDER', id: r.id })}
+                      onClick={() => setDeleteReminderId(r.id)}
                       aria-label="Delete reminder"
                     >
                       <Icon name="trash" size={14} />
@@ -402,6 +403,21 @@ export default function MedicalClient() {
             setDeleteDocId(null);
           }}
           onCancel={() => setDeleteDocId(null)}
+        />
+      )}
+
+      {deleteReminderId && (
+        <ConfirmDialog
+          title="Delete Reminder"
+          message="Are you sure you want to delete this reminder?"
+          confirmLabel="Yes, Delete"
+          cancelLabel="No, Keep"
+          tone="danger"
+          onConfirm={() => {
+            dispatch({ type: 'DELETE_REMINDER', id: deleteReminderId });
+            setDeleteReminderId(null);
+          }}
+          onCancel={() => setDeleteReminderId(null)}
         />
       )}
     </PageContainer>

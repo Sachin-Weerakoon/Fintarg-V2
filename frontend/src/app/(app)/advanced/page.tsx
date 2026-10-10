@@ -510,8 +510,23 @@ function Medical() {
                         {daysAway < 0 && <span className="ml-2 badge-muted">Past</span>}
                       </div>
                     </div>
-                    <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }}
-                      onClick={() => dispatch({ type: 'DELETE_REMINDER', id: r.id })}>✕</button>
+                    <button
+                      className="btn-ghost text-xs"
+                      style={{ color: 'var(--color-danger)' }}
+                      onClick={async () => {
+                        if (await confirmModal({
+                          title: 'Delete Reminder',
+                          message: `Are you sure you want to delete "${r.label}"?`,
+                          confirmLabel: 'Yes, Delete',
+                          cancelLabel: 'No, Keep',
+                          tone: 'danger',
+                        })) {
+                          dispatch({ type: 'DELETE_REMINDER', id: r.id });
+                        }
+                      }}
+                    >
+                      ✕
+                    </button>
                   </div>
                 );
               })}

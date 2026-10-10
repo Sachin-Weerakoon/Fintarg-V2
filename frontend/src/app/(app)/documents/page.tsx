@@ -174,7 +174,8 @@ export default function DocumentsClient() {
         <ConfirmDialog
           title="Delete Document"
           message="Are you sure you want to remove this document from your vault?"
-          confirmLabel="Delete"
+          confirmLabel="Yes, Delete"
+          cancelLabel="No, Keep"
           tone="danger"
           onConfirm={() => {
             dispatch({ type: 'DELETE_DOCUMENT', id: deleteConfirmId });

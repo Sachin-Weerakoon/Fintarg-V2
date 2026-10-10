@@ -555,6 +555,7 @@ function DocumentsTab() {
 
 function RemindersTab() {
   const { state, dispatch } = useApp();
+  const confirmModal = useConfirm();
   const reminders = state.reminders;
 
   const typeLabel: Record<string, string> = { finance: 'Finance payment', loan: 'Loan', pawn: 'Pawn interest', agreement: 'Agreement', appointment: 'Appointment', custom: 'Custom' };
@@ -589,7 +590,23 @@ function RemindersTab() {
                   {r.status === 'pending' && (
                     <button className="btn-ghost text-xs" style={{ fontSize: 11 }} onClick={() => dispatch({ type: 'UPDATE_REMINDER', id: r.id, status: 'dismissed' })}>Dismiss</button>
                   )}
-                  <button className="btn-ghost text-xs" style={{ color: 'var(--color-danger)' }} onClick={() => dispatch({ type: 'DELETE_REMINDER', id: r.id })}>✕</button>
+                  <button
+                    className="btn-ghost text-xs"
+                    style={{ color: 'var(--color-danger)' }}
+                    onClick={async () => {
+                      if (await confirmModal({
+                        title: 'Delete Reminder',
+                        message: `Are you sure you want to delete "${r.label}"?`,
+                        confirmLabel: 'Yes, Delete',
+                        cancelLabel: 'No, Keep',
+                        tone: 'danger',
+                      })) {
+                        dispatch({ type: 'DELETE_REMINDER', id: r.id });
+                      }
+                    }}
+                  >
+                    ✕
+                  </button>
                 </div>
               </div>
             );

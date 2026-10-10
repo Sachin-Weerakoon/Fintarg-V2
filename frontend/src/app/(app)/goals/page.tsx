@@ -434,7 +434,8 @@ export default function Goals() {
         <ConfirmDialog
           title="Delete Savings Goal"
           message="Are you sure you want to delete this savings goal? This action cannot be undone."
-          confirmLabel="Delete"
+          confirmLabel="Yes, Delete"
+          cancelLabel="No, Keep"
           tone="danger"
           onConfirm={() => {
             dispatch({ type: 'DELETE_GOAL', id: deleteConfirmId });

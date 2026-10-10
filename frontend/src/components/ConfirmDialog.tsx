@@ -15,10 +15,10 @@ export interface ConfirmDialogProps {
 }
 
 export default function ConfirmDialog({
-  title = 'Confirm',
+  title = 'Please Confirm',
   message,
-  confirmLabel = 'Delete',
-  cancelLabel = 'Cancel',
+  confirmLabel = 'Yes, Delete',
+  cancelLabel = 'No, Keep',
   tone = 'danger',
   loading = false,
   onConfirm,
