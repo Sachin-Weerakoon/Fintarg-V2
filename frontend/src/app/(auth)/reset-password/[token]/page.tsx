@@ -45,10 +45,7 @@ export default function ResetPassword({ params }: { params: Promise<{ token: str
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{ background: 'var(--color-bg)' }}
-    >
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <div className="onboarding-card max-w-md w-full">
         <h2 className="text-2xl font-bold tracking-tight text-text mb-2">Set a new password</h2>
         <form onSubmit={submit} className="space-y-4 mt-6">

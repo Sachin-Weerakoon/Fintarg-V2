@@ -16,7 +16,6 @@ import { Icon } from '@/components/ui/Icon';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import { MoneyField } from '@/components/ui/MoneyField';
-import { DateField } from '@/components/ui/DateField';
 
 export default function Goals() {
   const { state, dispatch } = useApp();

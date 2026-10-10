@@ -28,7 +28,8 @@ export function RadioGroup<T extends string = string>({
   'aria-label': ariaLabel,
   className = '',
 }: RadioGroupProps<T>) {
-  const groupName = name || React.useId();
+  const defaultName = React.useId();
+  const groupName = name || defaultName;
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
     let nextIndex = -1;

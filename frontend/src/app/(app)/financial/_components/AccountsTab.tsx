@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
@@ -10,14 +10,10 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
-import { Sheet } from '@/components/ui/Sheet';
 import { Modal } from '@/components/ui/Modal';
-import { ProgressBar } from '@/components/ui/ProgressBar';
 import { BankSelect } from '@/components/ui/BankSelect';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
-import { StatCard } from '@/components/ui/StatCard';
-import { MoneyField } from '@/components/ui/MoneyField';
 import { Alert } from '@/components/ui/Alert';
 import {
   SRI_LANKAN_BANKS,
@@ -940,10 +936,7 @@ export function AccountsTab() {
           <div className="space-y-4">
             {/* Visual Passbook / Digital Account Card */}
             <div
-              className="p-5 rounded-xl border border-primary-500/40 text-white shadow-lg relative overflow-hidden"
-              style={{
-                background: 'linear-gradient(135deg, var(--bg-surface-elevated, var(--bg-surface)) 0%, var(--bg-surface) 60%, var(--color-primary) 150%)',
-              }}
+              className="p-5 rounded-xl border border-primary-500/40 text-white shadow-lg relative overflow-hidden bg-gradient-to-br from-surface-elevated via-surface to-primary-tint/20"
             >
               <div className="flex items-start justify-between gap-2 mb-4">
                 <div className="flex items-center gap-2.5">

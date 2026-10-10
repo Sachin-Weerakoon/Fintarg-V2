@@ -223,7 +223,7 @@ export function AgreementsTab() {
             <div className="md:col-span-2">
               <FormField id="agr-file" label="Attach Executed / Signed Document">
                 <div className="flex items-center gap-3">
-                  <input
+                  <Input
                     ref={fileInputRef}
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png,.docx"
@@ -356,7 +356,7 @@ export function AgreementsTab() {
                     <div className="md:col-span-2">
                       <FormField id="edit-agr-file" label="Replace Signed Copy">
                         <div className="flex items-center gap-3">
-                          <input
+                          <Input
                             ref={editFileInputRef}
                             type="file"
                             accept=".pdf,.jpg,.jpeg,.png,.docx"

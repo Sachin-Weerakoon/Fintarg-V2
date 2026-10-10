@@ -24,7 +24,8 @@ export function Checkbox({
   name,
   className = '',
 }: CheckboxProps) {
-  const generatedId = id || React.useId();
+  const defaultId = React.useId();
+  const generatedId = id || defaultId;
 
   return (
     <label

@@ -38,3 +38,4 @@ export * from './Avatar';
 export * from './ErrorState';
 export * from './Divider';
 export * from './PageSection';
+export * from './ColorSwatch';

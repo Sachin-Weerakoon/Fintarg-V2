@@ -21,6 +21,7 @@ import {
   Divider,
   PageSection,
   Alert,
+  ColorSwatch,
 } from './index';
 
 describe('Stage 4 Building Blocks & Payment Methods', () => {
@@ -99,6 +100,7 @@ describe('Stage 4 Building Blocks & Payment Methods', () => {
     expect(Divider).toBeDefined();
     expect(PageSection).toBeDefined();
     expect(Alert).toBeDefined();
+    expect(ColorSwatch).toBeDefined();
   });
 
   it('Avatar generates initials properly', () => {
@@ -107,14 +109,48 @@ describe('Stage 4 Building Blocks & Payment Methods', () => {
   });
 
   it('MoneyField handles numeric and formatted inputs', () => {
-    let changed = '';
+    let _changed = '';
     const field = React.createElement(MoneyField, {
       value: 50000,
       onChange: (v) => {
-        changed = String(v);
+        _changed = String(v);
       },
     });
     expect(field.props.currency).toBeUndefined(); // defaults to Rs. inside component
     expect(field.props.value).toBe(50000);
+  });
+
+  it('ColorSwatch renders with correct color and accessibility attributes', () => {
+    const swatch = React.createElement(ColorSwatch, {
+      color: '#0FA3B1',
+      selected: true,
+      ariaLabel: 'Teal color swatch',
+    });
+    expect(swatch.props.color).toBe('#0FA3B1');
+    expect(swatch.props.selected).toBe(true);
+    expect(swatch.props.ariaLabel).toBe('Teal color swatch');
+  });
+
+  it('SettingRow, ErrorState, and Checkbox render valid React elements', () => {
+    const setting = React.createElement(SettingRow, {
+      label: 'Dark Mode',
+      description: 'Switch application color theme',
+      control: React.createElement('span', null, 'Toggle'),
+    });
+    expect(setting.props.label).toBe('Dark Mode');
+
+    const err = React.createElement(ErrorState, {
+      message: 'Failed to fetch account list',
+      onRetry: () => {},
+    });
+    expect(err.props.message).toBe('Failed to fetch account list');
+
+    const check = React.createElement(Checkbox, {
+      checked: true,
+      onChange: () => {},
+      label: 'Notify via email',
+    });
+    expect((check.props as { checked: boolean; label: string }).checked).toBe(true);
+    expect((check.props as { checked: boolean; label: string }).label).toBe('Notify via email');
   });
 });

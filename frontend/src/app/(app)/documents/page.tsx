@@ -8,6 +8,7 @@ import { PageContainer } from '@/components/ui/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Icon } from '@/components/ui/Icon';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
@@ -74,7 +75,7 @@ export default function DocumentsClient() {
         description="Secure repository for national ID, agreements, salary slips, and deeds."
         actions={
           <div className="flex items-center gap-3">
-            <input
+            <Input
               ref={fileRef}
               type="file"
               accept="application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document"

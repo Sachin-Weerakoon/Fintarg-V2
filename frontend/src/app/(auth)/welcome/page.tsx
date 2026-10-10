@@ -97,10 +97,7 @@ export default function Welcome() {
   };
 
   return (
-    <div
-      className="min-h-screen flex"
-      style={{ background: 'linear-gradient(135deg, var(--color-chrome-900) 0%, var(--color-chrome-800) 100%)' }}
-    >
+    <div className="min-h-screen flex bg-gradient-to-br from-chrome-900 to-chrome-800">
       <section className="hidden md:flex flex-col justify-between px-16 py-12 flex-1 relative overflow-hidden text-white">
         {/* Ambient background glow */}
         <div className="absolute top-1/4 -left-20 w-80 h-80 rounded-full bg-primary-500/10 blur-3xl pointer-events-none" />

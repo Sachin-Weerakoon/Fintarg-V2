@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect, Suspense } from 'react';
+import { useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/store';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Avatar } from '@/components/ui/Avatar';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
+import { ColorSwatch } from '@/components/ui/ColorSwatch';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -66,7 +67,7 @@ function ColorPickerRow({
               className="w-9 h-9 rounded-xl border-2 border-border shadow-sm group-hover:scale-105 transition-transform"
               style={{ backgroundColor: effective }}
             />
-            <input
+            <Input
               type="color"
               value={effective}
               onChange={e => onChange(e.target.value)}
@@ -142,23 +143,15 @@ function AppearanceTab() {
         </p>
 
         <div className="flex gap-3 flex-wrap mb-2">
-          {THEME_COLORS.map(c => {
-            const isSelected = profile.themeColor === c;
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => update({ themeColor: c })}
-                className={`w-10 h-10 rounded-full border-2 transition-all cursor-pointer relative flex items-center justify-center ${
-                  isSelected ? 'border-text ring-2 ring-offset-2 ring-primary-500 scale-105' : 'border-transparent'
-                }`}
-                style={{ backgroundColor: c }}
-                aria-label={`Theme color ${c}`}
-              >
-                {isSelected && <span className="w-2 h-2 rounded-full bg-white shadow-sm" />}
-              </button>
-            );
-          })}
+          {THEME_COLORS.map(c => (
+            <ColorSwatch
+              key={c}
+              color={c}
+              selected={profile.themeColor === c}
+              onClick={() => update({ themeColor: c })}
+              ariaLabel={`Theme color ${c}`}
+            />
+          ))}
         </div>
       </Card>
 
@@ -382,7 +375,7 @@ function ProfileTab() {
           <div className="text-sm font-bold text-text">Avatar Image</div>
           <p className="text-xs text-muted mt-0.5">JPG, PNG, or WEBP up to 5 MB</p>
           <div className="flex items-center gap-2 mt-2">
-            <input
+            <Input
               ref={avatarInputRef}
               type="file"
               accept="image/jpeg,image/png,image/jpg,image/webp"
@@ -754,7 +747,7 @@ function DocumentsTab() {
         </FormGrid>
 
         <div className="flex items-center justify-between pt-2">
-          <input
+          <Input
             ref={fileInputRef}
             type="file"
             accept=".pdf,.jpg,.jpeg,.png,.docx"
@@ -965,19 +958,21 @@ function SettingsContent() {
         <div>
           <Card className="p-2 space-y-1">
             {SETTING_TABS.map(t => (
-              <button
+              <Button
                 key={t.id}
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => setTab(t.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer text-left ${
+                className={`w-full !justify-start !min-h-[40px] px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                   tab === t.id
-                    ? 'bg-primary-tint text-primary-text shadow-sm border border-primary-500/30'
+                    ? '!bg-primary-tint !text-primary-text shadow-sm border border-primary-500/30'
                     : 'text-text hover:bg-surface-hover border border-transparent'
                 }`}
+                iconLeft={<span className={tab === t.id ? 'text-primary-text' : 'text-muted'}>{t.icon}</span>}
               >
-                <span className={tab === t.id ? 'text-primary-text' : 'text-muted'}>{t.icon}</span>
-                <span>{t.label}</span>
-              </button>
+                {t.label}
+              </Button>
             ))}
           </Card>
         </div>

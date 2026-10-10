@@ -34,10 +34,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{ background: 'var(--color-bg)' }}
-    >
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <div className="onboarding-card max-w-md w-full">
         <h2 className="text-2xl font-bold tracking-tight text-text mb-2">Reset your password</h2>
         <p className="text-sm text-muted mb-6">Enter your email and we&apos;ll send you a reset link.</p>

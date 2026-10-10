@@ -18,5 +18,33 @@
       }
     ],
     "no-alert": "warn"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/app/**/*.{ts,tsx}", "src/components/*.{ts,tsx}"],
+      "rules": {
+        "react/forbid-elements": [
+          "warn",
+          {
+            "forbid": [
+              { "element": "button", "message": "Raw <button> is discouraged. Use Button or ColorSwatch from @/components/ui." },
+              { "element": "input", "message": "Raw <input> is discouraged. Use Input or FormField from @/components/ui." },
+              { "element": "select", "message": "Raw <select> is discouraged. Use Select from @/components/ui." }
+            ]
+          }
+        ],
+        "no-restricted-syntax": [
+          "warn",
+          {
+            "selector": "JSXAttribute[name.name='className'] > Literal[value=/(slate|zinc|cyan|emerald|blue|amber|purple|indigo|rose|teal|sky|violet|pink|yellow)-\\d+/]",
+            "message": "Hardcoded Tailwind palette classes are discouraged. Use semantic design tokens from globals.css."
+          },
+          {
+            "selector": "JSXAttribute[name.name='style'] > JSXExpressionContainer > ObjectExpression > Property[value.type='Literal']",
+            "message": "Static style={{}} literals are discouraged. Use Tailwind tokens or dynamic variables."
+          }
+        ]
+      }
+    }
+  ]
 }

@@ -16,9 +16,6 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
-import { StatCard } from '@/components/ui/StatCard';
-import { MoneyField } from '@/components/ui/MoneyField';
-import { DateField } from '@/components/ui/DateField';
 
 const MEDICAL_TYPES = ['Consultation', 'Pharmacy', 'Lab test', 'Hospital', 'Dental', 'Specialist', 'Other'];
 const MONTHS = ['2026-07', '2026-08', '2026-09'];
@@ -298,7 +295,7 @@ export default function MedicalClient() {
           <Card className="p-5">
             <h3 className="font-semibold text-sm mb-1 text-text">Upload medical document</h3>
             <p className="text-xs text-muted mb-4">Store reports, prescriptions, and lab tests securely.</p>
-            <input
+            <Input
               ref={fileInputRef}
               type="file"
               accept=".pdf,.jpg,.jpeg,.png,.docx"

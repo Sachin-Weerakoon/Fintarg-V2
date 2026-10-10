@@ -7,6 +7,7 @@ import { AppProvider } from '@/store';
 import { deriveBrand, validateCustomOverrides, THEME_COLORS } from '@/lib/theme';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Avatar } from '@/components/ui/Avatar';
+import { Button } from '@/components/ui/Button';
 
 const navItems = [
   { href: '/', label: 'Home', page: 'dashboard' },
@@ -221,15 +222,15 @@ export default function AppLayout({
                     className="!rounded-xl shadow-sm"
                   />
                 </Link>
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={handleSignOut}
-                  disabled={signingOut}
-                  className="btn-secondary !min-h-[38px] !py-1.5 !px-3.5 !text-xs font-medium"
+                  loading={signingOut}
+                  iconLeft={<Icon name="logout" size={14} />}
                 >
-                  <Icon name="logout" size={14} />
-                  <span>{signingOut ? 'Signing out...' : 'Sign out'}</span>
-                </button>
+                  Sign out
+                </Button>
               </div>
             </header>
 
@@ -264,14 +265,15 @@ export default function AppLayout({
                   className="!w-8 !h-8"
                 />
               </Link>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleSignOut}
-                disabled={signingOut}
-                className="text-xs font-medium px-2.5 py-1 rounded-full border border-white/20 text-white bg-white/5"
+                loading={signingOut}
+                className="!text-xs !py-1 !px-2.5 !min-h-[28px] !rounded-full text-white border border-white/20 bg-white/5"
               >
-                {signingOut ? '...' : 'Sign out'}
-              </button>
+                Sign out
+              </Button>
             </div>
           </header>
 
@@ -302,10 +304,10 @@ export default function AppLayout({
                 </Link>
               );
             })}
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={() => setMoreOpen(v => !v)}
-              className={`mobile-nav-item min-h-[44px]${moreOpen || isMorePage ? ' active' : ''}`}
+              className={`mobile-nav-item min-h-[44px] !rounded-none !border-0 !p-0 ${moreOpen || isMorePage ? ' active' : ''}`}
               aria-expanded={moreOpen}
               aria-label="More navigation options"
             >
@@ -313,7 +315,7 @@ export default function AppLayout({
                 <Icon name="more" size={20} />
               </span>
               <span>More</span>
-            </button>
+            </Button>
           </nav>
 
           {moreOpen && (
@@ -328,14 +330,15 @@ export default function AppLayout({
                 <div className="mobile-sheet-handle col-span-3 w-12 h-1 rounded-full bg-border-input/40 mx-auto mb-2" />
                 <div className="col-span-3 flex items-center justify-between mb-2">
                   <span className="font-semibold text-sm text-text">More Options</span>
-                  <button
-                    type="button"
-                    className="btn-ghost text-xs py-1 px-2"
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="!text-xs !py-1 !px-2"
                     onClick={() => setMoreOpen(false)}
                     aria-label="Close menu"
                   >
                     Close
-                  </button>
+                  </Button>
                 </div>
                 {navItems
                   .filter(n => !mobileBottomItems.some(m => m.page === n.page))
