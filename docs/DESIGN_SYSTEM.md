@@ -105,3 +105,62 @@ Unified Design System and Component Specification based on `UIX-001`, `SRS-001`,
 * **Fill vs Text**: Use `*-solid` (`-600` or `-500`) for button fills, icons, and progress bars. ALWAYS use `*-text` (`-700` in light, `-400` in dark) for colored text.
 * **No Hardcoded Hexes**: Use semantic Tailwind classes (`bg-surface`, `text-text`, `text-muted`, `border-border`, `bg-primary-tint`) or CSS variables (`var(--color-...)`).
 * **Motion Accessibility**: All hover lifts and transitions respect `@media (prefers-reduced-motion: reduce)`.
+
+---
+
+## 6. Page Patterns (Dashboard Standard)
+
+Every screen in Fintarg must match the design quality, layout rhythm, and token consistency established by the Dashboard (`DashboardClient.tsx`):
+
+### 6.1 Layout Rhythm & Canvas
+* **Page Wrapper**: Every route must wrap its content with `<PageContainer>`:
+  * Default (`max-w-6xl mx-auto space-y-6 w-full`) for dashboards, list views, and multi-column workspaces.
+  * Narrow (`width="narrow"` / `max-w-4xl mx-auto space-y-6 w-full`) for single-purpose forms and settings documents.
+  * No per-section ad hoc `max-w-*` overrides.
+* **Page Header**: Every route begins with `<PageHeader>`:
+  * `eyebrow`: Optional semantic category / context label in uppercase tracking (`text-primary-text`).
+  * `title`: Semantic `h1` (`text-2xl font-bold tracking-tight text-text`).
+  * `description`: Supporting guide sentence (`text-xs sm:text-sm text-muted`).
+  * `actions`: Cluster of `<Button>` elements (`variant="primary"`, `variant="secondary"`) aligned right on desktop, wrapping on mobile.
+  * Divider: Border bottom divider (`border-b border-border/80 pb-6`) separates header from page content.
+* **Vertical Section Gap**: Sections are separated by exactly 24px (`space-y-6` or `gap-6`), aligning all cards on the 4px grid.
+
+### 6.2 Card Anatomy
+* **Standard Surface**:
+  * Outer styling: `card bg-surface border border-card-border rounded-xl shadow-card`.
+  * Padding: Uniform **24px desktop** (`p-6`) and **16px mobile** (`p-4` / `sm:p-6`).
+  * Hoverable: Subtle lift on interactive cards (`hover:-translate-y-0.5 hover:shadow-card`).
+* **Section Header**:
+  * `<CardHeader>` or `<SectionHeader>` with 16px bold title (`text-base font-bold text-text`) and muted description (`text-xs text-muted mt-0.5`).
+  * Right-aligned action slot for quick links, filters, or pills.
+
+### 6.3 Stat Card Anatomy
+* Metric cards use `<StatCard>` arranged in responsive grids (`grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5`):
+  * **Label**: `text-xs font-semibold uppercase tracking-wider text-muted`.
+  * **Value**: Tabular numeric format (`num text-2xl font-bold tracking-tight`).
+  * **Icon Chip**: `w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0` with tone-specific tint fill (`bg-primary-tint`, `bg-success-tint`, `bg-danger-tint`, `bg-warning-tint`).
+  * **Detail / Trend Pill**: `text-[11px] font-medium px-2 py-0.5 rounded-md` with tone-matched border.
+
+### 6.4 Quick-Action Tile Anatomy
+* Action shortcuts use standardized interactive rows:
+  * Container: `p-3 rounded-xl border border-border bg-surface hover:bg-surface-hover hover:border-primary-500/50 transition-all text-xs font-semibold text-text flex items-center justify-between group`.
+  * Leading icon box: `w-7 h-7 rounded-lg flex items-center justify-center` with tone-colored tint.
+  * Trailing arrow: `Icon name="arrow-right" size={14}` in `text-muted` transitioning to `text-primary-text`.
+
+### 6.5 Tabbed Interfaces
+* Multi-view screens use `<SegmentedTabs>`:
+  * Pill container: `rounded-xl bg-surface-hover border border-border p-1 gap-1.5`.
+  * Active tab: `bg-surface text-text shadow-sm font-semibold border border-border/80 rounded-xl`.
+  * Inactive tab: `text-muted hover:text-text hover:bg-surface/50 rounded-xl`.
+  * URL Synchronization: Active tab must always be mirrored to the URL query string (`?tab=...`) so refresh and browser history work reliably.
+  * Mobile adaptation: Horizontal scroll with hidden scrollbar (`overflow-x-auto no-scrollbar`).
+
+### 6.6 Forms, Tables & State Standards
+* **Form Grid**: Form fields must be arranged in `<FormGrid>` (1 column below 768px, 2 columns on desktop) with accessible `<FormField>` wrappers.
+* **Money & Date Fields**: Financial inputs must use `<MoneyField>` with `Rs.` prefix, numeric formatting, and tabular numbers. Dates must use `<DateField>`.
+* **Data Presentation**: List data must use `<DataTable>` on desktop (>=768px) and automatically adapt to mobile cards or responsive list rows below 768px.
+* **State Triad**:
+  * **Loading**: `<Skeleton>` matching the actual target layout (cards, stat tiles, or table rows).
+  * **Empty**: `<EmptyState>` with descriptive message and primary call-to-action button that populates the view.
+  * **Error**: `<ErrorState>` with clear message and retry button.
+
