@@ -159,15 +159,17 @@ function toStoredForCreate(kind: RecordKind, input: Record<string, unknown>) {
       }
     }
   }
-  if ('bankAccountId' in stored && stored.bankAccountId) {
-    if (mongoose.isValidObjectId(stored.bankAccountId)) {
+  if ('bankAccountId' in stored) {
+    if (stored.bankAccountId) {
+      if (!mongoose.isValidObjectId(stored.bankAccountId)) throw new HttpError(400, 'Invalid bank account id');
       stored.bankAccountId = new mongoose.Types.ObjectId(String(stored.bankAccountId));
     } else {
       stored.bankAccountId = null;
     }
   }
-  if ('cardId' in stored && stored.cardId) {
-    if (mongoose.isValidObjectId(stored.cardId)) {
+  if ('cardId' in stored) {
+    if (stored.cardId) {
+      if (!mongoose.isValidObjectId(stored.cardId)) throw new HttpError(400, 'Invalid card id');
       stored.cardId = new mongoose.Types.ObjectId(String(stored.cardId));
     } else {
       stored.cardId = null;
@@ -276,14 +278,16 @@ function toStoredForUpdate(kind: RecordKind, input: Record<string, unknown>, exi
     }
   }
   if ('bankAccountId' in stored) {
-    if (stored.bankAccountId && mongoose.isValidObjectId(stored.bankAccountId)) {
+    if (stored.bankAccountId) {
+      if (!mongoose.isValidObjectId(stored.bankAccountId)) throw new HttpError(400, 'Invalid bank account id');
       stored.bankAccountId = new mongoose.Types.ObjectId(String(stored.bankAccountId));
     } else {
       stored.bankAccountId = null;
     }
   }
   if ('cardId' in stored) {
-    if (stored.cardId && mongoose.isValidObjectId(stored.cardId)) {
+    if (stored.cardId) {
+      if (!mongoose.isValidObjectId(stored.cardId)) throw new HttpError(400, 'Invalid card id');
       stored.cardId = new mongoose.Types.ObjectId(String(stored.cardId));
     } else {
       stored.cardId = null;
@@ -372,13 +376,25 @@ export async function createRecord(kind: RecordKind, userId: string, input: Reco
   if (kind === 'loans' && input.dueDate && input.startDate && String(input.dueDate) < String(input.startDate)) {
     throw new HttpError(400, 'Due date cannot be before start date');
   }
-  if (kind === 'businessBranches' || kind === 'ownerDraws') {
-    if (!mongoose.isValidObjectId(input.companyId) || !await CompanyModel.exists({ _id: input.companyId, userId })) throw new HttpError(404, 'Company not found');
+  if (input.companyId && (kind === 'businessBranches' || kind === 'ownerDraws')) {
+    if (!mongoose.isValidObjectId(input.companyId)) throw new HttpError(400, 'Invalid company id');
+    if (!await CompanyModel.exists({ _id: input.companyId, userId })) throw new HttpError(404, 'Company not found');
   }
-  if (kind === 'branchEntries' && (!mongoose.isValidObjectId(input.branchId) || !await BusinessBranchModel.exists({ _id: input.branchId, userId }))) throw new HttpError(404, 'Branch not found');
-  if (kind === 'documents' && input.fileId && (!mongoose.isValidObjectId(input.fileId) || !await FileModel.exists({ _id: input.fileId, userId }))) throw new HttpError(404, 'File not found');
-  if ((kind === 'cards' || kind === 'expenses' || kind === 'incomes' || kind === 'transactions' || kind === 'financePayments') && input.bankAccountId) {
-    if (!mongoose.isValidObjectId(input.bankAccountId) || !await BankAccountModel.exists({ _id: input.bankAccountId, userId })) throw new HttpError(404, 'Bank account not found');
+  if (input.branchId && kind === 'branchEntries') {
+    if (!mongoose.isValidObjectId(input.branchId)) throw new HttpError(400, 'Invalid branch id');
+    if (!await BusinessBranchModel.exists({ _id: input.branchId, userId })) throw new HttpError(404, 'Branch not found');
+  }
+  if (input.fileId && kind === 'documents') {
+    if (!mongoose.isValidObjectId(input.fileId)) throw new HttpError(400, 'Invalid file id');
+    if (!await FileModel.exists({ _id: input.fileId, userId })) throw new HttpError(404, 'File not found');
+  }
+  if (input.bankAccountId && (kind === 'cards' || kind === 'expenses' || kind === 'incomes' || kind === 'transactions' || kind === 'financePayments')) {
+    if (!mongoose.isValidObjectId(input.bankAccountId)) throw new HttpError(400, 'Invalid bank account id');
+    if (!await BankAccountModel.exists({ _id: input.bankAccountId, userId })) throw new HttpError(404, 'Bank account not found');
+  }
+  if (input.cardId && (kind === 'expenses' || kind === 'transactions')) {
+    if (!mongoose.isValidObjectId(input.cardId)) throw new HttpError(400, 'Invalid card id');
+    if (!await CardModel.exists({ _id: input.cardId, userId })) throw new HttpError(404, 'Card not found');
   }
   const data = toStoredForCreate(kind, input);
   if (kind === 'businessBranches') delete data.entries;
@@ -422,10 +438,21 @@ export async function createRecord(kind: RecordKind, userId: string, input: Reco
 
 export async function updateRecord(kind: RecordKind, userId: string, id: string, input: Record<string, unknown>) {
   if (!mongoose.isValidObjectId(id)) throw new HttpError(400, 'Invalid record id');
-  if (kind === 'businessBranches' && input.companyId && !await CompanyModel.exists({ _id: input.companyId, userId })) throw new HttpError(404, 'Company not found');
-  if (kind === 'branchEntries' && input.branchId && !await BusinessBranchModel.exists({ _id: input.branchId, userId })) throw new HttpError(404, 'Branch not found');
-  if ((kind === 'cards' || kind === 'expenses' || kind === 'incomes' || kind === 'transactions' || kind === 'financePayments') && input.bankAccountId) {
-    if (!mongoose.isValidObjectId(input.bankAccountId) || !await BankAccountModel.exists({ _id: input.bankAccountId, userId })) throw new HttpError(404, 'Bank account not found');
+  if (input.companyId && (kind === 'businessBranches' || kind === 'ownerDraws')) {
+    if (!mongoose.isValidObjectId(input.companyId)) throw new HttpError(400, 'Invalid company id');
+    if (!await CompanyModel.exists({ _id: input.companyId, userId })) throw new HttpError(404, 'Company not found');
+  }
+  if (input.branchId && kind === 'branchEntries') {
+    if (!mongoose.isValidObjectId(input.branchId)) throw new HttpError(400, 'Invalid branch id');
+    if (!await BusinessBranchModel.exists({ _id: input.branchId, userId })) throw new HttpError(404, 'Branch not found');
+  }
+  if (input.bankAccountId && (kind === 'cards' || kind === 'expenses' || kind === 'incomes' || kind === 'transactions' || kind === 'financePayments')) {
+    if (!mongoose.isValidObjectId(input.bankAccountId)) throw new HttpError(400, 'Invalid bank account id');
+    if (!await BankAccountModel.exists({ _id: input.bankAccountId, userId })) throw new HttpError(404, 'Bank account not found');
+  }
+  if (input.cardId && (kind === 'expenses' || kind === 'transactions')) {
+    if (!mongoose.isValidObjectId(input.cardId)) throw new HttpError(400, 'Invalid card id');
+    if (!await CardModel.exists({ _id: input.cardId, userId })) throw new HttpError(404, 'Card not found');
   }
 
   const existingDoc = await models[kind].findOne({ _id: id, userId });

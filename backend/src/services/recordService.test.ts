@@ -192,4 +192,51 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
     assert.strictEqual((updated as any).savedAmountCents, 1500000, 'savedAmountCents must be preserved');
     assert.strictEqual((updated as any).contributions?.length, 1, 'contributions must be preserved');
   });
+
+  it('foreign keys: rejects invalid ObjectIds with 400 and unowned cards/accounts with 404 (1.7)', async () => {
+    // Invalid ObjectId format should throw 400
+    await assert.rejects(
+      async () => {
+        await createRecord('expenses', userId, {
+          date: '2026-10-02',
+          amount: 500,
+          category: 'Snacks',
+          cardId: 'invalid-non-object-id',
+        });
+      },
+      (err: any) => err.status === 400 && /Invalid card id/i.test(err.message)
+    );
+
+    await assert.rejects(
+      async () => {
+        await createRecord('expenses', userId, {
+          date: '2026-10-02',
+          amount: 500,
+          category: 'Snacks',
+          bankAccountId: 'invalid-non-object-id',
+        });
+      },
+      (err: any) => err.status === 400 && /Invalid bank account id/i.test(err.message)
+    );
+
+    // Another user's cardId should throw 404
+    const otherUserId = new mongoose.Types.ObjectId().toString();
+    const otherCard = await createRecord('cards', otherUserId, {
+      cardName: 'Other User Card',
+      last4: '1111',
+      creditLimit: 50000,
+    });
+
+    await assert.rejects(
+      async () => {
+        await createRecord('expenses', userId, {
+          date: '2026-10-02',
+          amount: 500,
+          category: 'Snacks',
+          cardId: String(otherCard._id),
+        });
+      },
+      (err: any) => err.status === 404 && /Card not found/i.test(err.message)
+    );
+  });
 });
