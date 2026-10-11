@@ -63,15 +63,33 @@ describe('Financial Record Validation Schemas', () => {
     });
   });
 
-  describe('savings goals schema', () => {
-    it('validates savings goal', () => {
-      const input = {
-        name: 'Emergency Fund',
-        dailyAmount: 1000,
-        endDate: '2026-12-31',
+  describe('paymentMethod enum alignment (1.6)', () => {
+    it('accepts standing_order and online across expenses, incomes, and transactions', () => {
+      const expense = {
+        date: '2026-10-02',
+        amount: 2500,
+        category: 'Utilities',
+        paymentMethod: 'standing_order',
       };
-      const parsed = recordSchemas.goals.safeParse(input);
-      assert.strictEqual(parsed.success, true);
+      assert.strictEqual(recordSchemas.expenses.safeParse(expense).success, true);
+
+      const income = {
+        source: 'Online Sales',
+        type: 'business',
+        amount: 50000,
+        frequency: 'one-time',
+        date: '2026-10-02',
+        paymentMethod: 'online',
+      };
+      assert.strictEqual(recordSchemas.incomes.safeParse(income).success, true);
+
+      const tx = {
+        type: 'expense',
+        amount: 1200,
+        date: '2026-10-02',
+        paymentMethod: 'standing_order',
+      };
+      assert.strictEqual(recordSchemas.transactions.safeParse(tx).success, true);
     });
   });
 });

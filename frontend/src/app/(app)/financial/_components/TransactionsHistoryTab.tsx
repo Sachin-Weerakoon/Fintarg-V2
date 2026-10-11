@@ -254,6 +254,7 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
             <option value="cheque">Cheque</option>
             <option value="standing_order">Standing Order</option>
             <option value="online">Online</option>
+            <option value="other">Other</option>
           </Select>
           <div className="flex gap-2">
             <Select

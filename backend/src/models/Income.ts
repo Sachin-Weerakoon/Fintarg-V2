@@ -7,7 +7,7 @@ export interface IIncome extends Document {
   amountCents: number;
   frequency: 'monthly' | 'weekly' | 'daily' | 'one-time';
   date: string;
-  paymentMethod: 'cash' | 'card' | 'bank_transfer' | 'cheque' | 'other';
+  paymentMethod: 'cash' | 'card' | 'bank_transfer' | 'cheque' | 'standing_order' | 'online' | 'other';
   bankAccountId?: mongoose.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
@@ -20,7 +20,7 @@ const IncomeSchema = new Schema<IIncome>({
   amountCents: { type: Number, required: true, min: 1 },
   frequency: { type: String, enum: ['monthly', 'weekly', 'daily', 'one-time'], required: true },
   date: { type: String, required: true },
-  paymentMethod: { type: String, enum: ['cash', 'card', 'bank_transfer', 'cheque', 'other'], default: 'cash' },
+  paymentMethod: { type: String, enum: ['cash', 'card', 'bank_transfer', 'cheque', 'standing_order', 'online', 'other'], default: 'cash' },
   bankAccountId: { type: Schema.Types.ObjectId, ref: 'BankAccount', default: null },
 }, { timestamps: true });
 

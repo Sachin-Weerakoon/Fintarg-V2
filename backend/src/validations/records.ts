@@ -48,7 +48,7 @@ export const recordSchemas = {
     date,
     category: z.string().trim().max(80).default('General'),
     description: optionalText,
-    paymentMethod: z.enum(['cash', 'card', 'bank_transfer', 'cheque', 'other']).default('cash'),
+    paymentMethod: z.enum(['cash', 'card', 'bank_transfer', 'cheque', 'standing_order', 'online', 'other']).default('cash'),
     referenceId: z.string().trim().max(120).default(''),
   }),
   incomes: z.object({
@@ -57,7 +57,7 @@ export const recordSchemas = {
     amount: money,
     frequency: z.enum(['monthly', 'weekly', 'daily', 'one-time']),
     date,
-    paymentMethod: z.enum(['cash', 'card', 'bank_transfer', 'cheque', 'other']).default('cash'),
+    paymentMethod: z.enum(['cash', 'card', 'bank_transfer', 'cheque', 'standing_order', 'online', 'other']).default('cash'),
     bankAccountId: z.string().optional().nullable(),
   }),
   expenses: z.object({
@@ -66,7 +66,7 @@ export const recordSchemas = {
     category: z.string().trim().min(1).max(80),
     note: optionalText,
     recurring: z.boolean().default(false),
-    paymentMethod: z.enum(['cash', 'card', 'bank_transfer', 'cheque', 'other']).default('cash'),
+    paymentMethod: z.enum(['cash', 'card', 'bank_transfer', 'cheque', 'standing_order', 'online', 'other']).default('cash'),
     bankAccountId: z.string().optional().nullable(),
     cardId: z.string().optional().nullable(),
   }),
