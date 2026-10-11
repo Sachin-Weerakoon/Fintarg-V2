@@ -1,7 +1,39 @@
 import { z } from 'zod';
 
 const money = z.coerce.number().finite().positive().max(1_000_000_000);
-const date = z.string().trim().min(1).max(32);
+
+const dateRegex = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+const monthRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+export function isValidIsoDate(val: string): boolean {
+  if (!dateRegex.test(val)) return false;
+  const [y, m, d] = val.split('-').map(Number);
+  const dateObj = new Date(Date.UTC(y, m - 1, d));
+  return (
+    dateObj.getUTCFullYear() === y &&
+    dateObj.getUTCMonth() === m - 1 &&
+    dateObj.getUTCDate() === d
+  );
+}
+
+export function isValidIsoMonth(val: string): boolean {
+  return monthRegex.test(val);
+}
+
+export const isoDateSchema = z.string().trim().refine(isValidIsoDate, {
+  message: 'Must be a valid calendar date in YYYY-MM-DD format',
+});
+
+export const optionalIsoDateSchema = z.string().trim().refine(
+  val => !val || isValidIsoDate(val),
+  { message: 'Must be a valid calendar date in YYYY-MM-DD format or empty' },
+);
+
+export const isoMonthSchema = z.string().trim().refine(isValidIsoMonth, {
+  message: 'Must be a valid month in YYYY-MM format',
+});
+
+const date = isoDateSchema;
 const optionalText = z.string().trim().max(2000).default('');
 
 export const recordSchemas = {
@@ -90,15 +122,15 @@ export const recordSchemas = {
     interestBasis: z.enum(['annual', 'monthly']).default('annual'),
     tenureMonths: z.coerce.number().int().min(1).max(600).default(12),
     startDate: date,
-    dueDate: z.string().trim().max(32).default(''),
+    dueDate: optionalIsoDateSchema.default(''),
   }),
-  pawnedItems: z.object({ description: z.string().trim().min(1).max(500), amountReceived: money, interestRate: z.coerce.number().min(0).max(1000), nextDue: date, redemptionDate: z.string().trim().max(32).default('') }),
+  pawnedItems: z.object({ description: z.string().trim().min(1).max(500), amountReceived: money, interestRate: z.coerce.number().min(0).max(1000), nextDue: date, redemptionDate: optionalIsoDateSchema.default('') }),
   goals: z.object({
     name: z.string().trim().min(1).max(120),
     dailyAmount: z.coerce.number().finite().min(0).max(1_000_000_000).optional(),
     targetAmount: z.coerce.number().finite().min(0).max(1_000_000_000).optional(),
-    targetDate: z.string().trim().max(32).optional(),
-    endDate: z.string().trim().max(32).optional().default(''),
+    targetDate: optionalIsoDateSchema.optional(),
+    endDate: optionalIsoDateSchema.optional().default(''),
   }),
   medicalExpenses: z.object({ date, type: z.string().trim().min(1).max(120), amount: money, note: optionalText }),
   reminders: z.object({ type: z.enum(['finance', 'loan', 'pawn', 'agreement', 'appointment', 'custom']), relatedId: z.string().default(''), label: z.string().trim().min(1).max(180), dueDate: date, channel: z.enum(['email', 'in-app']).default('in-app') }),
@@ -108,18 +140,18 @@ export const recordSchemas = {
     contact: z.string().max(120).default(''),
     logo: z.string().max(1000).default(''),
     businessType: z.string().max(120).default(''),
-    openingDate: z.string().max(32).default(''),
+    openingDate: optionalIsoDateSchema.default(''),
     brNumber: z.string().max(60).default(''),
     tinNumber: z.string().max(60).default(''),
     entityType: z.string().max(60).default(''),
     sector: z.string().max(120).default(''),
     email: z.string().max(120).default(''),
   }),
-  businessBranches: z.object({ companyId: z.string().min(1), name: z.string().trim().min(1).max(160), location: z.string().max(300).default(''), branchType: z.string().max(120).default(''), openingDate: z.string().max(32).default(''), logo: z.string().max(1000).default(''), monthlyTarget: z.coerce.number().min(0), annualTarget: z.coerce.number().min(0), entries: z.array(z.object({ id: z.string().optional(), date, type: z.enum(['revenue', 'utility', 'other-cost']), category: z.string().max(120), amount: money, note: optionalText })).default([]) }),
+  businessBranches: z.object({ companyId: z.string().min(1), name: z.string().trim().min(1).max(160), location: z.string().max(300).default(''), branchType: z.string().max(120).default(''), openingDate: optionalIsoDateSchema.default(''), logo: z.string().max(1000).default(''), monthlyTarget: z.coerce.number().min(0), annualTarget: z.coerce.number().min(0), entries: z.array(z.object({ id: z.string().optional(), date, type: z.enum(['revenue', 'utility', 'other-cost']), category: z.string().max(120), amount: money, note: optionalText })).default([]) }),
   branchEntries: z.object({ branchId: z.string().min(1), date, type: z.enum(['revenue', 'utility', 'other-cost']), category: z.string().trim().min(1).max(120), amount: money, note: optionalText }),
   employmentProfiles: z.object({ employer: z.string().trim().min(1).max(180), role: z.string().max(180).default(''), monthlyGross: money, payday: z.coerce.number().int().min(1).max(31), monthlyDeductions: z.coerce.number().min(0), monthlySavingsTarget: z.coerce.number().min(0), careerGoal: z.string().max(1000).default('') }),
   ownerDraws: z.object({ companyId: z.string().min(1), amount: money, date }),
-  agreements: z.object({ title: z.string().trim().min(1).max(180), otherParty: z.string().trim().min(1).max(180), startDate: z.string().max(32).default(''), endDate: z.string().max(32).default(''), value: z.coerce.number().min(0).default(0), summary: optionalText, status: z.enum(['draft', 'active', 'expired']), fileName: z.string().max(255).default('') }),
+  agreements: z.object({ title: z.string().trim().min(1).max(180), otherParty: z.string().trim().min(1).max(180), startDate: optionalIsoDateSchema.default(''), endDate: optionalIsoDateSchema.default(''), value: z.coerce.number().min(0).default(0), summary: optionalText, status: z.enum(['draft', 'active', 'expired']), fileName: z.string().max(255).default('') }),
   letters: z.object({ type: z.enum(['bank', 'offer', 'general']), mode: z.enum(['personal', 'business']), date, addressedTo: z.string().max(180).default(''), purpose: z.string().max(500).default(''), body: z.string().trim().min(1).max(20000), companyId: z.string().optional() }),
   documents: z.object({ type: z.enum(['profile-picture', 'cv', 'nic-front', 'nic-back', 'bank', 'other']), label: z.string().trim().min(1).max(120), uploadDate: date, note: optionalText, fileName: z.string().trim().min(1).max(255), fileId: z.string().optional() }),
 } as const;

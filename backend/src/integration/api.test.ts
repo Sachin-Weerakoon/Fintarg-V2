@@ -425,6 +425,25 @@ describe('Backend API Integration Tests', () => {
       const updatedData = await getRes2.json();
       assert.strictEqual(updatedData.budget, 75000);
     });
+
+    it('rejects invalid month format on GET and PUT /api/profile/personal-budget (1.8)', async () => {
+      // 1. Invalid month on GET
+      const getBadRes = await fetch(`${baseUrl}/api/profile/personal-budget?month=not-a-month`, {
+        headers: { Cookie: authCookie },
+      });
+      assert.strictEqual(getBadRes.status, 400);
+
+      // 2. Invalid month on PUT
+      const putBadRes = await fetch(`${baseUrl}/api/profile/personal-budget`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: authCookie,
+        },
+        body: JSON.stringify({ budget: 50000, month: '2026-13' }),
+      });
+      assert.strictEqual(putBadRes.status, 400);
+    });
   });
 
   describe('Stage 3: Backend Data Model (Phase 1)', () => {

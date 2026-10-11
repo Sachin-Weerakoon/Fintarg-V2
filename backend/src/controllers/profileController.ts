@@ -6,11 +6,12 @@ import { ProfileModel } from '../models/Profile';
 import { PersonalBudgetModel } from '../models/PersonalBudget';
 import { UserModel } from '../models/User';
 import { asyncHandler } from '../utils/asyncHandler';
+import { isoMonthSchema, optionalIsoDateSchema } from '../validations/records';
 
 const profileSchema = z.object({
   name: z.string().trim().max(120).optional(),
   address: z.string().max(500).optional(),
-  dateOfBirth: z.string().max(32).optional(),
+  dateOfBirth: optionalIsoDateSchema.optional(),
   nicNumber: z.string().max(24).optional(),
   portfolioLink: z.string().max(500).optional(),
   mobile: z.string().max(32).optional(),
@@ -45,16 +46,21 @@ export const updateProfile: RequestHandler = asyncHandler(async (request, respon
 export const getPersonalBudget: RequestHandler = asyncHandler(async (request, response) => {
   const userId = request.auth?.userId;
   if (!userId) throw new HttpError(401, 'Authentication required');
-  const month = (request.query.month as string) || new Date().toISOString().slice(0, 7);
+  const monthParam = (request.query.month as string) || new Date().toISOString().slice(0, 7);
+  const month = isoMonthSchema.parse(monthParam);
   const record = await PersonalBudgetModel.findOne({ userId: new mongoose.Types.ObjectId(userId), month });
   response.json({ budget: record ? record.budgetCents / 100 : 0 });
+});
+
+const setBudgetSchema = z.object({
+  budget: z.coerce.number().finite().min(0).max(1_000_000_000),
+  month: isoMonthSchema.optional().default(() => new Date().toISOString().slice(0, 7)),
 });
 
 export const setPersonalBudget: RequestHandler = asyncHandler(async (request, response) => {
   const userId = request.auth?.userId;
   if (!userId) throw new HttpError(401, 'Authentication required');
-  const { budget } = z.object({ budget: z.coerce.number().finite().min(0).max(1_000_000_000) }).parse(request.body);
-  const month = (request.body.month as string) || new Date().toISOString().slice(0, 7);
+  const { budget, month } = setBudgetSchema.parse(request.body);
   const record = await PersonalBudgetModel.findOneAndUpdate(
     { userId: new mongoose.Types.ObjectId(userId), month },
     { $set: { budgetCents: Math.round(budget * 100) } },
