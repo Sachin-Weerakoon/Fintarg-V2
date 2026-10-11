@@ -47,4 +47,26 @@ describe('Shared Loan Maths (Test Vectors & Verification)', () => {
     // Ending balance on last month should be 0
     assert.strictEqual(schedule[11].balance, 0);
   });
+
+  it('supports monthly interestBasis with rate * 12 equivalence', () => {
+    // 1% per month = 12% per year
+    const monthlyLoan = calculateLoan(100_000, 1, 12, 'reducing_balance', 'monthly');
+    assert.strictEqual(monthlyLoan.monthlyPayment, 8884.88);
+    assert.strictEqual(monthlyLoan.totalInterest, 6618.55);
+
+    const simpleMonthly = calculateLoan(100_000, 1, 12, 'simple', 'monthly');
+    assert.strictEqual(simpleMonthly.totalInterest, 12000);
+
+    const schedule = calculateAmortizationSchedule(100_000, 1, 12, 'monthly');
+    assert.strictEqual(schedule.length, 12);
+    assert.strictEqual(schedule[0].payment, 8884.88);
+    assert.strictEqual(schedule[11].balance, 0);
+  });
+
+  it('treats compound and reducing_balance methods equivalently for installment loan math', () => {
+    const compoundLoan = calculateLoan(100_000, 12, 12, 'compound');
+    const reducingLoan = calculateLoan(100_000, 12, 12, 'reducing_balance');
+    assert.strictEqual(compoundLoan.monthlyPayment, reducingLoan.monthlyPayment);
+    assert.strictEqual(compoundLoan.totalInterest, reducingLoan.totalInterest);
+  });
 });

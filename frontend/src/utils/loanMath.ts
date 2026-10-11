@@ -57,17 +57,19 @@ export function calculateLoan(
   principal: number,
   annualRatePercent: number,
   tenureMonths: number,
-  method: 'reducing_balance' | 'compound' | 'simple' = 'reducing_balance'
+  method: 'reducing_balance' | 'compound' | 'simple' = 'reducing_balance',
+  interestBasis: 'monthly' | 'annual' = 'annual'
 ): LoanCalculationResult {
+  const effectiveAnnualRate = interestBasis === 'monthly' ? annualRatePercent * 12 : annualRatePercent;
   if (method === 'simple') {
-    const totalInterest = calculateSimpleInterest(principal, annualRatePercent, tenureMonths);
+    const totalInterest = calculateSimpleInterest(principal, effectiveAnnualRate, tenureMonths);
     const totalPayment = principal + totalInterest;
     const monthlyPayment = tenureMonths > 0 ? Math.round((totalPayment / tenureMonths) * 100) / 100 : totalPayment;
     return { monthlyPayment, totalInterest, totalPayment };
   }
 
-  const monthlyPayment = calculateEMI(principal, annualRatePercent, tenureMonths);
-  const totalInterest = calculateTotalInterest(principal, annualRatePercent, tenureMonths);
+  const monthlyPayment = calculateEMI(principal, effectiveAnnualRate, tenureMonths);
+  const totalInterest = calculateTotalInterest(principal, effectiveAnnualRate, tenureMonths);
   const totalPayment = Math.round((principal + totalInterest) * 100) / 100;
   return { monthlyPayment, totalInterest, totalPayment };
 }
@@ -78,13 +80,15 @@ export function calculateLoan(
 export function calculateAmortizationSchedule(
   principal: number,
   annualRatePercent: number,
-  tenureMonths: number
+  tenureMonths: number,
+  interestBasis: 'monthly' | 'annual' = 'annual'
 ): AmortizationRow[] {
   const schedule: AmortizationRow[] = [];
   if (tenureMonths <= 0) return schedule;
 
-  const monthlyRate = (annualRatePercent / 100) / 12;
-  const emi = calculateEMI(principal, annualRatePercent, tenureMonths);
+  const effectiveAnnualRate = interestBasis === 'monthly' ? annualRatePercent * 12 : annualRatePercent;
+  const monthlyRate = (effectiveAnnualRate / 100) / 12;
+  const emi = calculateEMI(principal, effectiveAnnualRate, tenureMonths);
   let balance = principal;
 
   for (let m = 1; m <= tenureMonths; m++) {

@@ -152,6 +152,8 @@ type Action =
   | { type: 'ADD_FINANCE_PAYMENT'; entry: FinancePayment }
   | { type: 'UPDATE_FINANCE_PAYMENT'; entry: FinancePayment }
   | { type: 'DELETE_FINANCE_PAYMENT'; id: string }
+  | { type: 'MARK_FINANCE_PAYMENT_PAID'; id: string; amount?: number; paymentMethod?: string; bankAccountId?: string | null; date?: string; note?: string }
+  | { type: 'DELETE_FINANCE_PAYMENT_PAYMENT'; id: string; paymentId: string }
   | { type: 'ADD_BANK_ACCOUNT'; entry: BankAccount }
   | { type: 'UPDATE_BANK_ACCOUNT'; entry: BankAccount }
   | { type: 'DELETE_BANK_ACCOUNT'; id: string }
@@ -160,17 +162,22 @@ type Action =
   | { type: 'DELETE_CARD'; id: string }
   | { type: 'ADD_TRANSACTION'; entry: Transaction }
   | { type: 'DELETE_TRANSACTION'; id: string }
+  | { type: 'TRANSFER_FUNDS'; fromAccountId?: string | null; fromCardId?: string | null; toAccountId?: string | null; toCardId?: string | null; amount: number; date: string; description?: string; category?: string }
+  | { type: 'DELETE_TRANSFER'; transferGroupId: string }
   | { type: 'ADD_LOAN'; entry: Loan }
   | { type: 'UPDATE_LOAN'; entry: Loan }
-  | { type: 'RECORD_LOAN_REPAYMENT'; id: string; amount: number; note?: string; date?: string }
+  | { type: 'RECORD_LOAN_REPAYMENT'; id: string; amount: number; note?: string; date?: string; paymentMethod?: string; bankAccountId?: string | null }
+  | { type: 'DELETE_LOAN_REPAYMENT'; id: string; repaymentId: string }
   | { type: 'DELETE_LOAN'; id: string }
   | { type: 'ADD_PAWNED'; entry: PawnedItem }
-  | { type: 'RECORD_PAWN_PAYMENT'; id: string }
+  | { type: 'RECORD_PAWN_PAYMENT'; id: string; amount?: number; paymentType?: 'interest' | 'part_principal' | 'redemption'; paymentMethod?: string; bankAccountId?: string | null; date?: string; note?: string }
+  | { type: 'DELETE_PAWN_PAYMENT'; id: string; paymentId: string }
   | { type: 'DELETE_PAWNED'; id: string }
   | { type: 'ADD_GOAL'; entry: SavingsGoal }
   | { type: 'UPDATE_GOAL'; id: string; dailyAmount?: number; monthlyTarget?: number; targetAmount?: number; targetDate?: string; savedAmount?: number }
   | { type: 'DELETE_GOAL'; id: string }
-  | { type: 'ADD_SAVING_CONTRIBUTION'; goalId: string; amount: number; date: string; note?: string }
+  | { type: 'ADD_SAVING_CONTRIBUTION'; goalId: string; amount: number; date: string; note?: string; debitAccount?: boolean; paymentMethod?: string; bankAccountId?: string | null }
+  | { type: 'DELETE_SAVING_CONTRIBUTION'; goalId: string; contributionId: string }
   | { type: 'SET_PERSONAL_SPENDING_BUDGET'; budget: number }
   | { type: 'ADD_LETTER'; entry: Letter }
   | { type: 'DELETE_LETTER'; id: string }
@@ -221,6 +228,74 @@ function reducer(state: AppState, action: Action): AppState {
     case 'ADD_FINANCE_PAYMENT': return { ...state, financePayments: [...state.financePayments, action.entry] };
     case 'UPDATE_FINANCE_PAYMENT': return { ...state, financePayments: state.financePayments.map(f => f.id === action.entry.id ? action.entry : f) };
     case 'DELETE_FINANCE_PAYMENT': return { ...state, financePayments: state.financePayments.filter(f => f.id !== action.id) };
+    case 'MARK_FINANCE_PAYMENT_PAID': {
+      const fp = state.financePayments.find(f => f.id === action.id);
+      if (!fp) return state;
+      const paymentDate = action.date || new Date().toISOString().slice(0, 10);
+      const payAmount = action.amount !== undefined ? action.amount : fp.amount;
+      const newMonths = Math.max(0, (fp.monthsRemaining || 1) - 1);
+      const newStatus = newMonths === 0 ? 'completed' : fp.status || 'active';
+
+      let nextDue = fp.nextDueDate;
+      if (nextDue) {
+        const d = new Date(`${nextDue}T00:00:00.000Z`);
+        d.setUTCMonth(d.getUTCMonth() + 1);
+        nextDue = d.toISOString().slice(0, 10);
+      } else {
+        const d = new Date();
+        d.setMonth(d.getMonth() + 1);
+        d.setDate(fp.dueDay || 1);
+        nextDue = d.toISOString().slice(0, 10);
+      }
+
+      return {
+        ...state,
+        financePayments: state.financePayments.map(f => f.id === action.id ? {
+          ...f,
+          monthsRemaining: newMonths,
+          status: newStatus,
+          nextDueDate: nextDue,
+          payments: [
+            ...(f.payments || []),
+            {
+              date: paymentDate,
+              amount: payAmount,
+              paymentMethod: action.paymentMethod || 'bank_transfer',
+              bankAccountId: action.bankAccountId,
+              note: action.note,
+            },
+          ],
+        } : f),
+      };
+    }
+    case 'DELETE_FINANCE_PAYMENT_PAYMENT': {
+      return {
+        ...state,
+        financePayments: state.financePayments.map(f => {
+          if (f.id !== action.id) return f;
+          const target = (f.payments || []).find(p => (p.id || p._id) === action.paymentId);
+          const payments = (f.payments || []).filter(p => (p.id || p._id) !== action.paymentId);
+          if (!target) return { ...f, payments };
+
+          const newMonths = (f.monthsRemaining || 0) + 1;
+          const newStatus = f.status === 'completed' ? 'active' : f.status;
+          let nextDue = f.nextDueDate;
+          if (nextDue) {
+            const d = new Date(`${nextDue}T00:00:00.000Z`);
+            d.setUTCMonth(d.getUTCMonth() - 1);
+            nextDue = d.toISOString().slice(0, 10);
+          }
+
+          return {
+            ...f,
+            monthsRemaining: newMonths,
+            status: newStatus,
+            nextDueDate: nextDue,
+            payments,
+          };
+        }),
+      };
+    }
     case 'ADD_BANK_ACCOUNT': return { ...state, bankAccounts: [...state.bankAccounts, action.entry] };
     case 'UPDATE_BANK_ACCOUNT': return { ...state, bankAccounts: state.bankAccounts.map(b => b.id === action.entry.id ? action.entry : b) };
     case 'DELETE_BANK_ACCOUNT': return { ...state, bankAccounts: state.bankAccounts.filter(b => b.id !== action.id) };
@@ -229,6 +304,40 @@ function reducer(state: AppState, action: Action): AppState {
     case 'DELETE_CARD': return { ...state, cards: state.cards.filter(c => c.id !== action.id) };
     case 'ADD_TRANSACTION': return { ...state, transactions: [action.entry, ...state.transactions] };
     case 'DELETE_TRANSACTION': return { ...state, transactions: state.transactions.filter(t => t.id !== action.id) };
+    case 'TRANSFER_FUNDS': {
+      let updatedAccounts = state.bankAccounts;
+      let updatedCards = state.cards;
+
+      if (action.fromAccountId) {
+        updatedAccounts = updatedAccounts.map(a =>
+          a.id === action.fromAccountId ? { ...a, currentBalance: (a.currentBalance || 0) - action.amount } : a
+        );
+      } else if (action.fromCardId) {
+        updatedCards = updatedCards.map(c =>
+          c.id === action.fromCardId ? { ...c, currentBalance: (c.currentBalance || 0) + action.amount } : c
+        );
+      }
+
+      if (action.toAccountId) {
+        updatedAccounts = updatedAccounts.map(a =>
+          a.id === action.toAccountId ? { ...a, currentBalance: (a.currentBalance || 0) + action.amount } : a
+        );
+      } else if (action.toCardId) {
+        updatedCards = updatedCards.map(c =>
+          c.id === action.toCardId ? { ...c, currentBalance: Math.max(0, (c.currentBalance || 0) - action.amount) } : c
+        );
+      }
+
+      return {
+        ...state,
+        bankAccounts: updatedAccounts,
+        cards: updatedCards,
+      };
+    }
+    case 'DELETE_TRANSFER': return {
+      ...state,
+      transactions: state.transactions.filter(t => t.transferGroupId !== action.transferGroupId),
+    };
     case 'ADD_LOAN': return { ...state, loans: [...state.loans, action.entry] };
     case 'UPDATE_LOAN': return { ...state, loans: state.loans.map(l => l.id === action.entry.id ? action.entry : l) };
     case 'RECORD_LOAN_REPAYMENT': return {
@@ -238,21 +347,127 @@ function reducer(state: AppState, action: Action): AppState {
         balance: Math.max(0, l.balance - action.amount),
         repayments: [
           ...(l.repayments || []),
-          { date: action.date || new Date().toISOString().slice(0, 10), amount: action.amount, note: action.note },
+          {
+            date: action.date || new Date().toISOString().slice(0, 10),
+            amount: action.amount,
+            note: action.note,
+            paymentMethod: action.paymentMethod || 'cash',
+            bankAccountId: action.bankAccountId,
+          },
         ],
       } : l),
+    };
+    case 'DELETE_LOAN_REPAYMENT': return {
+      ...state,
+      loans: state.loans.map(l => {
+        if (l.id !== action.id) return l;
+        const reps = (l.repayments || []).filter(r => (r.id || r._id) !== action.repaymentId);
+        const totalRepaid = reps.reduce((sum, r) => sum + r.amount, 0);
+        return {
+          ...l,
+          balance: Math.max(0, l.principal - totalRepaid),
+          repayments: reps,
+        };
+      }),
     };
     case 'DELETE_LOAN': return { ...state, loans: state.loans.filter(l => l.id !== action.id) };
     case 'ADD_PAWNED': return { ...state, pawnedItems: [...state.pawnedItems, action.entry] };
     case 'RECORD_PAWN_PAYMENT': {
       const p = state.pawnedItems.find(pi => pi.id === action.id);
       if (!p) return state;
-      const nextDate = new Date(p.nextDue);
-      nextDate.setMonth(nextDate.getMonth() + 1);
+      const pType = action.paymentType || 'interest';
+      const paymentDate = action.date || new Date().toISOString().slice(0, 10);
+      const currentPrincipal = p.principalOutstanding !== undefined ? p.principalOutstanding : p.amountReceived;
+      let payAmount = action.amount;
+      if (!payAmount) {
+        if (pType === 'interest') payAmount = Math.max(1, Math.round(currentPrincipal * (p.interestRate / 100) / 12));
+        else if (pType === 'redemption') payAmount = currentPrincipal;
+        else payAmount = 0;
+      }
+      let newNextDue = p.nextDue;
+      let newInterestPaid = p.interestPaid || 0;
+      let newPrincipalOutstanding = currentPrincipal;
+      let newStatus = p.status || 'active';
+      let newRedemptionDate = p.redemptionDate;
+
+      if (pType === 'interest') {
+        newInterestPaid += payAmount;
+        const nextDate = new Date(`${p.nextDue}T00:00:00.000Z`);
+        nextDate.setUTCMonth(nextDate.getUTCMonth() + 1);
+        newNextDue = nextDate.toISOString().slice(0, 10);
+      } else if (pType === 'part_principal') {
+        newPrincipalOutstanding = Math.max(0, currentPrincipal - payAmount);
+        if (newPrincipalOutstanding === 0) {
+          newStatus = 'redeemed';
+          newRedemptionDate = paymentDate;
+        }
+      } else if (pType === 'redemption') {
+        newPrincipalOutstanding = 0;
+        newStatus = 'redeemed';
+        newRedemptionDate = paymentDate;
+      }
+
       return {
         ...state,
-        pawnedItems: state.pawnedItems.map(pi => pi.id === action.id
-          ? { ...pi, nextDue: nextDate.toISOString().slice(0, 10) } : pi),
+        pawnedItems: state.pawnedItems.map(pi => pi.id === action.id ? {
+          ...pi,
+          nextDue: newNextDue,
+          interestPaid: newInterestPaid,
+          principalOutstanding: newPrincipalOutstanding,
+          status: newStatus,
+          redemptionDate: newRedemptionDate,
+          payments: [
+            ...(pi.payments || []),
+            {
+              date: paymentDate,
+              amount: payAmount,
+              paymentType: pType,
+              paymentMethod: action.paymentMethod || 'cash',
+              bankAccountId: action.bankAccountId,
+              note: action.note,
+            },
+          ],
+        } : pi),
+      };
+    }
+    case 'DELETE_PAWN_PAYMENT': {
+      return {
+        ...state,
+        pawnedItems: state.pawnedItems.map(pi => {
+          if (pi.id !== action.id) return pi;
+          const target = (pi.payments || []).find(p => (p.id || p._id) === action.paymentId);
+          const payments = (pi.payments || []).filter(p => (p.id || p._id) !== action.paymentId);
+          if (!target) return { ...pi, payments };
+
+          let nextDue = pi.nextDue;
+          let interestPaid = pi.interestPaid || 0;
+          let principalOutstanding = pi.principalOutstanding !== undefined ? pi.principalOutstanding : pi.amountReceived;
+          let status = pi.status || 'active';
+          let redemptionDate = pi.redemptionDate;
+
+          if (target.paymentType === 'interest') {
+            interestPaid = Math.max(0, interestPaid - target.amount);
+            const dueDate = new Date(`${pi.nextDue}T00:00:00.000Z`);
+            dueDate.setUTCMonth(dueDate.getUTCMonth() - 1);
+            nextDue = dueDate.toISOString().slice(0, 10);
+          } else if (target.paymentType === 'part_principal' || target.paymentType === 'redemption') {
+            principalOutstanding = principalOutstanding + target.amount;
+            if (status === 'redeemed' && principalOutstanding > 0) {
+              status = 'active';
+              redemptionDate = '';
+            }
+          }
+
+          return {
+            ...pi,
+            nextDue,
+            interestPaid,
+            principalOutstanding,
+            status,
+            redemptionDate,
+            payments,
+          };
+        }),
       };
     }
     case 'DELETE_PAWNED': return { ...state, pawnedItems: state.pawnedItems.filter(p => p.id !== action.id) };
@@ -276,9 +491,32 @@ function reducer(state: AppState, action: Action): AppState {
         ? {
             ...g,
             savedAmount: g.savedAmount + action.amount,
-            contributions: [...(g.contributions || []), { date: action.date, amount: action.amount, note: action.note }],
+            contributions: [
+              ...(g.contributions || []),
+              {
+                date: action.date,
+                amount: action.amount,
+                note: action.note,
+                paymentMethod: action.debitAccount ? (action.paymentMethod || 'cash') : undefined,
+                bankAccountId: action.bankAccountId,
+              },
+            ],
           }
         : g),
+    };
+    case 'DELETE_SAVING_CONTRIBUTION': return {
+      ...state,
+      savingsGoals: state.savingsGoals.map(g => {
+        if (g.id !== action.goalId) return g;
+        const target = (g.contributions || []).find(c => (c.id || c._id) === action.contributionId);
+        const contributions = (g.contributions || []).filter(c => (c.id || c._id) !== action.contributionId);
+        const savedAmount = target ? Math.max(0, g.savedAmount - target.amount) : g.savedAmount;
+        return {
+          ...g,
+          savedAmount,
+          contributions,
+        };
+      }),
     };
     case 'SET_PERSONAL_SPENDING_BUDGET': return { ...state, personalSpendingBudget: action.budget };
     case 'ADD_LETTER': return { ...state, letters: [...state.letters, action.entry] };

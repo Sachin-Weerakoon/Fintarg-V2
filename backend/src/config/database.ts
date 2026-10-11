@@ -1,10 +1,9 @@
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { env } from './env';
 import { logger } from './logger';
 
 let connection: Promise<typeof mongoose> | null = null;
-let memoryServer: MongoMemoryServer | null = null;
+let memoryServer: { getUri: () => string; stop: () => Promise<boolean> } | null = null;
 
 async function connectWithFallback(): Promise<typeof mongoose> {
   try {
@@ -23,6 +22,7 @@ async function connectWithFallback(): Promise<typeof mongoose> {
     if (!shouldFallback) throw error;
 
     if (!memoryServer) {
+      const { MongoMemoryServer } = await import('mongodb-memory-server');
       memoryServer = await MongoMemoryServer.create({ binary: { version: '7.0.14' } });
     }
 
@@ -34,8 +34,19 @@ async function connectWithFallback(): Promise<typeof mongoose> {
   }
 }
 
+let listenerAttached = false;
+
+function ensureConnectionListener(): void {
+  if (listenerAttached) return;
+  listenerAttached = true;
+  mongoose.connection.on('connected', () => {
+    logger.info({ database: mongoose.connection.name }, 'MongoDB connected');
+  });
+}
+
 export async function connectDatabase(): Promise<void> {
   mongoose.set('strictQuery', true);
+  ensureConnectionListener();
   if (mongoose.connection.readyState !== 1) {
     connection ??= connectWithFallback().catch(error => {
       connection = null;
@@ -43,5 +54,4 @@ export async function connectDatabase(): Promise<void> {
     });
     await connection;
   }
-  logger.info({ database: mongoose.connection.name }, 'MongoDB connected');
 }

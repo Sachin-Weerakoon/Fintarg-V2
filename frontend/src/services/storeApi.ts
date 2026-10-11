@@ -84,13 +84,24 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
       lender: row.lender,
       amount: (row.amountCents || 0) / 100,
       dueDay: row.dueDay,
+      nextDueDate: row.nextDueDate || '',
       monthsRemaining: row.monthsRemaining,
       paymentKind: row.paymentKind,
       chequeNumber: row.chequeNumber,
-      bankAccountId: row.bankAccountId,
+      bankAccountId: row.bankAccountId ? String(row.bankAccountId) : undefined,
       payee: row.payee,
       frequency: row.frequency,
       status: row.status,
+      payments: (row.payments || []).map((p: RawRecord) => ({
+        id: p._id,
+        _id: p._id,
+        date: p.date,
+        amount: (p.amountCents || 0) / 100,
+        paymentMethod: p.paymentMethod || 'bank_transfer',
+        bankAccountId: p.bankAccountId ? String(p.bankAccountId) : null,
+        transactionId: p.transactionId ? String(p.transactionId) : null,
+        note: p.note,
+      })),
     })),
     loans: loans.map(row => ({
       id: row._id,
@@ -106,9 +117,16 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
       monthlyPayment: row.monthlyPaymentCents ? row.monthlyPaymentCents / 100 : undefined,
       totalInterest: row.totalInterestCents ? row.totalInterestCents / 100 : undefined,
       repayments: (row.repayments || []).map((r: RawRecord) => ({
+        id: r._id,
+        _id: r._id,
         date: r.date,
         amount: (r.amountCents || 0) / 100,
+        principal: (r.principalCents || 0) / 100,
+        interest: (r.interestCents || 0) / 100,
         note: r.note,
+        paymentMethod: r.paymentMethod,
+        bankAccountId: r.bankAccountId,
+        transactionId: r.transactionId,
       })),
     })),
     bankAccounts: bankAccounts.map(row => ({
@@ -121,6 +139,7 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
       swiftCode: row.swiftCode || '',
       accountType: row.accountType || 'savings',
       currentBalance: (row.currentBalanceCents ?? row.balanceCents ?? 0) / 100,
+      openingBalance: (row.openingBalanceCents ?? row.balanceCents ?? 0) / 100,
       currency: row.currency || 'LKR',
       notes: row.notes || '',
     })),
@@ -158,10 +177,25 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
     pawnedItems: pawnedItems.map(row => ({
       id: row._id,
       description: row.description,
+      ticketNumber: row.ticketNumber || '',
+      status: row.status || 'active',
       amountReceived: (row.amountReceivedCents || 0) / 100,
+      principalOutstanding: (row.principalOutstandingCents ?? row.amountReceivedCents ?? 0) / 100,
+      interestPaid: (row.interestPaidCents || 0) / 100,
       interestRate: row.interestRatePercent,
       nextDue: row.nextDue,
       redemptionDate: row.redemptionDate,
+      payments: (row.payments || []).map((p: RawRecord) => ({
+        id: p._id,
+        _id: p._id,
+        date: p.date,
+        amount: (p.amountCents || 0) / 100,
+        paymentType: p.paymentType || 'interest',
+        paymentMethod: p.paymentMethod || 'cash',
+        bankAccountId: p.bankAccountId,
+        transactionId: p.transactionId,
+        note: p.note,
+      })),
     })),
     savingsGoals: savingsGoals.map(row => ({
       id: row._id,
@@ -173,8 +207,13 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
       targetAmount: row.targetAmountCents ? row.targetAmountCents / 100 : undefined,
       targetDate: row.targetDate,
       contributions: (row.contributions || []).map((item: RawRecord) => ({
+        id: item._id,
+        _id: item._id,
         date: item.date,
         amount: (item.amountCents || 0) / 100,
+        paymentMethod: item.paymentMethod || undefined,
+        bankAccountId: item.bankAccountId ? String(item.bankAccountId) : undefined,
+        transactionId: item.transactionId ? String(item.transactionId) : undefined,
         note: item.note,
       })),
     })),
@@ -302,6 +341,16 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
       return void (await send(`/api/backend/records/financePayments/${id}`, 'PATCH', action.entry));
     case 'DELETE_FINANCE_PAYMENT':
       return void (await send(`/api/backend/records/financePayments/${id}`, 'DELETE'));
+    case 'MARK_FINANCE_PAYMENT_PAID':
+      return void (await send(`/api/backend/records/financePayments/${id}/pay`, 'POST', {
+        amount: action.amount,
+        paymentMethod: action.paymentMethod,
+        bankAccountId: action.bankAccountId,
+        date: action.date,
+        note: action.note,
+      }));
+    case 'DELETE_FINANCE_PAYMENT_PAYMENT':
+      return void (await send(`/api/backend/records/financePayments/${id}/payments/${action.paymentId}`, 'DELETE'));
 
     case 'ADD_BANK_ACCOUNT':
       return create('/api/backend/records/bankAccounts', {
@@ -313,6 +362,7 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
         branchCode: action.entry.branchCode || '',
         swiftCode: action.entry.swiftCode || '',
         accountType: action.entry.accountType === 'checking' ? 'current' : action.entry.accountType || 'savings',
+        openingBalance: Number(action.entry.openingBalance ?? action.entry.currentBalance ?? 0),
         balance: Number(action.entry.currentBalance || 0),
         currentBalance: Number(action.entry.currentBalance || 0),
         currency: action.entry.currency || 'LKR',
@@ -329,8 +379,6 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
         branchCode: action.entry.branchCode || '',
         swiftCode: action.entry.swiftCode || '',
         accountType: action.entry.accountType === 'checking' ? 'current' : action.entry.accountType || 'savings',
-        balance: Number(action.entry.currentBalance || 0),
-        currentBalance: Number(action.entry.currentBalance || 0),
         currency: action.entry.currency || 'LKR',
         notes: action.entry.notes || '',
       }));
@@ -379,35 +427,77 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
     case 'DELETE_TRANSACTION':
       return void (await send(`/api/backend/records/transactions/${id}`, 'DELETE'));
 
-    case 'ADD_LOAN':
-      return create('/api/backend/records/loans', {
+    case 'TRANSFER_FUNDS': {
+      const res = await send('/api/backend/records/transfers', 'POST', {
+        fromAccountId: action.fromAccountId,
+        fromCardId: action.fromCardId,
+        toAccountId: action.toAccountId,
+        toCardId: action.toCardId,
+        amount: action.amount,
+        date: action.date,
+        description: action.description,
+        category: action.category,
+      });
+      return (res as any)?.data?.transferGroupId;
+    }
+    case 'DELETE_TRANSFER':
+      return void (await send(`/api/backend/records/transfers/${action.transferGroupId}`, 'DELETE'));
+
+    case 'ADD_LOAN': {
+      const payload: Record<string, any> = {
         lender: action.entry.lender,
-        amount: action.entry.principal,
+        amount: action.entry.amount !== undefined ? action.entry.amount : action.entry.principal,
         rate: action.entry.rate,
         method: action.entry.method,
         startDate: action.entry.startDate,
         dueDate: action.entry.dueDate,
-        interestBasis: action.entry.interestBasis,
-        tenureMonths: action.entry.tenureMonths,
-        monthlyPayment: action.entry.monthlyPayment,
-        totalInterest: action.entry.totalInterest,
-      });
-    case 'UPDATE_LOAN':
-      return void (await send(`/api/backend/records/loans/${id}`, 'PATCH', action.entry));
+      };
+      if (action.entry.interestBasis) payload.interestBasis = action.entry.interestBasis;
+      if (action.entry.tenureMonths) payload.tenureMonths = action.entry.tenureMonths;
+      return create('/api/backend/records/loans', payload);
+    }
+    case 'UPDATE_LOAN': {
+      const payload: Record<string, any> = {};
+      const src = action.entry || {};
+      if (src.lender !== undefined) payload.lender = src.lender;
+      if (src.amount !== undefined) payload.amount = src.amount;
+      else if (src.principal !== undefined) payload.amount = src.principal;
+      if (src.rate !== undefined) payload.rate = src.rate;
+      if (src.method !== undefined) payload.method = src.method;
+      if (src.startDate !== undefined) payload.startDate = src.startDate;
+      if (src.dueDate !== undefined) payload.dueDate = src.dueDate;
+      if (src.interestBasis !== undefined) payload.interestBasis = src.interestBasis;
+      if (src.tenureMonths !== undefined) payload.tenureMonths = src.tenureMonths;
+      return void (await send(`/api/backend/records/loans/${id}`, 'PATCH', payload));
+    }
     case 'DELETE_LOAN':
       return void (await send(`/api/backend/records/loans/${id}`, 'DELETE'));
     case 'RECORD_LOAN_REPAYMENT':
       return void (await send(`/api/backend/records/loans/${id}/repay`, 'POST', {
         amount: action.amount,
+        date: action.date,
         note: action.note,
+        paymentMethod: action.paymentMethod,
+        bankAccountId: action.bankAccountId,
       }));
+    case 'DELETE_LOAN_REPAYMENT':
+      return void (await send(`/api/backend/records/loans/${id}/repayments/${action.repaymentId}`, 'DELETE'));
 
     case 'ADD_PAWNED':
       return create('/api/backend/records/pawnedItems', action.entry);
     case 'DELETE_PAWNED':
       return void (await send(`/api/backend/records/pawnedItems/${id}`, 'DELETE'));
     case 'RECORD_PAWN_PAYMENT':
-      return void (await send(`/api/backend/records/pawnedItems/${id}/payment`, 'POST'));
+      return void (await send(`/api/backend/records/pawnedItems/${id}/payment`, 'POST', {
+        amount: action.amount,
+        paymentType: action.paymentType,
+        paymentMethod: action.paymentMethod,
+        bankAccountId: action.bankAccountId,
+        date: action.date,
+        note: action.note,
+      }));
+    case 'DELETE_PAWN_PAYMENT':
+      return void (await send(`/api/backend/records/pawnedItems/${id}/payments/${action.paymentId}`, 'DELETE'));
 
     case 'ADD_GOAL':
       return create('/api/backend/records/goals', {
@@ -429,7 +519,19 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
       return void (await send(
         `/api/backend/records/goals/${encodeURIComponent(action.goalId)}/contributions`,
         'POST',
-        { amount: action.amount, date: action.date, note: action.note }
+        {
+          amount: action.amount,
+          date: action.date,
+          note: action.note,
+          debitAccount: action.debitAccount,
+          paymentMethod: action.paymentMethod,
+          bankAccountId: action.bankAccountId,
+        }
+      ));
+    case 'DELETE_SAVING_CONTRIBUTION':
+      return void (await send(
+        `/api/backend/records/goals/${encodeURIComponent(action.goalId)}/contributions/${encodeURIComponent(action.contributionId)}`,
+        'DELETE'
       ));
 
     case 'SET_PERSONAL_SPENDING_BUDGET':
@@ -498,6 +600,8 @@ export async function fetchTransactionHistory(filters: Record<string, any> = {})
     data: (res.data || []).map(row => ({
       id: row._id,
       type: row.type,
+      transferDirection: row.transferDirection,
+      transferGroupId: row.transferGroupId,
       amount: (row.amountCents || 0) / 100,
       date: row.date,
       category: row.category,

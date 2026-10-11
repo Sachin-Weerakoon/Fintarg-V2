@@ -82,19 +82,26 @@ export default function DashboardClient() {
         });
       });
 
-    state.financePayments.forEach(fp => {
-      const dueDay = fp.dueDay || 1;
-      const targetDate = new Date(today.getFullYear(), today.getMonth(), dueDay);
-      const diff = Math.round((targetDate.getTime() - today.getTime()) / 86400000);
-      list.push({
-        id: 'fp_' + fp.id,
-        title: `${fp.lender} · ${fp.paymentKind || 'Installment'}`,
-        category: 'Lease / Finance',
-        amount: fp.amount,
-        dueDate: targetDate.toISOString().slice(0, 10),
-        daysAway: diff,
+    state.financePayments
+      .filter(fp => fp.status !== 'completed' && fp.status !== 'cleared' && fp.status !== 'cancelled' && (fp.monthsRemaining === undefined || fp.monthsRemaining > 0))
+      .forEach(fp => {
+        let targetDate: Date;
+        if (fp.nextDueDate) {
+          targetDate = new Date(`${fp.nextDueDate}T00:00:00.000Z`);
+        } else {
+          const dueDay = fp.dueDay || 1;
+          targetDate = new Date(today.getFullYear(), today.getMonth(), dueDay);
+        }
+        const diff = Math.round((targetDate.getTime() - today.getTime()) / 86400000);
+        list.push({
+          id: 'fp_' + fp.id,
+          title: `${fp.lender} · ${fp.paymentKind || 'Installment'}`,
+          category: 'Lease / Finance',
+          amount: fp.amount,
+          dueDate: targetDate.toISOString().slice(0, 10),
+          daysAway: diff,
+        });
       });
-    });
 
     state.pawnedItems.forEach(p => {
       const d = new Date(p.nextDue);

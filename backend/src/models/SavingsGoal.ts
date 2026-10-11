@@ -1,8 +1,12 @@
 import mongoose, { type Document, Schema } from 'mongoose';
 
 export interface ISavingsGoalContribution {
+  _id?: mongoose.Types.ObjectId;
   date: string;
   amountCents: number;
+  paymentMethod?: string;
+  bankAccountId?: mongoose.Types.ObjectId | null;
+  transactionId?: mongoose.Types.ObjectId | null;
   note?: string;
 }
 
@@ -20,6 +24,15 @@ export interface ISavingsGoal extends Document {
   updatedAt: Date;
 }
 
+const SavingsGoalContributionSchema = new Schema<ISavingsGoalContribution>({
+  date: { type: String, required: true },
+  amountCents: { type: Number, required: true },
+  paymentMethod: { type: String, default: '' },
+  bankAccountId: { type: Schema.Types.ObjectId, ref: 'BankAccount', default: null },
+  transactionId: { type: Schema.Types.ObjectId, ref: 'Transaction', default: null },
+  note: { type: String, default: '' },
+});
+
 const SavingsGoalSchema = new Schema<ISavingsGoal>({
   userId: { type: Schema.Types.ObjectId, required: true, index: true },
   name: { type: String, required: true },
@@ -29,7 +42,7 @@ const SavingsGoalSchema = new Schema<ISavingsGoal>({
   monthlyTargetCents: { type: Number, default: 0, min: 0 },
   endDate: { type: String, default: '' },
   savedAmountCents: { type: Number, default: 0, min: 0 },
-  contributions: [{ date: String, amountCents: Number, note: { type: String, default: '' } }],
+  contributions: [SavingsGoalContributionSchema],
 }, { timestamps: true });
 
 export const SavingsGoalModel = mongoose.models.SavingsGoal || mongoose.model<ISavingsGoal>('SavingsGoal', SavingsGoalSchema);

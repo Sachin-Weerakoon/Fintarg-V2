@@ -1,10 +1,21 @@
 import mongoose, { type Document, Schema } from 'mongoose';
 
+export interface IFinancePaymentHistory {
+  _id?: mongoose.Types.ObjectId;
+  date: string;
+  amountCents: number;
+  paymentMethod: string;
+  bankAccountId?: mongoose.Types.ObjectId | null;
+  transactionId?: mongoose.Types.ObjectId | null;
+  note?: string;
+}
+
 export interface IFinancePayment extends Document {
   userId: mongoose.Types.ObjectId;
   lender: string;
   amountCents: number;
   dueDay: number;
+  nextDueDate: string;
   monthsRemaining: number;
   paymentKind: 'instalment' | 'lease' | 'cheque' | 'standing_order';
   chequeNumber?: string;
@@ -12,22 +23,34 @@ export interface IFinancePayment extends Document {
   payee?: string;
   frequency?: 'monthly' | 'one-time';
   status?: 'active' | 'completed' | 'cleared' | 'cancelled';
+  payments: IFinancePaymentHistory[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+const FinancePaymentHistorySchema = new Schema<IFinancePaymentHistory>({
+  date: { type: String, required: true },
+  amountCents: { type: Number, required: true },
+  paymentMethod: { type: String, default: 'bank_transfer' },
+  bankAccountId: { type: Schema.Types.ObjectId, ref: 'BankAccount', default: null },
+  transactionId: { type: Schema.Types.ObjectId, ref: 'Transaction', default: null },
+  note: { type: String, default: '' },
+});
 
 const FinancePaymentSchema = new Schema<IFinancePayment>({
   userId: { type: Schema.Types.ObjectId, required: true, index: true },
   lender: { type: String, required: true },
   amountCents: { type: Number, required: true, min: 1 },
   dueDay: { type: Number, required: true, min: 1, max: 31 },
-  monthsRemaining: { type: Number, required: true, min: 1 },
+  nextDueDate: { type: String, default: '' },
+  monthsRemaining: { type: Number, required: true, min: 0 },
   paymentKind: { type: String, enum: ['instalment', 'lease', 'cheque', 'standing_order'], default: 'instalment' },
   chequeNumber: { type: String, default: '', trim: true },
   bankAccountId: { type: Schema.Types.ObjectId, ref: 'BankAccount', default: null },
   payee: { type: String, default: '', trim: true },
   frequency: { type: String, enum: ['monthly', 'one-time'], default: 'monthly' },
   status: { type: String, enum: ['active', 'completed', 'cleared', 'cancelled'], default: 'active' },
+  payments: [FinancePaymentHistorySchema],
 }, { timestamps: true });
 
 export const FinancePaymentModel = mongoose.models.FinancePayment || mongoose.model<IFinancePayment>('FinancePayment', FinancePaymentSchema);

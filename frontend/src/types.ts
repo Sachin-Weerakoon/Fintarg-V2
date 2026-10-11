@@ -51,8 +51,9 @@ export interface BankAccount {
   branch?: string;
   branchCode?: string;
   swiftCode?: string;
-  accountType?: 'savings' | 'checking' | 'current' | 'business' | 'other';
+  accountType?: 'savings' | 'checking' | 'current' | 'business' | 'cash' | 'other';
   currentBalance: number;
+  openingBalance?: number;
   currency?: string;
   notes?: string;
 }
@@ -79,6 +80,8 @@ export interface Card {
 export interface Transaction {
   id: string;
   type: 'income' | 'expense' | 'transfer';
+  transferDirection?: 'incoming' | 'outgoing';
+  transferGroupId?: string;
   amount: number;
   date: string;
   category?: string;
@@ -114,18 +117,44 @@ export interface ExpenseEntry {
   cardId?: string;
 }
 
+export interface FinancePaymentHistory {
+  id?: string;
+  _id?: string;
+  date: string;
+  amount: number;
+  paymentMethod: string;
+  bankAccountId?: string | null;
+  transactionId?: string | null;
+  note?: string;
+}
+
 export interface FinancePayment {
   id: string;
   lender: string;
   amount: number;
   dueDay: number;
+  nextDueDate?: string;
   monthsRemaining: number;
   paymentKind?: 'instalment' | 'lease' | 'cheque' | 'standing_order';
   chequeNumber?: string;
   bankAccountId?: string;
   payee?: string;
   frequency?: 'monthly' | 'weekly' | 'quarterly' | 'annually' | 'one-time';
-  status?: 'active' | 'cleared' | 'cancelled' | 'pending';
+  status?: 'active' | 'cleared' | 'cancelled' | 'pending' | 'completed';
+  payments?: FinancePaymentHistory[];
+}
+
+export interface LoanRepayment {
+  id?: string;
+  _id?: string;
+  date: string;
+  amount: number;
+  principal?: number;
+  interest?: number;
+  note?: string;
+  paymentMethod?: string;
+  bankAccountId?: string | null;
+  transactionId?: string | null;
 }
 
 export interface Loan {
@@ -141,16 +170,44 @@ export interface Loan {
   tenureMonths?: number;
   monthlyPayment?: number;
   totalInterest?: number;
-  repayments?: { date: string; amount: number; note?: string }[];
+  repayments?: LoanRepayment[];
+}
+
+export interface PawnPayment {
+  id?: string;
+  _id?: string;
+  date: string;
+  amount: number;
+  paymentType: 'interest' | 'part_principal' | 'redemption';
+  paymentMethod: string;
+  bankAccountId?: string | null;
+  transactionId?: string | null;
+  note?: string;
 }
 
 export interface PawnedItem {
   id: string;
   description: string;
+  ticketNumber?: string;
+  status?: 'active' | 'redeemed' | 'forfeited';
   amountReceived: number;
+  principalOutstanding?: number;
+  interestPaid?: number;
   interestRate: number;
   nextDue: string;
   redemptionDate: string;
+  payments?: PawnPayment[];
+}
+
+export interface GoalContribution {
+  id?: string;
+  _id?: string;
+  date: string;
+  amount: number;
+  paymentMethod?: string;
+  bankAccountId?: string | null;
+  transactionId?: string | null;
+  note?: string;
 }
 
 export interface SavingsGoal {
@@ -162,7 +219,7 @@ export interface SavingsGoal {
   savedAmount: number;
   targetAmount?: number;
   targetDate?: string;
-  contributions: { date: string; amount: number; note?: string }[];
+  contributions: GoalContribution[];
 }
 
 export interface Letter {

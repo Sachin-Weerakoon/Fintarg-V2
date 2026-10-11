@@ -45,6 +45,8 @@ export function LoansTab() {
     amount: '',
     date: new Date().toISOString().slice(0, 10),
     note: '',
+    paymentMethod: 'cash',
+    bankAccountId: '',
   });
 
   // Amortization sheet state
@@ -61,8 +63,7 @@ export function LoansTab() {
   const previewTenure = Number(form.tenureMonths) || 12;
   const liveCalc = useMemo(() => {
     if (previewPrincipal <= 0) return null;
-    const effectiveRate = form.interestBasis === 'monthly' ? previewRate * 12 : previewRate;
-    return calculateLoan(previewPrincipal, effectiveRate, previewTenure, form.method);
+    return calculateLoan(previewPrincipal, previewRate, previewTenure, form.method, form.interestBasis);
   }, [previewPrincipal, previewRate, previewTenure, form.method, form.interestBasis]);
 
   const submit = () => {
@@ -70,13 +71,16 @@ export function LoansTab() {
     const principal = Number(form.amount);
     const rate = Number(form.rate) || 0;
     const tenure = Number(form.tenureMonths) || 12;
-    const effectiveRate = form.interestBasis === 'monthly' ? rate * 12 : rate;
-    const calc = calculateLoan(principal, effectiveRate, tenure, form.method);
+    const calc = calculateLoan(principal, rate, tenure, form.method, form.interestBasis);
 
     const startDate = form.startDate || new Date().toISOString().slice(0, 10);
     const defaultDue = new Date(startDate);
     defaultDue.setMonth(defaultDue.getMonth() + tenure);
     const dueDate = form.dueDate || defaultDue.toISOString().slice(0, 10);
+
+    const existingLoan = editId ? state.loans.find(l => l.id === editId) : null;
+    const totalRepaid = existingLoan ? (existingLoan.repayments || []).reduce((s, r) => s + r.amount, 0) : 0;
+    const newBalance = existingLoan ? Math.max(0, principal - totalRepaid) : principal;
 
     const entry: Loan = {
       id: editId || 'ln_' + Date.now(),
@@ -88,10 +92,10 @@ export function LoansTab() {
       tenureMonths: tenure,
       startDate,
       dueDate,
-      balance: principal,
+      balance: newBalance,
       monthlyPayment: calc.monthlyPayment,
       totalInterest: calc.totalInterest,
-      repayments: [],
+      repayments: existingLoan?.repayments || [],
     };
 
     if (editId) {
@@ -117,16 +121,46 @@ export function LoansTab() {
 
   const handleRecordRepayment = () => {
     if (!repayingLoan || !repaymentForm.amount || Number(repaymentForm.amount) <= 0) return;
+    const isBankMethod = ['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(repaymentForm.paymentMethod);
+    if (isBankMethod && !repaymentForm.bankAccountId) {
+      toast.error('Please select a bank account for this payment method');
+      return;
+    }
     dispatch({
       type: 'RECORD_LOAN_REPAYMENT',
       id: repayingLoan.id,
       amount: Number(repaymentForm.amount),
       note: repaymentForm.note,
       date: repaymentForm.date,
+      paymentMethod: repaymentForm.paymentMethod,
+      bankAccountId: repaymentForm.bankAccountId || null,
     });
     toast.success(`Repayment of ${formatRs(Number(repaymentForm.amount))} logged`);
     setRepayingLoan(null);
-    setRepaymentForm({ amount: '', date: new Date().toISOString().slice(0, 10), note: '' });
+    setRepaymentForm({
+      amount: '',
+      date: new Date().toISOString().slice(0, 10),
+      note: '',
+      paymentMethod: 'cash',
+      bankAccountId: '',
+    });
+  };
+
+  const handleUndoRepayment = async (loanId: string, repaymentId: string, amount: number) => {
+    const ok = await confirm({
+      title: 'Undo Repayment',
+      message: `Undo repayment of ${formatRs(amount)}? Account balance and loan balance will be restored.`,
+      confirmLabel: 'Yes, Undo',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    dispatch({
+      type: 'DELETE_LOAN_REPAYMENT',
+      id: loanId,
+      repaymentId,
+    });
+    toast.success(`Repayment of ${formatRs(amount)} undone`);
   };
 
   const handleDelete = async (id: string, lender: string) => {
@@ -145,13 +179,11 @@ export function LoansTab() {
 
   const amortizationSchedule: AmortizationRow[] = useMemo(() => {
     if (!amortizingLoan) return [];
-    const effectiveRate = amortizingLoan.interestBasis === 'monthly'
-      ? (amortizingLoan.rate || 0) * 12
-      : amortizingLoan.rate || 0;
     return calculateAmortizationSchedule(
       amortizingLoan.principal,
-      effectiveRate,
-      amortizingLoan.tenureMonths || 12
+      amortizingLoan.rate || 0,
+      amortizingLoan.tenureMonths || 12,
+      amortizingLoan.interestBasis || 'annual'
     );
   }, [amortizingLoan]);
 
@@ -198,7 +230,7 @@ export function LoansTab() {
                       <div>
                         <div className="font-bold text-sm text-text">{ln.lender}</div>
                         <div className="text-xs text-muted mt-0.5">
-                          Principal <span className="font-semibold num text-text">{formatRs(ln.principal)}</span> · {ln.rate}% ({ln.interestBasis || 'annual'}) · {ln.tenureMonths || 12}M
+                          Principal <span className="font-semibold num text-text">{formatRs(ln.principal)}</span> · {ln.rate}% ({ln.interestBasis || 'annual'}) · {ln.method === 'simple' ? 'Flat' : 'Reducing Balance'} · {ln.tenureMonths || 12}M
                         </div>
                       </div>
                       <div className="text-right">
@@ -222,17 +254,41 @@ export function LoansTab() {
 
                     {/* Actions */}
                     <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Button
                           variant="secondary"
                           size="sm"
                           onClick={() => {
                             setRepayingLoan(ln);
-                            setRepaymentForm({ amount: '', date: new Date().toISOString().slice(0, 10), note: '' });
+                            setRepaymentForm({
+                              amount: '',
+                              date: new Date().toISOString().slice(0, 10),
+                              note: '',
+                              paymentMethod: 'cash',
+                              bankAccountId: '',
+                            });
                           }}
                         >
                           Log Repayment
                         </Button>
+                        {ln.balance > 0 && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setRepayingLoan(ln);
+                              setRepaymentForm({
+                                amount: String(ln.balance),
+                                date: new Date().toISOString().slice(0, 10),
+                                note: 'Full payoff / Early settlement',
+                                paymentMethod: 'cash',
+                                bankAccountId: '',
+                              });
+                            }}
+                          >
+                            Settle Loan
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -259,12 +315,31 @@ export function LoansTab() {
                       <div className="pt-2 border-t border-border/40 text-xs">
                         <span className="text-[11px] font-semibold text-muted mb-1 block">Recent Repayments:</span>
                         <div className="space-y-1">
-                          {ln.repayments.slice(-3).reverse().map((r, idx) => (
-                            <div key={idx} className="flex justify-between text-muted text-[11px]">
-                              <span>{r.date} {r.note ? `· ${r.note}` : ''}</span>
-                              <span className="font-medium text-success-text num">-{formatRs(r.amount)}</span>
-                            </div>
-                          ))}
+                          {ln.repayments.slice(-3).reverse().map((r, idx) => {
+                            const repId = r.id || r._id || '';
+                            return (
+                              <div key={idx} className="flex justify-between items-center text-muted text-[11px]">
+                                <span>
+                                  {r.date} {r.note ? `· ${r.note}` : ''}
+                                  {r.paymentMethod && r.paymentMethod !== 'cash' ? ` (${r.paymentMethod.replace('_', ' ')})` : ''}
+                                  {r.principal !== undefined && r.interest !== undefined ? ` [P: ${formatRs(r.principal)} | I: ${formatRs(r.interest)}]` : ''}
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-medium text-success-text num">-{formatRs(r.amount)}</span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleUndoRepayment(ln.id, repId, r.amount)}
+                                      className="!p-0.5 h-auto text-muted hover:text-danger-text"
+                                      title="Undo repayment"
+                                      aria-label="Undo repayment"
+                                    >
+                                      <Icon name="close" size={12} />
+                                    </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -385,6 +460,34 @@ export function LoansTab() {
         description={repayingLoan ? `Log a payment for ${repayingLoan.lender}` : ''}
       >
         <div className="space-y-4 pt-2">
+          <Field id="repay-method" label="Payment Method">
+            <Select
+              value={repaymentForm.paymentMethod}
+              onChange={e => setRepaymentForm(f => ({ ...f, paymentMethod: e.target.value }))}
+            >
+              <option value="cash">Cash</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="standing_order">Standing Order</option>
+              <option value="cheque">Cheque</option>
+              <option value="online">Online</option>
+              <option value="other">Other</option>
+            </Select>
+          </Field>
+          {['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(repaymentForm.paymentMethod) && (
+            <Field id="repay-account" label="Debit Bank Account">
+              <Select
+                value={repaymentForm.bankAccountId}
+                onChange={e => setRepaymentForm(f => ({ ...f, bankAccountId: e.target.value }))}
+              >
+                <option value="">Select Account...</option>
+                {state.bankAccounts.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.bankName} - {b.accountNumber} ({formatRs(b.currentBalance)})
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
           <Field id="repay-amount" label="Repayment Amount (Rs.)">
             <MoneyField
               value={repaymentForm.amount}

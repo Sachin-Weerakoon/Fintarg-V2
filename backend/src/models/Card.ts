@@ -4,6 +4,7 @@ export interface ICard extends Document {
   userId: mongoose.Types.ObjectId;
   bankAccountId?: mongoose.Types.ObjectId | null;
   cardName: string;
+  cardHolder?: string;
   cardType: 'debit' | 'credit';
   cardNetwork?: string;
   last4: string;
@@ -22,6 +23,7 @@ const CardSchema = new Schema<ICard>({
   userId: { type: Schema.Types.ObjectId, required: true, index: true },
   bankAccountId: { type: Schema.Types.ObjectId, ref: 'BankAccount', default: null },
   cardName: { type: String, required: true, trim: true },
+  cardHolder: { type: String, default: '', trim: true },
   cardType: { type: String, enum: ['debit', 'credit'], default: 'debit' },
   cardNetwork: { type: String, default: 'visa', trim: true },
   last4: { type: String, required: true, trim: true, minlength: 4, maxlength: 4 },
