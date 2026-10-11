@@ -47,7 +47,7 @@ const models: Record<RecordKind, Model<any>> = {
 };
 
 const moneyFields: Partial<Record<RecordKind, Record<string, string>>> = {
-  bankAccounts: { balance: 'balanceCents' },
+  bankAccounts: { balance: 'balanceCents', openingBalance: 'openingBalanceCents' },
   cards: { creditLimit: 'creditLimitCents', balance: 'balanceCents' },
   transactions: { amount: 'amountCents' },
   incomes: { amount: 'amountCents' },
@@ -119,9 +119,20 @@ function toStoredForCreate(kind: RecordKind, input: Record<string, unknown>) {
     if (!stored.accountName) {
       stored.accountName = 'Main Account';
     }
-    if ('currentBalance' in stored && !('balance' in stored) && !('balanceCents' in stored)) {
-      stored.balanceCents = Math.round(Number(stored.currentBalance || 0) * 100);
-      delete stored.currentBalance;
+    if ('currentBalance' in stored && !('balanceCents' in stored) && !('openingBalanceCents' in stored)) {
+      stored.openingBalanceCents = Math.round(Number(stored.currentBalance || 0) * 100);
+    }
+    delete stored.currentBalance;
+    delete stored.balance;
+    delete stored.openingBalance;
+
+    if ('openingBalanceCents' in stored && !('balanceCents' in stored)) {
+      stored.balanceCents = stored.openingBalanceCents;
+    } else if ('balanceCents' in stored && !('openingBalanceCents' in stored)) {
+      stored.openingBalanceCents = stored.balanceCents;
+    } else if (!('openingBalanceCents' in stored) && !('balanceCents' in stored)) {
+      stored.openingBalanceCents = 0;
+      stored.balanceCents = 0;
     }
     if (stored.accountType === 'checking') {
       stored.accountType = 'current';
@@ -247,6 +258,8 @@ function toStoredForUpdate(kind: RecordKind, input: Record<string, unknown>, exi
     delete stored.balance;
     delete stored.balanceCents;
     delete stored.currentBalance;
+    delete stored.openingBalance;
+    delete stored.openingBalanceCents;
     if (stored.accountType === 'checking') {
       stored.accountType = 'current';
     }
@@ -308,6 +321,8 @@ export async function getRecord(kind: RecordKind, userId: string, id: string) {
       accountName: (record as any).accountName || (record as any).name || 'Main Account',
       currentBalance: ((record as any).balanceCents || 0) / 100,
       balance: ((record as any).balanceCents || 0) / 100,
+      openingBalance: ((record as any).openingBalanceCents || 0) / 100,
+      openingBalanceCents: (record as any).openingBalanceCents || 0,
     };
   }
   if (kind === 'cards') {
@@ -344,6 +359,8 @@ export async function listRecords(kind: RecordKind, userId: string) {
       accountName: acc.accountName || acc.name || 'Main Account',
       currentBalance: (acc.balanceCents || 0) / 100,
       balance: (acc.balanceCents || 0) / 100,
+      openingBalance: (acc.openingBalanceCents || 0) / 100,
+      openingBalanceCents: acc.openingBalanceCents || 0,
     }));
   }
   if (kind === 'cards') {
@@ -484,6 +501,12 @@ export async function updateRecord(kind: RecordKind, userId: string, id: string,
 
 export async function deleteRecord(kind: RecordKind, userId: string, id: string) {
   if (!mongoose.isValidObjectId(id)) throw new HttpError(400, 'Invalid record id');
+  if (kind === 'bankAccounts') {
+    const account = await BankAccountModel.findOne({ _id: id, userId });
+    if (account?.accountType === 'cash') {
+      throw new HttpError(400, 'Cannot delete the built-in cash wallet account');
+    }
+  }
   const deleted = await models[kind].findOneAndDelete({ _id: id, userId });
   if (!deleted) throw new HttpError(404, 'Record not found');
   if (kind === 'companies') {

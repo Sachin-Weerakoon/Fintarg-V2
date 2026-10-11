@@ -8,8 +8,9 @@ export interface IBankAccount extends Document {
   branch: string;
   branchCode?: string;
   swiftCode?: string;
-  accountType: 'savings' | 'current' | 'checking' | 'business' | 'other';
+  accountType: 'savings' | 'current' | 'checking' | 'business' | 'cash' | 'other';
   balanceCents: number;
+  openingBalanceCents: number;
   currency: string;
   notes?: string;
   isDefault: boolean;
@@ -25,8 +26,9 @@ const BankAccountSchema = new Schema<IBankAccount>({
   branch: { type: String, default: '', trim: true },
   branchCode: { type: String, default: '', trim: true },
   swiftCode: { type: String, default: '', trim: true },
-  accountType: { type: String, enum: ['savings', 'current', 'checking', 'business', 'other'], default: 'savings' },
+  accountType: { type: String, enum: ['savings', 'current', 'checking', 'business', 'cash', 'other'], default: 'savings' },
   balanceCents: { type: Number, default: 0 },
+  openingBalanceCents: { type: Number, default: 0 },
   currency: { type: String, default: 'LKR', trim: true },
   notes: { type: String, default: '', trim: true },
   isDefault: { type: Boolean, default: false },

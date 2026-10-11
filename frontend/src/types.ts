@@ -51,8 +51,9 @@ export interface BankAccount {
   branch?: string;
   branchCode?: string;
   swiftCode?: string;
-  accountType?: 'savings' | 'checking' | 'current' | 'business' | 'other';
+  accountType?: 'savings' | 'checking' | 'current' | 'business' | 'cash' | 'other';
   currentBalance: number;
+  openingBalance?: number;
   currency?: string;
   notes?: string;
 }
