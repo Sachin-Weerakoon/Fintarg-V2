@@ -34,8 +34,19 @@ async function connectWithFallback(): Promise<typeof mongoose> {
   }
 }
 
+let listenerAttached = false;
+
+function ensureConnectionListener(): void {
+  if (listenerAttached) return;
+  listenerAttached = true;
+  mongoose.connection.on('connected', () => {
+    logger.info({ database: mongoose.connection.name }, 'MongoDB connected');
+  });
+}
+
 export async function connectDatabase(): Promise<void> {
   mongoose.set('strictQuery', true);
+  ensureConnectionListener();
   if (mongoose.connection.readyState !== 1) {
     connection ??= connectWithFallback().catch(error => {
       connection = null;
@@ -43,5 +54,4 @@ export async function connectDatabase(): Promise<void> {
     });
     await connection;
   }
-  logger.info({ database: mongoose.connection.name }, 'MongoDB connected');
 }
