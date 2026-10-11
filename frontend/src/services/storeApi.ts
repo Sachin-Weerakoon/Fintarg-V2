@@ -166,10 +166,25 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
     pawnedItems: pawnedItems.map(row => ({
       id: row._id,
       description: row.description,
+      ticketNumber: row.ticketNumber || '',
+      status: row.status || 'active',
       amountReceived: (row.amountReceivedCents || 0) / 100,
+      principalOutstanding: (row.principalOutstandingCents ?? row.amountReceivedCents ?? 0) / 100,
+      interestPaid: (row.interestPaidCents || 0) / 100,
       interestRate: row.interestRatePercent,
       nextDue: row.nextDue,
       redemptionDate: row.redemptionDate,
+      payments: (row.payments || []).map((p: RawRecord) => ({
+        id: p._id,
+        _id: p._id,
+        date: p.date,
+        amount: (p.amountCents || 0) / 100,
+        paymentType: p.paymentType || 'interest',
+        paymentMethod: p.paymentMethod || 'cash',
+        bankAccountId: p.bankAccountId,
+        transactionId: p.transactionId,
+        note: p.note,
+      })),
     })),
     savingsGoals: savingsGoals.map(row => ({
       id: row._id,
@@ -431,7 +446,16 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
     case 'DELETE_PAWNED':
       return void (await send(`/api/backend/records/pawnedItems/${id}`, 'DELETE'));
     case 'RECORD_PAWN_PAYMENT':
-      return void (await send(`/api/backend/records/pawnedItems/${id}/payment`, 'POST'));
+      return void (await send(`/api/backend/records/pawnedItems/${id}/payment`, 'POST', {
+        amount: action.amount,
+        paymentType: action.paymentType,
+        paymentMethod: action.paymentMethod,
+        bankAccountId: action.bankAccountId,
+        date: action.date,
+        note: action.note,
+      }));
+    case 'DELETE_PAWN_PAYMENT':
+      return void (await send(`/api/backend/records/pawnedItems/${id}/payments/${action.paymentId}`, 'DELETE'));
 
     case 'ADD_GOAL':
       return create('/api/backend/records/goals', {

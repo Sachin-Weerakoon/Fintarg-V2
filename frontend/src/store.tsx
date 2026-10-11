@@ -166,7 +166,8 @@ type Action =
   | { type: 'DELETE_LOAN_REPAYMENT'; id: string; repaymentId: string }
   | { type: 'DELETE_LOAN'; id: string }
   | { type: 'ADD_PAWNED'; entry: PawnedItem }
-  | { type: 'RECORD_PAWN_PAYMENT'; id: string }
+  | { type: 'RECORD_PAWN_PAYMENT'; id: string; amount?: number; paymentType?: 'interest' | 'part_principal' | 'redemption'; paymentMethod?: string; bankAccountId?: string | null; date?: string; note?: string }
+  | { type: 'DELETE_PAWN_PAYMENT'; id: string; paymentId: string }
   | { type: 'DELETE_PAWNED'; id: string }
   | { type: 'ADD_GOAL'; entry: SavingsGoal }
   | { type: 'UPDATE_GOAL'; id: string; dailyAmount?: number; monthlyTarget?: number; targetAmount?: number; targetDate?: string; savedAmount?: number }
@@ -267,12 +268,99 @@ function reducer(state: AppState, action: Action): AppState {
     case 'RECORD_PAWN_PAYMENT': {
       const p = state.pawnedItems.find(pi => pi.id === action.id);
       if (!p) return state;
-      const nextDate = new Date(p.nextDue);
-      nextDate.setMonth(nextDate.getMonth() + 1);
+      const pType = action.paymentType || 'interest';
+      const paymentDate = action.date || new Date().toISOString().slice(0, 10);
+      const currentPrincipal = p.principalOutstanding !== undefined ? p.principalOutstanding : p.amountReceived;
+      let payAmount = action.amount;
+      if (!payAmount) {
+        if (pType === 'interest') payAmount = Math.max(1, Math.round(currentPrincipal * (p.interestRate / 100) / 12));
+        else if (pType === 'redemption') payAmount = currentPrincipal;
+        else payAmount = 0;
+      }
+      let newNextDue = p.nextDue;
+      let newInterestPaid = p.interestPaid || 0;
+      let newPrincipalOutstanding = currentPrincipal;
+      let newStatus = p.status || 'active';
+      let newRedemptionDate = p.redemptionDate;
+
+      if (pType === 'interest') {
+        newInterestPaid += payAmount;
+        const nextDate = new Date(`${p.nextDue}T00:00:00.000Z`);
+        nextDate.setUTCMonth(nextDate.getUTCMonth() + 1);
+        newNextDue = nextDate.toISOString().slice(0, 10);
+      } else if (pType === 'part_principal') {
+        newPrincipalOutstanding = Math.max(0, currentPrincipal - payAmount);
+        if (newPrincipalOutstanding === 0) {
+          newStatus = 'redeemed';
+          newRedemptionDate = paymentDate;
+        }
+      } else if (pType === 'redemption') {
+        newPrincipalOutstanding = 0;
+        newStatus = 'redeemed';
+        newRedemptionDate = paymentDate;
+      }
+
       return {
         ...state,
-        pawnedItems: state.pawnedItems.map(pi => pi.id === action.id
-          ? { ...pi, nextDue: nextDate.toISOString().slice(0, 10) } : pi),
+        pawnedItems: state.pawnedItems.map(pi => pi.id === action.id ? {
+          ...pi,
+          nextDue: newNextDue,
+          interestPaid: newInterestPaid,
+          principalOutstanding: newPrincipalOutstanding,
+          status: newStatus,
+          redemptionDate: newRedemptionDate,
+          payments: [
+            ...(pi.payments || []),
+            {
+              date: paymentDate,
+              amount: payAmount,
+              paymentType: pType,
+              paymentMethod: action.paymentMethod || 'cash',
+              bankAccountId: action.bankAccountId,
+              note: action.note,
+            },
+          ],
+        } : pi),
+      };
+    }
+    case 'DELETE_PAWN_PAYMENT': {
+      return {
+        ...state,
+        pawnedItems: state.pawnedItems.map(pi => {
+          if (pi.id !== action.id) return pi;
+          const target = (pi.payments || []).find(p => (p.id || p._id) === action.paymentId);
+          const payments = (pi.payments || []).filter(p => (p.id || p._id) !== action.paymentId);
+          if (!target) return { ...pi, payments };
+
+          let nextDue = pi.nextDue;
+          let interestPaid = pi.interestPaid || 0;
+          let principalOutstanding = pi.principalOutstanding !== undefined ? pi.principalOutstanding : pi.amountReceived;
+          let status = pi.status || 'active';
+          let redemptionDate = pi.redemptionDate;
+
+          if (target.paymentType === 'interest') {
+            interestPaid = Math.max(0, interestPaid - target.amount);
+            const dueDate = new Date(`${pi.nextDue}T00:00:00.000Z`);
+            dueDate.setUTCMonth(dueDate.getUTCMonth() - 1);
+            nextDue = dueDate.toISOString().slice(0, 10);
+          } else if (target.paymentType === 'part_principal' || target.paymentType === 'redemption') {
+            principalOutstanding = principalOutstanding + target.amount;
+            if (status === 'redeemed' && principalOutstanding > 0) {
+              status = 'active';
+              redemptionDate = '';
+            }
+          }
+
+          return {
+            ...pi,
+            nextDue,
+            interestPaid,
+            principalOutstanding,
+            status,
+            redemptionDate,
+            payments,
+          };
+        }),
       };
     }
     case 'DELETE_PAWNED': return { ...state, pawnedItems: state.pawnedItems.filter(p => p.id !== action.id) };

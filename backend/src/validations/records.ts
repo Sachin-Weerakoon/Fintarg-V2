@@ -181,10 +181,14 @@ const loanSchema = z.object({
 
 const pawnedItemSchema = z.object({
   description: z.string().trim().min(1).max(500),
+  ticketNumber: z.string().trim().max(64).default(''),
   amountReceived: money,
+  principalOutstanding: z.coerce.number().min(0).max(1_000_000_000).optional(),
+  interestPaid: z.coerce.number().min(0).max(1_000_000_000).optional(),
   interestRate: z.coerce.number().min(0).max(1000),
   nextDue: date,
   redemptionDate: optionalIsoDateSchema.default(''),
+  status: z.enum(['active', 'redeemed', 'forfeited']).default('active'),
 });
 
 const goalSchema = z.object({

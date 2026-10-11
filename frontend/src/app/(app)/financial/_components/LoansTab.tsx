@@ -316,7 +316,7 @@ export function LoansTab() {
                         <span className="text-[11px] font-semibold text-muted mb-1 block">Recent Repayments:</span>
                         <div className="space-y-1">
                           {ln.repayments.slice(-3).reverse().map((r, idx) => {
-                            const repId = r.id || r._id;
+                            const repId = r.id || r._id || '';
                             return (
                               <div key={idx} className="flex justify-between items-center text-muted text-[11px]">
                                 <span>

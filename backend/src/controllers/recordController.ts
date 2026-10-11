@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import type { RequestHandler } from 'express';
 import { z } from 'zod';
 import { HttpError } from '../middleware/errors';
-import { addGoalContribution, calculateLoanPayoff, createRecord, deleteLoanRepayment, deleteRecord, getTransactionHistory, listRecords, recordLoanRepayment, recordPawnPayment, updateRecord } from '../services/recordService';
+import { addGoalContribution, calculateLoanPayoff, createRecord, deleteLoanRepayment, deletePawnPayment, deleteRecord, getTransactionHistory, listRecords, recordLoanRepayment, recordPawnPayment, updateRecord } from '../services/recordService';
 import { optionalIsoDateSchema, paymentMethodEnum, recordKinds, recordSchemas, recordUpdateSchemas, type RecordKind } from '../validations/records';
 import { asyncHandler } from '../utils/asyncHandler';
 
@@ -104,7 +104,33 @@ export const getLoanPayoff: RequestHandler = asyncHandler(async (request, respon
 export const payPawnInterest: RequestHandler = asyncHandler(async (request, response) => {
   const userId = request.auth?.userId;
   if (!userId) throw new HttpError(401, 'Authentication required');
-  response.json({ data: await recordPawnPayment(userId, request.params.id) });
+  const schema = z.object({
+    amount: z.coerce.number().positive().optional(),
+    paymentType: z.enum(['interest', 'part_principal', 'redemption']).optional().default('interest'),
+    paymentMethod: paymentMethodEnum.optional().default('cash'),
+    bankAccountId: z.string().optional().nullable(),
+    date: optionalIsoDateSchema.optional(),
+    note: z.string().optional(),
+  }).superRefine((data, ctx) => {
+    const method = data.paymentMethod;
+    if (['debit_card', 'bank_transfer', 'cheque', 'standing_order'].includes(method)) {
+      if (!data.bankAccountId || data.bankAccountId.trim() === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Bank account is required for ${method.replace('_', ' ')} payments`,
+          path: ['bankAccountId'],
+        });
+      }
+    }
+  });
+  const parsed = schema.parse(request.body || {});
+  response.json({ data: await recordPawnPayment(userId, request.params.id, parsed) });
+});
+
+export const undoPawnPayment: RequestHandler = asyncHandler(async (request, response) => {
+  const userId = request.auth?.userId;
+  if (!userId) throw new HttpError(401, 'Authentication required');
+  response.json({ data: await deletePawnPayment(userId, request.params.id, request.params.paymentId) });
 });
 
 export const transactionHistory: RequestHandler = asyncHandler(async (request, response) => {

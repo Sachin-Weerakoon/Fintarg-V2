@@ -158,13 +158,30 @@ export interface Loan {
   repayments?: LoanRepayment[];
 }
 
+export interface PawnPayment {
+  id?: string;
+  _id?: string;
+  date: string;
+  amount: number;
+  paymentType: 'interest' | 'part_principal' | 'redemption';
+  paymentMethod: string;
+  bankAccountId?: string | null;
+  transactionId?: string | null;
+  note?: string;
+}
+
 export interface PawnedItem {
   id: string;
   description: string;
+  ticketNumber?: string;
+  status?: 'active' | 'redeemed' | 'forfeited';
   amountReceived: number;
+  principalOutstanding?: number;
+  interestPaid?: number;
   interestRate: number;
   nextDue: string;
   redemptionDate: string;
+  payments?: PawnPayment[];
 }
 
 export interface SavingsGoal {

@@ -55,7 +55,7 @@ const moneyFields: Partial<Record<RecordKind, Record<string, string>>> = {
   expenses: { amount: 'amountCents' },
   financePayments: { amount: 'amountCents' },
   loans: { amount: 'principalCents' },
-  pawnedItems: { amountReceived: 'amountReceivedCents' },
+  pawnedItems: { amountReceived: 'amountReceivedCents', principalOutstanding: 'principalOutstandingCents', interestPaid: 'interestPaidCents' },
   goals: { targetAmount: 'targetAmountCents' },
   medicalExpenses: { amount: 'amountCents' },
   branchEntries: { amount: 'amountCents' },
@@ -106,9 +106,20 @@ function toStoredForCreate(kind: RecordKind, input: Record<string, unknown>) {
     stored.monthlyPaymentCents = Math.round(calc.monthlyPayment * 100);
     stored.totalInterestCents = Math.round(calc.totalInterest * 100);
   }
-  if (kind === 'pawnedItems' && 'interestRate' in stored) {
-    stored.interestRatePercent = Number(stored.interestRate);
-    delete stored.interestRate;
+  if (kind === 'pawnedItems') {
+    if ('interestRate' in stored) {
+      stored.interestRatePercent = Number(stored.interestRate);
+      delete stored.interestRate;
+    }
+    if (!('principalOutstandingCents' in stored) && 'amountReceivedCents' in stored) {
+      stored.principalOutstandingCents = stored.amountReceivedCents;
+    }
+    if (!('interestPaidCents' in stored)) {
+      stored.interestPaidCents = 0;
+    }
+    if (!('status' in stored)) {
+      stored.status = 'active';
+    }
   }
   if (kind === 'bankAccounts') {
     if ('name' in stored && !('accountName' in stored)) {
@@ -734,15 +745,142 @@ export async function calculateLoanPayoff(userId: string, loanId: string) {
   };
 }
 
-export async function recordPawnPayment(userId: string, pawnId: string) {
+export interface RecordPawnPaymentParams {
+  amount?: number;
+  paymentType?: 'interest' | 'part_principal' | 'redemption';
+  paymentMethod?: string;
+  bankAccountId?: string | null;
+  date?: string;
+  note?: string;
+}
+
+export async function recordPawnPayment(
+  userId: string,
+  pawnId: string,
+  params: RecordPawnPaymentParams = {},
+) {
   if (!mongoose.isValidObjectId(pawnId)) throw new HttpError(400, 'Invalid pawned item id');
   const item = await PawnedItemModel.findOne({ _id: pawnId, userId });
   if (!item) throw new HttpError(404, 'Pawned item not found');
-  const dueDate = new Date(`${item.nextDue}T00:00:00.000Z`);
-  dueDate.setUTCMonth(dueDate.getUTCMonth() + 1);
-  item.nextDue = dueDate.toISOString().slice(0, 10);
+  if (item.status !== 'active') throw new HttpError(400, `Cannot make payment on a pawned item that is ${item.status}`);
+
+  const paymentType = params.paymentType || 'interest';
+  const paymentMethod = params.paymentMethod || 'cash';
+  const paymentDate = params.date && isValidIsoDate(params.date) ? params.date : new Date().toISOString().slice(0, 10);
+
+  let targetBankAccountId: mongoose.Types.ObjectId | null = null;
+  if (['debit_card', 'bank_transfer', 'cheque', 'standing_order'].includes(paymentMethod)) {
+    if (!params.bankAccountId || !params.bankAccountId.trim()) {
+      throw new HttpError(400, `Bank account is required for ${paymentMethod.replace('_', ' ')} payments`);
+    }
+  }
+  if (params.bankAccountId && params.bankAccountId.trim() !== '') {
+    if (!mongoose.isValidObjectId(params.bankAccountId)) throw new HttpError(400, 'Invalid bank account id');
+    const bankAccount = await BankAccountModel.findOne({ _id: params.bankAccountId, userId });
+    if (!bankAccount) throw new HttpError(404, 'Bank account not found');
+    targetBankAccountId = bankAccount._id as mongoose.Types.ObjectId;
+  }
+
+  const currentPrincipal = item.principalOutstandingCents ?? item.amountReceivedCents;
+
+  let amountCents = 0;
+  if (params.amount !== undefined && params.amount !== null && params.amount > 0) {
+    amountCents = Math.round(params.amount * 100);
+  } else if (paymentType === 'interest') {
+    const rate = item.interestRatePercent || 0;
+    amountCents = Math.max(1, Math.round(currentPrincipal * (rate / 100) / 12));
+  } else if (paymentType === 'redemption') {
+    amountCents = currentPrincipal;
+  } else {
+    throw new HttpError(400, 'Amount must be specified for part-principal payment');
+  }
+
+  const subdocId = new mongoose.Types.ObjectId();
+
+  const tx = await postTransaction({
+    userId,
+    type: 'expense',
+    amountCents,
+    date: paymentDate,
+    category: 'Pawn Payment',
+    description: params.note || `Pawn payment (${paymentType}) for ${item.description}`,
+    paymentMethod: paymentMethod as any,
+    bankAccountId: targetBankAccountId,
+    referenceId: `pawn_payment_${item._id}_${subdocId}`,
+  });
+
+  if (paymentType === 'interest') {
+    item.interestPaidCents = (item.interestPaidCents || 0) + amountCents;
+    const dueDate = new Date(`${item.nextDue}T00:00:00.000Z`);
+    dueDate.setUTCMonth(dueDate.getUTCMonth() + 1);
+    item.nextDue = dueDate.toISOString().slice(0, 10);
+  } else if (paymentType === 'part_principal') {
+    item.principalOutstandingCents = Math.max(0, currentPrincipal - amountCents);
+    if (item.principalOutstandingCents === 0) {
+      item.status = 'redeemed';
+      item.redemptionDate = paymentDate;
+    }
+  } else if (paymentType === 'redemption') {
+    item.principalOutstandingCents = 0;
+    item.status = 'redeemed';
+    item.redemptionDate = paymentDate;
+  }
+
+  item.payments = item.payments || [];
+  item.payments.push({
+    _id: subdocId,
+    date: paymentDate,
+    amountCents,
+    paymentType,
+    paymentMethod,
+    bankAccountId: targetBankAccountId,
+    transactionId: tx._id,
+    note: params.note || '',
+  });
+
   await item.save();
-  await AuditLogModel.create({ userId, action: 'interest-paid', resourceType: 'pawnedItems', resourceId: item._id });
+  await AuditLogModel.create({
+    userId,
+    action: paymentType === 'interest' ? 'interest-paid' : paymentType === 'redemption' ? 'redeemed' : 'part-principal-paid',
+    resourceType: 'pawnedItems',
+    resourceId: item._id,
+  });
+
+  return item;
+}
+
+export async function deletePawnPayment(userId: string, pawnId: string, paymentId: string) {
+  if (!mongoose.isValidObjectId(pawnId)) throw new HttpError(400, 'Invalid pawned item id');
+  if (!mongoose.isValidObjectId(paymentId)) throw new HttpError(400, 'Invalid payment id');
+
+  const item = await PawnedItemModel.findOne({ _id: pawnId, userId });
+  if (!item) throw new HttpError(404, 'Pawned item not found');
+
+  const idx = (item.payments || []).findIndex((p: any) => String(p._id) === String(paymentId));
+  if (idx === -1) throw new HttpError(404, 'Payment not found');
+
+  const payment = item.payments[idx];
+  const refId = `pawn_payment_${item._id}_${payment._id}`;
+
+  await reverseTransaction(userId, refId);
+
+  if (payment.paymentType === 'interest') {
+    item.interestPaidCents = Math.max(0, (item.interestPaidCents || 0) - payment.amountCents);
+    const dueDate = new Date(`${item.nextDue}T00:00:00.000Z`);
+    dueDate.setUTCMonth(dueDate.getUTCMonth() - 1);
+    item.nextDue = dueDate.toISOString().slice(0, 10);
+  } else if (payment.paymentType === 'part_principal' || payment.paymentType === 'redemption') {
+    item.principalOutstandingCents = (item.principalOutstandingCents || 0) + payment.amountCents;
+    if (item.status === 'redeemed' && item.principalOutstandingCents > 0) {
+      item.status = 'active';
+      item.redemptionDate = '';
+    }
+  }
+
+  item.payments.splice(idx, 1);
+  await item.save();
+
+  await AuditLogModel.create({ userId, action: 'undo-pawn-payment', resourceType: 'pawnedItems', resourceId: item._id });
   return item;
 }
 

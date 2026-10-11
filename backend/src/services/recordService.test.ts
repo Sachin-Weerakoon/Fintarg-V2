@@ -1,8 +1,9 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
-import { calculateLoanPayoff, createRecord, deleteLoanRepayment, getRecord, listRecords, recordLoanRepayment, updateRecord } from './recordService';
+import { calculateLoanPayoff, createRecord, deleteLoanRepayment, deletePawnPayment, getRecord, listRecords, recordLoanRepayment, recordPawnPayment, updateRecord } from './recordService';
 import { BankAccountModel } from '../models/BankAccount';
+import { PawnedItemModel } from '../models/PawnedItem';
 import { TransactionModel } from '../models/Transaction';
 
 describe('recordService CRUD & Update partial isolation (1.1)', () => {
@@ -374,6 +375,113 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
           await recordLoanRepayment(userId, String(loan._id), 2500, '2026-02-01', 'Other account', 'bank_transfer', String(otherAccount._id));
         },
         (err: any) => err.status === 404 && /Bank account not found/i.test(err.message),
+      );
+    });
+  });
+
+  describe('pawn payments, part-principal, redemption, and undo (2.4)', () => {
+    it('creates pawned item with default status active and sets principalOutstandingCents', async () => {
+      const item = await createRecord('pawnedItems', userId, {
+        description: '22K Gold Sovereign',
+        ticketNumber: 'TKT-9901',
+        amountReceived: 100000,
+        interestRate: 2,
+        nextDue: '2026-03-01',
+      });
+
+      assert.strictEqual((item as any).status, 'active');
+      assert.strictEqual((item as any).ticketNumber, 'TKT-9901');
+      assert.strictEqual((item as any).amountReceivedCents, 10000000);
+      assert.strictEqual((item as any).principalOutstandingCents, 10000000);
+      assert.strictEqual((item as any).interestPaidCents, 0);
+    });
+
+    it('records interest payment, updates interestPaidCents, advances nextDue, and logs transaction', async () => {
+      const item = await createRecord('pawnedItems', userId, {
+        description: 'Gold Chain (16g)',
+        amountReceived: 60000,
+        interestRate: 24, // 24% annual / 2% monthly -> 60000 * 0.24 / 12 = 1200 rupees (120,000 cents)
+        nextDue: '2026-04-15',
+      });
+
+      const updated = await recordPawnPayment(userId, String(item._id), {
+        paymentType: 'interest',
+        paymentMethod: 'cash',
+        date: '2026-04-10',
+      });
+
+      assert.strictEqual(updated.interestPaidCents, 120000);
+      assert.strictEqual(updated.principalOutstandingCents, 6000000);
+      assert.strictEqual(updated.nextDue, '2026-05-15');
+      assert.strictEqual(updated.payments.length, 1);
+      assert.strictEqual(updated.payments[0].paymentType, 'interest');
+      assert.strictEqual(updated.payments[0].amountCents, 120000);
+
+      // Verify transaction created
+      const tx = await TransactionModel.findById(updated.payments[0].transactionId);
+      assert.ok(tx);
+      assert.strictEqual(tx.type, 'expense');
+      assert.strictEqual(tx.amountCents, 120000);
+    });
+
+    it('handles part-principal payment, full redemption, and undo', async () => {
+      const item = await createRecord('pawnedItems', userId, {
+        description: 'Gold Ring',
+        amountReceived: 50000,
+        interestRate: 12,
+        nextDue: '2026-05-01',
+      });
+
+      // Part principal of 20,000
+      const afterPart = await recordPawnPayment(userId, String(item._id), {
+        paymentType: 'part_principal',
+        amount: 20000,
+        paymentMethod: 'cash',
+        date: '2026-05-01',
+      });
+
+      assert.strictEqual(afterPart.principalOutstandingCents, 3000000);
+      assert.strictEqual(afterPart.status, 'active');
+      assert.strictEqual(afterPart.payments.length, 1);
+
+      // Full redemption of remaining 30,000
+      const afterRedemption = await recordPawnPayment(userId, String(item._id), {
+        paymentType: 'redemption',
+        paymentMethod: 'cash',
+        date: '2026-05-15',
+      });
+
+      assert.strictEqual(afterRedemption.principalOutstandingCents, 0);
+      assert.strictEqual(afterRedemption.status, 'redeemed');
+      assert.strictEqual(afterRedemption.redemptionDate, '2026-05-15');
+      assert.strictEqual(afterRedemption.payments.length, 2);
+
+      // Undo redemption payment
+      const redemptionPaymentId = String(afterRedemption.payments[1]._id);
+      const afterUndo = await deletePawnPayment(userId, String(item._id), redemptionPaymentId);
+
+      assert.strictEqual(afterUndo.principalOutstandingCents, 3000000);
+      assert.strictEqual(afterUndo.status, 'active');
+      assert.strictEqual(afterUndo.redemptionDate, '');
+      assert.strictEqual(afterUndo.payments.length, 1);
+    });
+
+    it('rejects bank payment without bankAccountId', async () => {
+      const item = await createRecord('pawnedItems', userId, {
+        description: 'Gold Bracelet',
+        amountReceived: 40000,
+        interestRate: 12,
+        nextDue: '2026-06-01',
+      });
+
+      await assert.rejects(
+        async () => {
+          await recordPawnPayment(userId, String(item._id), {
+            paymentType: 'interest',
+            paymentMethod: 'bank_transfer',
+          });
+        },
+        (err: any) => err.status === 400 && /Bank account is required/i.test(err.message),
       );
     });
   });

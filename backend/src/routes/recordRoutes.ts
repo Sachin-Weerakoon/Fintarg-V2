@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { contribute, create, getLoanPayoff, list, payPawnInterest, remove, repayLoan, transactionHistory, undoLoanRepayment, update } from '../controllers/recordController';
+import { contribute, create, getLoanPayoff, list, payPawnInterest, remove, repayLoan, transactionHistory, undoLoanRepayment, undoPawnPayment, update } from '../controllers/recordController';
 import { requireAuth, requireBusinessPlan } from '../middleware/auth';
 
 export const recordRoutes = Router();
@@ -12,6 +12,7 @@ recordRoutes.get('/loans/:id/payoff', getLoanPayoff);
 recordRoutes.post('/loans/:id/repay', repayLoan);
 recordRoutes.delete('/loans/:id/repayments/:repaymentId', undoLoanRepayment);
 recordRoutes.post('/pawnedItems/:id/payment', payPawnInterest);
+recordRoutes.delete('/pawnedItems/:id/payments/:paymentId', undoPawnPayment);
 recordRoutes.get('/:kind', list);
 recordRoutes.post('/:kind', create);
 recordRoutes.patch('/:kind/:id', update);
