@@ -625,20 +625,29 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
     <AppContext.Provider value={{ state, dispatch, showToast }}>
       {children}
       {toasts.length > 0 && (
-        <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none" aria-live="polite">
+        <div className="fixed bottom-5 right-5 z-[60] flex flex-col gap-2.5 w-[min(92vw,380px)] pointer-events-none no-print" aria-live="polite">
           {toasts.map((t: Toast) => (
             <div
               key={t.id}
-              className={`pointer-events-auto px-4 py-3 rounded-xl shadow-lg border text-xs font-medium flex items-center gap-2 transition-all ${
-                t.tone === 'error'
-                  ? 'bg-danger-tint border-danger-solid/40 text-danger-text'
-                  : t.tone === 'success'
-                  ? 'bg-success-tint border-success-solid/40 text-success-text'
-                  : 'bg-surface border-border text-text'
-              }`}
+              className="glass-toast pointer-events-auto relative overflow-hidden rounded-2xl pl-5 pr-4 py-3 flex items-center gap-3 text-xs font-medium animate-fade-in"
             >
-              <span>{t.tone === 'error' ? '⚠' : t.tone === 'success' ? '✓' : 'ℹ'}</span>
-              <span>{t.message}</span>
+              <span
+                className={`absolute left-0 top-0 bottom-0 w-1 ${t.tone === 'error' ? 'bg-rose-400' : t.tone === 'success' ? 'bg-emerald-400' : 'bg-primary-400'}`}
+                aria-hidden="true"
+              />
+              <span
+                className={`w-6 h-6 rounded-full border flex items-center justify-center text-[11px] font-black flex-shrink-0 ${
+                  t.tone === 'error'
+                    ? 'bg-rose-400/15 text-rose-300 border-rose-400/30'
+                    : t.tone === 'success'
+                    ? 'bg-emerald-400/15 text-emerald-300 border-emerald-400/30'
+                    : 'bg-primary-400/15 text-primary-300 border-primary-400/30'
+                }`}
+                aria-hidden="true"
+              >
+                {t.tone === 'error' ? '!' : t.tone === 'success' ? '✓' : 'i'}
+              </span>
+              <span className="text-slate-100 leading-relaxed">{t.message}</span>
             </div>
           ))}
         </div>

@@ -749,6 +749,88 @@ select option {
   scrollbar-width: none;
 }
 
+/* ───────────────────────────────────────────────────────────────
+   Landing-page theme — deep navy glass with teal accents.
+   Shared by toasts, the notification centre and insight hero panels
+   so alerts/reminders look identical across the whole system.
+   ─────────────────────────────────────────────────────────────── */
+.glass-panel {
+  background: linear-gradient(160deg, rgba(14, 23, 38, 0.97), rgba(11, 21, 40, 0.97));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  color: #E8EEF7;
+}
+.glass-toast {
+  background: rgba(14, 23, 38, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 18px 44px -14px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: #E8EEF7;
+}
+.hero-panel {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #070D19 0%, #0B1528 55%, #0F1D32 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #E8EEF7;
+}
+.hero-panel::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  left: -10%;
+  width: 420px;
+  height: 420px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(53, 194, 208, 0.16), transparent 65%);
+  pointer-events: none;
+}
+.hero-panel::after {
+  content: '';
+  position: absolute;
+  bottom: -40%;
+  right: -8%;
+  width: 380px;
+  height: 380px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(11, 127, 139, 0.2), transparent 65%);
+  pointer-events: none;
+}
+.hero-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-fade-in {
+  animation: fade-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-rise-in {
+  animation: rise-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes bell-ring {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(8deg); }
+  60% { transform: rotate(-6deg); }
+  75% { transform: rotate(3deg); }
+}
+.animate-bell-ring {
+  transform-origin: 50% 0;
+  animation: bell-ring 1.2s ease-in-out 1;
+}
+
 /* Motion reduction */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

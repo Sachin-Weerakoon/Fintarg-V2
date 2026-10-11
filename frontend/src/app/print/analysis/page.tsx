@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useApp, formatRs, calcAnalysis, calcExpensesByCategory } from '@/store';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 const MONTH_LABELS: Record<string, string> = {
   '2026-07': 'July 2026',
@@ -57,11 +58,8 @@ export default function PrintAnalysisPage() {
       <div className="border-b-2 border-text pb-6 mb-8">
         <div className="flex justify-between items-start">
           <div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-primary-solid text-white font-black flex items-center justify-center text-sm">
-                F
-              </div>
-              <h1 className="text-2xl font-black tracking-tight text-text">FINTARG</h1>
+            <div className="flex items-center gap-3">
+              <BrandLogo variant="full" onLight height={32} />
             </div>
             <p className="text-xs font-semibold text-muted uppercase tracking-widest mt-1">
               Personal & Business Financial Statement
