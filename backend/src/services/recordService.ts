@@ -23,7 +23,7 @@ import { TransactionModel } from '../models/Transaction';
 import { calculateAmortizationSchedule, calculateLoan } from '../utils/loanMath';
 import { HttpError } from '../middleware/errors';
 import { isValidIsoDate, transferSchema, type RecordKind } from '../validations/records';
-import { deleteTransfer, postTransaction, replaceTransaction, reverseTransaction, transferFunds } from './ledgerService';
+import { deleteTransfer, postTransaction, replaceTransaction, reverseTransaction, reverseTransactionById, transferFunds, updateTransactionById } from './ledgerService';
 
 const models: Record<RecordKind, Model<any>> = {
   bankAccounts: BankAccountModel,
@@ -453,6 +453,24 @@ export async function createRecord(kind: RecordKind, userId: string, input: Reco
     if (!await CardModel.exists({ _id: input.cardId, userId })) throw new HttpError(404, 'Card not found');
   }
   const data = toStoredForCreate(kind, input);
+  if (kind === 'transactions') {
+    const record = await postTransaction({
+      userId,
+      type: (data.type as any) || 'expense',
+      transferDirection: (data.transferDirection as any) || null,
+      transferGroupId: null,
+      amountCents: Number(data.amountCents || 0),
+      date: String(data.date),
+      category: String(data.category || 'General'),
+      description: String(data.description || ''),
+      paymentMethod: (data.paymentMethod as any) || 'cash',
+      bankAccountId: data.bankAccountId ? new mongoose.Types.ObjectId(String(data.bankAccountId)) : null,
+      cardId: data.cardId ? new mongoose.Types.ObjectId(String(data.cardId)) : null,
+      referenceId: '',
+    });
+    await AuditLogModel.create({ userId, action: 'create', resourceType: kind, resourceId: record._id });
+    return record.toObject();
+  }
   if (kind === 'businessBranches') delete data.entries;
   if (kind === 'branchEntries') data.branchId = new mongoose.Types.ObjectId(String(input.branchId));
   if (kind === 'ownerDraws') data.companyId = new mongoose.Types.ObjectId(String(input.companyId));
@@ -512,6 +530,28 @@ export async function updateRecord(kind: RecordKind, userId: string, id: string,
   const existingDoc = await models[kind].findOne({ _id: id, userId });
   if (!existingDoc) throw new HttpError(404, 'Record not found');
 
+  if (kind === 'transactions') {
+    if (existingDoc.referenceId || existingDoc.transferGroupId) {
+      throw new HttpError(403, 'System-generated transactions cannot be updated directly. Please modify the source record.');
+    }
+    const changes = toStoredForUpdate(kind, input, existingDoc);
+    const updated = await updateTransactionById(userId, id, {
+      userId,
+      type: (changes.type as any) || existingDoc.type,
+      transferDirection: (changes.transferDirection as any) || existingDoc.transferDirection,
+      amountCents: Number(changes.amountCents !== undefined ? changes.amountCents : existingDoc.amountCents),
+      date: String(changes.date || existingDoc.date),
+      category: String(changes.category || existingDoc.category),
+      description: String(changes.description !== undefined ? changes.description : existingDoc.description),
+      paymentMethod: (changes.paymentMethod as any) || existingDoc.paymentMethod,
+      bankAccountId: changes.bankAccountId !== undefined ? (changes.bankAccountId ? new mongoose.Types.ObjectId(String(changes.bankAccountId)) : null) : existingDoc.bankAccountId,
+      cardId: changes.cardId !== undefined ? (changes.cardId ? new mongoose.Types.ObjectId(String(changes.cardId)) : null) : existingDoc.cardId,
+      referenceId: '',
+    });
+    await AuditLogModel.create({ userId, action: 'update', resourceType: kind, resourceId: updated._id });
+    return updated.toObject();
+  }
+
   const changes = toStoredForUpdate(kind, input, existingDoc);
   const entries = kind === 'businessBranches' && Array.isArray(changes.entries) ? changes.entries as Record<string, unknown>[] : [];
   delete changes.entries;
@@ -570,6 +610,16 @@ export async function deleteRecord(kind: RecordKind, userId: string, id: string)
     if (account?.accountType === 'cash') {
       throw new HttpError(400, 'Cannot delete the built-in cash wallet account');
     }
+  }
+  if (kind === 'transactions') {
+    const existingTx = await TransactionModel.findOne({ _id: id, userId });
+    if (!existingTx) throw new HttpError(404, 'Record not found');
+    if (existingTx.referenceId || existingTx.transferGroupId) {
+      throw new HttpError(403, 'System-generated transactions cannot be deleted directly. Please delete or undo the source record.');
+    }
+    await reverseTransactionById(userId, id);
+    await AuditLogModel.create({ userId, action: 'delete', resourceType: kind, resourceId: existingTx._id });
+    return;
   }
   const deleted = await models[kind].findOneAndDelete({ _id: id, userId });
   if (!deleted) throw new HttpError(404, 'Record not found');

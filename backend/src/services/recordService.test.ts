@@ -1,7 +1,8 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
-import { addGoalContribution, calculateLoanPayoff, createRecord, deleteFinancePaymentPayment, deleteGoalContribution, deleteLoanRepayment, deletePawnPayment, deriveNextDueDate, getRecord, listRecords, recordFinancePayment, recordLoanRepayment, recordPawnPayment, updateRecord } from './recordService';
+import { addGoalContribution, calculateLoanPayoff, createRecord, deleteFinancePaymentPayment, deleteGoalContribution, deleteLoanRepayment, deletePawnPayment, deleteRecord, deriveNextDueDate, getRecord, listRecords, recordFinancePayment, recordLoanRepayment, recordPawnPayment, updateRecord } from './recordService';
+import { recomputeBalance } from './ledgerService';
 import { BankAccountModel } from '../models/BankAccount';
 import { FinancePaymentModel } from '../models/FinancePayment';
 import { PawnedItemModel } from '../models/PawnedItem';
@@ -699,6 +700,144 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
           });
         },
         (err: any) => err.status === 400 && /Bank account is required/i.test(err.message),
+      );
+    });
+  });
+
+  describe('Generic /records/transactions CRUD and system row protection (2.8)', () => {
+    it('creates generic transaction via ledger, adjusts account balance, and prevents direct referenceId spoofing', async () => {
+      const account = await createRecord('bankAccounts', userId, {
+        bankName: 'Seylan Bank',
+        accountNumber: '99881122',
+        accountName: 'Generic Tx Test',
+        accountType: 'savings',
+        openingBalance: 50000, // 5,000,000 cents
+      });
+
+      const tx = await createRecord('transactions', userId, {
+        type: 'expense',
+        amount: 10000, // 10,000 LKR = 1,000,000 cents
+        date: '2026-10-12',
+        category: 'Office Supplies',
+        description: 'Printer ink',
+        paymentMethod: 'bank_transfer',
+        bankAccountId: account._id.toString(),
+        referenceId: 'spoofed_system_id',
+      });
+
+      // referenceId should be empty (protected from direct spoofing)
+      assert.strictEqual(tx.referenceId, '');
+      assert.strictEqual(tx.amountCents, 1000000);
+
+      // Account balance must decrease by 10,000
+      const accAfter = await BankAccountModel.findById(account._id);
+      assert.strictEqual(accAfter?.balanceCents, 4000000);
+
+      // Recompute balance must show zero drift
+      const recompute = await recomputeBalance(userId, account._id.toString());
+      assert.strictEqual(recompute.driftCents, 0);
+      assert.strictEqual(recompute.computedBalanceCents, 4000000);
+    });
+
+    it('updates generic transaction with accurate balance adjustment and zero drift', async () => {
+      const account = await createRecord('bankAccounts', userId, {
+        bankName: 'HNB Bank',
+        accountNumber: '55443322',
+        accountName: 'Update Tx Test',
+        accountType: 'current',
+        openingBalance: 50000, // 5,000,000 cents
+      });
+
+      const tx = await createRecord('transactions', userId, {
+        type: 'expense',
+        amount: 10000,
+        date: '2026-10-12',
+        category: 'Supplies',
+        paymentMethod: 'bank_transfer',
+        bankAccountId: account._id.toString(),
+      });
+
+      // Update amount to 15,000
+      const updated = await updateRecord('transactions', userId, tx._id.toString(), {
+        amount: 15000,
+        description: 'Updated ink price',
+      });
+
+      assert.strictEqual(updated.amountCents, 1500000);
+      const accAfterUpdate = await BankAccountModel.findById(account._id);
+      assert.strictEqual(accAfterUpdate?.balanceCents, 3500000);
+
+      const recompute = await recomputeBalance(userId, account._id.toString());
+      assert.strictEqual(recompute.driftCents, 0);
+      assert.strictEqual(recompute.computedBalanceCents, 3500000);
+    });
+
+    it('deletes generic transaction, restores balance, and confirms zero drift', async () => {
+      const account = await createRecord('bankAccounts', userId, {
+        bankName: 'BOC Bank',
+        accountNumber: '11223344',
+        accountName: 'Delete Tx Test',
+        accountType: 'savings',
+        openingBalance: 50000, // 5,000,000 cents
+      });
+
+      const tx = await createRecord('transactions', userId, {
+        type: 'expense',
+        amount: 8000,
+        date: '2026-10-12',
+        paymentMethod: 'bank_transfer',
+        bankAccountId: account._id.toString(),
+      });
+
+      const accAfterCreate = await BankAccountModel.findById(account._id);
+      assert.strictEqual(accAfterCreate?.balanceCents, 4200000);
+
+      await deleteRecord('transactions', userId, tx._id.toString());
+
+      const accAfterDelete = await BankAccountModel.findById(account._id);
+      assert.strictEqual(accAfterDelete?.balanceCents, 5000000);
+
+      const recompute = await recomputeBalance(userId, account._id.toString());
+      assert.strictEqual(recompute.driftCents, 0);
+      assert.strictEqual(recompute.computedBalanceCents, 5000000);
+    });
+
+    it('protects system-generated rows (referenceId or transferGroupId present) from direct update and delete', async () => {
+      const account = await createRecord('bankAccounts', userId, {
+        bankName: 'Commercial Bank',
+        accountNumber: '77665544',
+        accountName: 'System Protection Test',
+        openingBalance: 100000,
+      });
+
+      // Create an expense record (which creates a system transaction with referenceId)
+      const expense = await createRecord('expenses', userId, {
+        date: '2026-10-12',
+        amount: 5000,
+        category: 'Food',
+        paymentMethod: 'bank_transfer',
+        bankAccountId: account._id.toString(),
+      });
+
+      const systemTx = await TransactionModel.findOne({ referenceId: expense._id.toString() });
+      assert.ok(systemTx);
+
+      // Attempting to update systemTx directly via /records/transactions must reject with 403
+      await assert.rejects(
+        async () => {
+          await updateRecord('transactions', userId, systemTx._id.toString(), {
+            amount: 9999,
+          });
+        },
+        (err: any) => err.status === 403 && /System-generated transactions cannot be updated directly/i.test(err.message),
+      );
+
+      // Attempting to delete systemTx directly via /records/transactions must reject with 403
+      await assert.rejects(
+        async () => {
+          await deleteRecord('transactions', userId, systemTx._id.toString());
+        },
+        (err: any) => err.status === 403 && /System-generated transactions cannot be deleted directly/i.test(err.message),
       );
     });
   });
