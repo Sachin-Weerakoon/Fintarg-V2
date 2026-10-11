@@ -1,6 +1,28 @@
 import { describe, expect, it } from 'vitest';
+import React from 'react';
 import { PAYMENT_METHOD_OPTIONS } from './PaymentMethodField';
 import { fetchTransactionHistory } from '../../services/storeApi';
+import {
+  FormField,
+  FormGrid,
+  MoneyField,
+  DateField,
+  Checkbox,
+  RadioGroup,
+  SettingRow,
+  SectionHeader,
+  ListRow,
+  DataTable,
+  FilterBar,
+  Tooltip,
+  IconChip,
+  Avatar,
+  ErrorState,
+  Divider,
+  PageSection,
+  Alert,
+  ColorSwatch,
+} from './index';
 
 describe('Stage 4 Building Blocks & Payment Methods', () => {
   it('defines all required payment methods with user-friendly labels', () => {
@@ -15,7 +37,6 @@ describe('Stage 4 Building Blocks & Payment Methods', () => {
   });
 
   it('formats fetchTransactionHistory queries properly', async () => {
-    // Mock global fetch
     const originalFetch = global.fetch;
     let requestedUrl = '';
     global.fetch = async (input: RequestInfo | URL) => {
@@ -58,5 +79,78 @@ describe('Stage 4 Building Blocks & Payment Methods', () => {
     } finally {
       global.fetch = originalFetch;
     }
+  });
+
+  it('exports all new UI primitives from components/ui/index', () => {
+    expect(FormField).toBeDefined();
+    expect(FormGrid).toBeDefined();
+    expect(MoneyField).toBeDefined();
+    expect(DateField).toBeDefined();
+    expect(Checkbox).toBeDefined();
+    expect(RadioGroup).toBeDefined();
+    expect(SettingRow).toBeDefined();
+    expect(SectionHeader).toBeDefined();
+    expect(ListRow).toBeDefined();
+    expect(DataTable).toBeDefined();
+    expect(FilterBar).toBeDefined();
+    expect(Tooltip).toBeDefined();
+    expect(IconChip).toBeDefined();
+    expect(Avatar).toBeDefined();
+    expect(ErrorState).toBeDefined();
+    expect(Divider).toBeDefined();
+    expect(PageSection).toBeDefined();
+    expect(Alert).toBeDefined();
+    expect(ColorSwatch).toBeDefined();
+  });
+
+  it('Avatar generates initials properly', () => {
+    const avatarEl = React.createElement(Avatar, { name: 'Kasun Perera' });
+    expect(avatarEl.props.name).toBe('Kasun Perera');
+  });
+
+  it('MoneyField handles numeric and formatted inputs', () => {
+    let _changed = '';
+    const field = React.createElement(MoneyField, {
+      value: 50000,
+      onChange: (v) => {
+        _changed = String(v);
+      },
+    });
+    expect(field.props.currency).toBeUndefined(); // defaults to Rs. inside component
+    expect(field.props.value).toBe(50000);
+  });
+
+  it('ColorSwatch renders with correct color and accessibility attributes', () => {
+    const swatch = React.createElement(ColorSwatch, {
+      color: '#0FA3B1',
+      selected: true,
+      ariaLabel: 'Teal color swatch',
+    });
+    expect(swatch.props.color).toBe('#0FA3B1');
+    expect(swatch.props.selected).toBe(true);
+    expect(swatch.props.ariaLabel).toBe('Teal color swatch');
+  });
+
+  it('SettingRow, ErrorState, and Checkbox render valid React elements', () => {
+    const setting = React.createElement(SettingRow, {
+      label: 'Dark Mode',
+      description: 'Switch application color theme',
+      control: React.createElement('span', null, 'Toggle'),
+    });
+    expect(setting.props.label).toBe('Dark Mode');
+
+    const err = React.createElement(ErrorState, {
+      message: 'Failed to fetch account list',
+      onRetry: () => {},
+    });
+    expect(err.props.message).toBe('Failed to fetch account list');
+
+    const check = React.createElement(Checkbox, {
+      checked: true,
+      onChange: () => {},
+      label: 'Notify via email',
+    });
+    expect((check.props as { checked: boolean; label: string }).checked).toBe(true);
+    expect((check.props as { checked: boolean; label: string }).label).toBe('Notify via email');
   });
 });

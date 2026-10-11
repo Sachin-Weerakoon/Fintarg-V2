@@ -7,7 +7,7 @@ export default async function PrintLayout({ children }: { children: React.ReactN
   if (!user) redirect('/welcome');
   return (
     <AppProvider initialProfile={user.profile || {}}>
-      <div className="min-h-screen bg-white text-slate-900">
+      <div className="min-h-screen bg-white text-text font-sans">
         {children}
       </div>
     </AppProvider>

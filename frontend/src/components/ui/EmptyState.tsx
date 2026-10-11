@@ -5,6 +5,7 @@ export interface EmptyStateProps {
   title: React.ReactNode;
   helper?: React.ReactNode;
   cta?: React.ReactNode;
+  action?: React.ReactNode;
   className?: string;
 }
 
@@ -13,8 +14,11 @@ export function EmptyState({
   title,
   helper,
   cta,
+  action,
   className = '',
 }: EmptyStateProps) {
+  const button = cta || action;
+
   return (
     <div
       className={`flex flex-col items-center justify-center text-center py-12 px-4 rounded-2xl border border-dashed border-border bg-surface/50 ${className}`.trim()}
@@ -32,7 +36,7 @@ export function EmptyState({
           {helper}
         </p>
       )}
-      {cta && <div className="mt-1">{cta}</div>}
+      {button && <div className="mt-1">{button}</div>}
     </div>
   );
 }

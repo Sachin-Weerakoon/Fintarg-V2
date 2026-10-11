@@ -13,10 +13,14 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
-import ConfirmDialog from '@/components/ConfirmDialog';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useToast } from '@/components/ui/ToastProvider';
+import { MoneyField } from '@/components/ui/MoneyField';
 
 export default function Goals() {
-  const { state, dispatch, showToast } = useApp();
+  const { state, dispatch } = useApp();
+  const confirm = useConfirm();
+  const toast = useToast();
   const month = state.selectedMonth;
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [goalForm, setGoalForm] = useState({
@@ -29,7 +33,19 @@ export default function Goals() {
   const [saving, setSaving] = useState<Record<string, { amount: string; date: string; note: string }>>({});
   const [adjusting, setAdjusting] = useState<string | null>(null);
   const [adjustForm, setAdjustForm] = useState({ dailyAmount: '' });
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const handleDeleteGoal = async (id: string, name: string) => {
+    const ok = await confirm({
+      title: 'Delete Savings Goal',
+      message: `Are you sure you want to delete savings goal "${name}"? This action cannot be undone.`,
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (ok) {
+      dispatch({ type: 'DELETE_GOAL', id });
+      toast.success(`Savings goal "${name}" deleted`);
+    }
+  };
 
   const DAYS_IN_MONTH = 30;
   const a = calcAnalysis(state, month);
@@ -100,7 +116,7 @@ export default function Goals() {
       });
     }
 
-    showToast(`Savings goal "${goalForm.name}" created! Target deadline reminder scheduled.`, 'success');
+    toast.success(`Savings goal "${goalForm.name}" created! Target deadline reminder scheduled.`);
     setGoalForm({ name: '', targetAmount: '', targetDate: '', dailyAmount: '' });
     setGoalError('');
     setShowAddGoal(false);
@@ -172,11 +188,10 @@ export default function Goals() {
               />
             </Field>
             <Field id="goal-targetamt" label="Target Total Amount (Rs.)">
-              <Input
-                type="number"
+              <MoneyField
                 value={goalForm.targetAmount}
-                onChange={e => setGoalForm(f => ({ ...f, targetAmount: e.target.value }))}
-                placeholder="e.g. 500,000"
+                onChange={v => setGoalForm(f => ({ ...f, targetAmount: String(v) }))}
+                placeholder="500,000"
               />
             </Field>
             <Field id="goal-targetdate" label="Target Date">
@@ -214,16 +229,16 @@ export default function Goals() {
           <Badge tone="neutral" size="sm">Auto-tracked from expenses</Badge>
         </div>
         <div className="flex flex-wrap items-end gap-6 mb-3">
-          <div>
-            <label className="block text-xs font-semibold text-text mb-1">Monthly budget (Rs.)</label>
+          <Field id="personal-budget" label="Monthly budget (Rs.)">
             <Input
+              id="personal-budget"
               className="!w-36"
               type="number"
               min="0"
               value={budget}
               onChange={e => dispatch({ type: 'SET_PERSONAL_SPENDING_BUDGET', budget: Number(e.target.value) })}
             />
-          </div>
+          </Field>
           <div>
             <div className="text-xs text-muted mb-1">Actual spent (Personal category)</div>
             <div className="text-lg font-bold text-text num">{formatRs(personalSpent)}</div>
@@ -322,7 +337,7 @@ export default function Goals() {
                     variant="ghost"
                     size="sm"
                     className="text-danger-text hover:text-danger-text !p-1.5"
-                    onClick={() => setDeleteConfirmId(goal.id)}
+                    onClick={() => handleDeleteGoal(goal.id, goal.name)}
                     aria-label="Delete goal"
                   >
                     <Icon name="trash" size={14} />
@@ -387,15 +402,17 @@ export default function Goals() {
                       Maximum achievable: <strong className="num">{formatRs(Math.max(0, cashForThisGoal))}</strong>.
                     </p>
                     {!adjusting && (
-                      <button
-                        className="mt-2 text-xs font-semibold text-primary-text hover:underline block"
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="!p-0 mt-2 text-xs font-semibold text-primary-text hover:underline block"
                         onClick={() => {
                           setAdjusting(goal.id);
                           setAdjustForm({ dailyAmount: String(Math.max(0, Math.floor(cashForThisGoal / DAYS_IN_MONTH))) });
                         }}
                       >
                         Adjust goal to feasible amount →
-                      </button>
+                      </Button>
                     )}
                   </div>
                 )}
@@ -405,9 +422,9 @@ export default function Goals() {
                   <div className="p-4 rounded-xl mb-3 border border-border bg-surface-hover/70">
                     <div className="font-semibold text-xs mb-2 text-text">Adjust goal</div>
                     <div className="flex gap-2 items-end">
-                      <div className="flex-1">
-                        <label className="block text-xs font-medium text-muted mb-1">New daily amount (Rs.)</label>
+                      <Field id={`adjust-daily-${goal.id}`} label="New daily amount (Rs.)" className="flex-1">
                         <Input
+                          id={`adjust-daily-${goal.id}`}
                           type="number"
                           value={adjustForm.dailyAmount}
                           onChange={e => setAdjustForm({ dailyAmount: e.target.value })}
@@ -417,7 +434,7 @@ export default function Goals() {
                             Monthly: <span className="num font-semibold text-text">{formatRs(Number(adjustForm.dailyAmount) * 30)}</span>
                           </p>
                         )}
-                      </div>
+                      </Field>
                       <Button variant="primary" size="sm" onClick={() => submitAdjust(goal.id)}>Save</Button>
                       <Button variant="secondary" size="sm" onClick={() => setAdjusting(null)}>Cancel</Button>
                     </div>
@@ -426,31 +443,31 @@ export default function Goals() {
 
                 {/* Add contribution form */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mt-3 items-end">
-                  <div>
-                    <label className="block text-xs font-medium text-muted mb-1">Contribution (Rs.)</label>
+                  <Field id={`contrib-amount-${goal.id}`} label="Contribution (Rs.)">
                     <Input
+                      id={`contrib-amount-${goal.id}`}
                       type="number"
                       placeholder="1,000"
                       value={sv.amount}
                       onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, amount: e.target.value } }))}
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-muted mb-1">Date</label>
+                  </Field>
+                  <Field id={`contrib-date-${goal.id}`} label="Date">
                     <Input
+                      id={`contrib-date-${goal.id}`}
                       type="date"
                       value={sv.date}
                       onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, date: e.target.value } }))}
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-muted mb-1">Note (optional)</label>
+                  </Field>
+                  <Field id={`contrib-note-${goal.id}`} label="Note (optional)">
                     <Input
+                      id={`contrib-note-${goal.id}`}
                       placeholder="e.g. Salary deposit"
                       value={sv.note}
                       onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, note: e.target.value } }))}
                     />
-                  </div>
+                  </Field>
                   <Button variant="primary" size="sm" onClick={() => addContribution(goal.id)}>
                     Add Savings
                   </Button>
@@ -478,20 +495,7 @@ export default function Goals() {
         </div>
       )}
 
-      {deleteConfirmId && (
-        <ConfirmDialog
-          title="Delete Savings Goal"
-          message="Are you sure you want to delete this savings goal? This action cannot be undone."
-          confirmLabel="Yes, Delete"
-          cancelLabel="No, Keep"
-          tone="danger"
-          onConfirm={() => {
-            dispatch({ type: 'DELETE_GOAL', id: deleteConfirmId });
-            setDeleteConfirmId(null);
-          }}
-          onCancel={() => setDeleteConfirmId(null)}
-        />
-      )}
+
     </PageContainer>
   );
 }

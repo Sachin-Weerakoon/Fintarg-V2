@@ -8,15 +8,32 @@ import { PageContainer } from '@/components/ui/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Icon } from '@/components/ui/Icon';
-import ConfirmDialog from '@/components/ConfirmDialog';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useToast } from '@/components/ui/ToastProvider';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 export default function DocumentsClient() {
   const { state, dispatch } = useApp();
+  const confirm = useConfirm();
+  const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const handleDelete = async (id: string, label: string) => {
+    const ok = await confirm({
+      title: 'Delete Document',
+      message: `Are you sure you want to remove "${label}" from your vault?`,
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (ok) {
+      dispatch({ type: 'DELETE_DOCUMENT', id });
+      toast.success(`Document "${label}" removed`);
+    }
+  };
 
   const upload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -58,7 +75,7 @@ export default function DocumentsClient() {
         description="Secure repository for national ID, agreements, salary slips, and deeds."
         actions={
           <div className="flex items-center gap-3">
-            <input
+            <Input
               ref={fileRef}
               type="file"
               accept="application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -93,35 +110,26 @@ export default function DocumentsClient() {
       )}
 
       {state.documents.length === 0 ? (
-        <Card
-          className={`text-center py-16 px-6 border-dashed border-2 border-border hover:border-primary-500/50 transition-colors cursor-pointer ${
-            uploading ? 'opacity-50 pointer-events-none' : ''
-          }`}
-          onClick={() => fileRef.current?.click()}
-        >
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-primary-tint text-primary-text flex items-center justify-center mb-4">
-            <Icon name="documents" size={28} />
-          </div>
-          <h3 className="font-bold text-base text-text mb-1">
-            {uploading ? 'Uploading your document...' : 'No documents uploaded yet'}
-          </h3>
-          <p className="text-xs text-muted max-w-sm mx-auto mb-5 leading-relaxed">
-            {uploading
+        <EmptyState
+          icon={<Icon name="documents" size={32} />}
+          title={uploading ? 'Uploading your document...' : 'No documents uploaded yet'}
+          helper={
+            uploading
               ? 'Please wait while your document is being securely encrypted and stored.'
-              : 'Drag and drop or select PDFs, PNGs, and DOCX files. Keep all bank and legal papers securely organized in one place.'}
-          </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={e => {
-              e.stopPropagation();
-              fileRef.current?.click();
-            }}
-            loading={uploading}
-          >
-            {uploading ? 'Uploading...' : 'Select Files to Upload (Max 10MB)'}
-          </Button>
-        </Card>
+              : 'Drag and drop or select PDFs, PNGs, and DOCX files. Keep all bank and legal papers securely organized in one place.'
+          }
+          action={
+            <Button
+              variant="primary"
+              size="sm"
+              iconLeft={<Icon name="upload" size={16} />}
+              onClick={() => fileRef.current?.click()}
+              loading={uploading}
+            >
+              Select Files to Upload (Max 10MB)
+            </Button>
+          }
+        />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {state.documents.map(document => (
@@ -139,7 +147,7 @@ export default function DocumentsClient() {
                     size="sm"
                     className="text-muted hover:text-danger-text !p-1.5"
                     aria-label={`Delete ${document.label}`}
-                    onClick={() => setDeleteConfirmId(document.id)}
+                    onClick={() => handleDelete(document.id, document.label)}
                     title="Delete file"
                   >
                     <Icon name="trash" size={15} />
@@ -170,20 +178,7 @@ export default function DocumentsClient() {
         </div>
       )}
 
-      {deleteConfirmId && (
-        <ConfirmDialog
-          title="Delete Document"
-          message="Are you sure you want to remove this document from your vault?"
-          confirmLabel="Yes, Delete"
-          cancelLabel="No, Keep"
-          tone="danger"
-          onConfirm={() => {
-            dispatch({ type: 'DELETE_DOCUMENT', id: deleteConfirmId });
-            setDeleteConfirmId(null);
-          }}
-          onCancel={() => setDeleteConfirmId(null)}
-        />
-      )}
+
     </PageContainer>
   );
 }

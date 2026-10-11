@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Icon } from '@/components/ui/Icon';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 const MONTHS = ['2026-07', '2026-08', '2026-09'];
 const MONTH_LABELS: Record<string, string> = { '2026-07': 'July 2026', '2026-08': 'August 2026', '2026-09': 'September 2026' };
@@ -229,7 +230,17 @@ export default function Analysis() {
             </div>
           </div>
           {catEntries.length === 0 ? (
-            <p className="text-xs text-muted py-4 text-center">No expenses recorded for this month.</p>
+            <EmptyState
+              title="No expenses recorded"
+              helper="Add expenses for this month to see category distribution and burn rate breakdown."
+              action={
+                <Link href="/financial?tab=expenses">
+                  <Button variant="secondary" size="sm">
+                    Record Expense
+                  </Button>
+                </Link>
+              }
+            />
           ) : (
             <div className="space-y-3">
               {catEntries.map(([cat, amt]) => (
@@ -267,10 +278,10 @@ export default function Analysis() {
             </div>
           </div>
 
-          <div className="flex gap-6 items-end pt-4 pb-2" style={{ height: 140 }}>
+          <div className="flex gap-6 items-end pt-4 pb-2 h-[140px]">
             {trendData.map(t => (
               <div key={t.month} className="flex-1 flex flex-col items-center gap-2">
-                <div className="w-full flex gap-1.5 items-end justify-center" style={{ height: 95 }}>
+                <div className="w-full flex gap-1.5 items-end justify-center h-[95px]">
                   <div
                     className="w-5 rounded-t-lg transition-all duration-300 hover:brightness-110 shadow-sm bg-success-solid"
                     style={{ height: `${Math.max(6, (t.income / maxTrend) * 95)}px` }}
