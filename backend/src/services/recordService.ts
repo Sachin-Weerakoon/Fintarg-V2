@@ -64,7 +64,7 @@ const moneyFields: Partial<Record<RecordKind, Record<string, string>>> = {
   agreements: { value: 'valueCents' },
 };
 
-function toStored(kind: RecordKind, input: Record<string, unknown>, isCreate = false) {
+function toStoredForCreate(kind: RecordKind, input: Record<string, unknown>) {
   const stored: Record<string, unknown> = { ...input };
   for (const [inputKey, modelKey] of Object.entries(moneyFields[kind] ?? {})) {
     if (inputKey in stored) {
@@ -85,10 +85,8 @@ function toStored(kind: RecordKind, input: Record<string, unknown>, isCreate = f
       stored.monthlyTargetCents = dailyCents * 30;
       delete stored.dailyAmount;
     }
-    if (isCreate) {
-      if (!('savedAmountCents' in stored)) stored.savedAmountCents = 0;
-      if (!('contributions' in stored)) stored.contributions = [];
-    }
+    if (!('savedAmountCents' in stored)) stored.savedAmountCents = 0;
+    if (!('contributions' in stored)) stored.contributions = [];
   }
   if (kind === 'loans') {
     if ('rate' in stored) {
@@ -129,6 +127,13 @@ function toStored(kind: RecordKind, input: Record<string, unknown>, isCreate = f
     }
   }
   if (kind === 'cards') {
+    if ('cardNumber' in stored && stored.cardNumber && !stored.last4) {
+      stored.last4 = String(stored.cardNumber).replace(/\D/g, '').slice(-4);
+      stored.lastFourDigits = stored.last4;
+    }
+    delete stored.cardNumber;
+    delete stored.cvv;
+
     if ('name' in stored && !('cardName' in stored)) {
       stored.cardName = stored.name;
     }
@@ -137,10 +142,6 @@ function toStored(kind: RecordKind, input: Record<string, unknown>, isCreate = f
     }
     if (!stored.cardName) {
       stored.cardName = 'Payment Card';
-    }
-    if ('cardNumber' in stored && stored.cardNumber && !stored.last4) {
-      stored.last4 = String(stored.cardNumber).replace(/\D/g, '').slice(-4);
-      stored.lastFourDigits = stored.last4;
     }
     if ('lastFourDigits' in stored && !('last4' in stored)) {
       stored.last4 = String(stored.lastFourDigits).slice(-4);
@@ -174,6 +175,159 @@ function toStored(kind: RecordKind, input: Record<string, unknown>, isCreate = f
   return stored;
 }
 
+function toStoredForUpdate(kind: RecordKind, input: Record<string, unknown>, existingDoc: any) {
+  const stored: Record<string, unknown> = { ...input };
+  for (const [inputKey, modelKey] of Object.entries(moneyFields[kind] ?? {})) {
+    if (inputKey in stored) {
+      stored[modelKey] = Math.round(Number(stored[inputKey]) * 100);
+      delete stored[inputKey];
+    }
+  }
+  if (kind === 'goals') {
+    if (stored.targetDate && (!stored.endDate || stored.endDate === '')) {
+      stored.endDate = stored.targetDate;
+    }
+    if (stored.endDate && (!stored.targetDate || stored.targetDate === '')) {
+      stored.targetDate = stored.endDate;
+    }
+    if ('dailyAmount' in stored && stored.dailyAmount !== undefined && stored.dailyAmount !== null && stored.dailyAmount !== '') {
+      const dailyCents = Math.round(Number(stored.dailyAmount) * 100);
+      stored.dailyAmountCents = dailyCents;
+      stored.monthlyTargetCents = dailyCents * 30;
+      delete stored.dailyAmount;
+    }
+  }
+  if (kind === 'loans') {
+    if ('rate' in stored) {
+      stored.ratePercent = Number(stored.rate);
+      delete stored.rate;
+    }
+    const hasTermChanges =
+      'principalCents' in stored ||
+      'ratePercent' in stored ||
+      'tenureMonths' in stored ||
+      'method' in stored ||
+      'interestBasis' in stored;
+
+    if (hasTermChanges) {
+      const newPrincipalCents = 'principalCents' in stored ? Number(stored.principalCents) : Number(existingDoc.principalCents || 0);
+      const principal = newPrincipalCents / 100;
+      const rate = 'ratePercent' in stored ? Number(stored.ratePercent) : Number(existingDoc.ratePercent || 0);
+      const tenure = 'tenureMonths' in stored ? Number(stored.tenureMonths) : Number(existingDoc.tenureMonths || 12);
+      const method = (('method' in stored ? stored.method : existingDoc.method) as any) || 'simple';
+      const calc = calculateLoan(principal, rate, tenure, method);
+      stored.monthlyPaymentCents = Math.round(calc.monthlyPayment * 100);
+      stored.totalInterestCents = Math.round(calc.totalInterest * 100);
+
+      if ('principalCents' in stored && !('balanceCents' in stored)) {
+        const totalRepaidCents = Array.isArray(existingDoc.repayments) && existingDoc.repayments.length > 0
+          ? existingDoc.repayments.reduce((sum: number, r: any) => sum + (Number(r.amountCents) || 0), 0)
+          : Math.max(0, (Number(existingDoc.principalCents) || 0) - (Number(existingDoc.balanceCents) || 0));
+
+        stored.balanceCents = Math.max(0, newPrincipalCents - totalRepaidCents);
+      }
+    }
+  }
+  if (kind === 'pawnedItems' && 'interestRate' in stored) {
+    stored.interestRatePercent = Number(stored.interestRate);
+    delete stored.interestRate;
+  }
+  if (kind === 'bankAccounts') {
+    if ('name' in stored && !('accountName' in stored)) {
+      stored.accountName = stored.name;
+    }
+    if ('accountName' in stored && !('name' in stored)) {
+      stored.name = stored.accountName;
+    }
+    if ('currentBalance' in stored && !('balance' in stored) && !('balanceCents' in stored)) {
+      stored.balanceCents = Math.round(Number(stored.currentBalance || 0) * 100);
+      delete stored.currentBalance;
+    }
+    if (stored.accountType === 'checking') {
+      stored.accountType = 'current';
+    }
+  }
+  if (kind === 'cards') {
+    if ('cardNumber' in stored && stored.cardNumber && !stored.last4) {
+      stored.last4 = String(stored.cardNumber).replace(/\D/g, '').slice(-4);
+      stored.lastFourDigits = stored.last4;
+    }
+    delete stored.cardNumber;
+    delete stored.cvv;
+
+    if ('name' in stored && !('cardName' in stored)) {
+      stored.cardName = stored.name;
+    }
+    if ('cardName' in stored && !('name' in stored)) {
+      stored.name = stored.cardName;
+    }
+    if ('lastFourDigits' in stored && !('last4' in stored)) {
+      stored.last4 = String(stored.lastFourDigits).slice(-4);
+    }
+    if ('expiryDate' in stored && stored.expiryDate && (!stored.expiryMonth || !stored.expiryYear)) {
+      const match = String(stored.expiryDate).match(/^(\d{1,2})\/(\d{2,4})$/);
+      if (match) {
+        stored.expiryMonth = parseInt(match[1], 10);
+        const yr = parseInt(match[2], 10);
+        stored.expiryYear = yr < 100 ? 2000 + yr : yr;
+      }
+    }
+  }
+  if ('bankAccountId' in stored) {
+    if (stored.bankAccountId && mongoose.isValidObjectId(stored.bankAccountId)) {
+      stored.bankAccountId = new mongoose.Types.ObjectId(String(stored.bankAccountId));
+    } else {
+      stored.bankAccountId = null;
+    }
+  }
+  if ('cardId' in stored) {
+    if (stored.cardId && mongoose.isValidObjectId(stored.cardId)) {
+      stored.cardId = new mongoose.Types.ObjectId(String(stored.cardId));
+    } else {
+      stored.cardId = null;
+    }
+  }
+  return stored;
+}
+
+export async function getRecord(kind: RecordKind, userId: string, id: string) {
+  if (!mongoose.isValidObjectId(id)) throw new HttpError(400, 'Invalid record id');
+  const record: any = await models[kind].findOne({ _id: id, userId }).lean();
+  if (!record) throw new HttpError(404, 'Record not found');
+  if (kind === 'bankAccounts') {
+    return {
+      ...record,
+      id: record._id.toString(),
+      name: (record as any).accountName || (record as any).name || 'Main Account',
+      accountName: (record as any).accountName || (record as any).name || 'Main Account',
+      currentBalance: ((record as any).balanceCents || 0) / 100,
+      balance: ((record as any).balanceCents || 0) / 100,
+    };
+  }
+  if (kind === 'cards') {
+    const card: any = { ...record };
+    delete card.cardNumber;
+    delete card.cvv;
+    return {
+      ...card,
+      id: card._id.toString(),
+      name: card.cardName || card.name || 'Payment Card',
+      cardName: card.cardName || card.name || 'Payment Card',
+      lastFourDigits: card.last4 || '0000',
+      currentBalance: (card.balanceCents || 0) / 100,
+      creditLimit: (card.creditLimitCents || 0) / 100,
+    };
+  }
+  if (kind === 'businessBranches') {
+    const entries = await BranchEntryModel.find({ userId, branchId: record._id }).sort({ date: -1 }).lean();
+    return {
+      ...record,
+      entries: entries.map((entry: any) => ({ ...entry, amountCents: entry.amountCents })),
+    };
+  }
+  return record;
+}
+
 export async function listRecords(kind: RecordKind, userId: string) {
   const records = await models[kind].find({ userId }).sort({ createdAt: -1 }).lean();
   if (kind === 'bankAccounts') {
@@ -187,15 +341,19 @@ export async function listRecords(kind: RecordKind, userId: string) {
     }));
   }
   if (kind === 'cards') {
-    return records.map((card: any) => ({
-      ...card,
-      id: card._id.toString(),
-      name: card.cardName || card.name || 'Payment Card',
-      cardName: card.cardName || card.name || 'Payment Card',
-      lastFourDigits: card.last4 || '0000',
-      currentBalance: (card.balanceCents || 0) / 100,
-      creditLimit: (card.creditLimitCents || 0) / 100,
-    }));
+    return records.map((card: any) => {
+      delete card.cardNumber;
+      delete card.cvv;
+      return {
+        ...card,
+        id: card._id.toString(),
+        name: card.cardName || card.name || 'Payment Card',
+        cardName: card.cardName || card.name || 'Payment Card',
+        lastFourDigits: card.last4 || '0000',
+        currentBalance: (card.balanceCents || 0) / 100,
+        creditLimit: (card.creditLimitCents || 0) / 100,
+      };
+    });
   }
   if (kind !== 'businessBranches') return records;
   const branchIds = records.map((branch: any) => branch._id);
@@ -220,7 +378,7 @@ export async function createRecord(kind: RecordKind, userId: string, input: Reco
   if ((kind === 'cards' || kind === 'expenses' || kind === 'incomes' || kind === 'transactions' || kind === 'financePayments') && input.bankAccountId) {
     if (!mongoose.isValidObjectId(input.bankAccountId) || !await BankAccountModel.exists({ _id: input.bankAccountId, userId })) throw new HttpError(404, 'Bank account not found');
   }
-  const data = toStored(kind, input, true);
+  const data = toStoredForCreate(kind, input);
   if (kind === 'businessBranches') delete data.entries;
   if (kind === 'branchEntries') data.branchId = new mongoose.Types.ObjectId(String(input.branchId));
   if (kind === 'ownerDraws') data.companyId = new mongoose.Types.ObjectId(String(input.companyId));
@@ -267,7 +425,11 @@ export async function updateRecord(kind: RecordKind, userId: string, id: string,
   if ((kind === 'cards' || kind === 'expenses' || kind === 'incomes' || kind === 'transactions' || kind === 'financePayments') && input.bankAccountId) {
     if (!mongoose.isValidObjectId(input.bankAccountId) || !await BankAccountModel.exists({ _id: input.bankAccountId, userId })) throw new HttpError(404, 'Bank account not found');
   }
-  const changes = toStored(kind, input, false);
+
+  const existingDoc = await models[kind].findOne({ _id: id, userId });
+  if (!existingDoc) throw new HttpError(404, 'Record not found');
+
+  const changes = toStoredForUpdate(kind, input, existingDoc);
   const entries = kind === 'businessBranches' && Array.isArray(changes.entries) ? changes.entries as Record<string, unknown>[] : [];
   delete changes.entries;
   const updated = await models[kind].findOneAndUpdate(

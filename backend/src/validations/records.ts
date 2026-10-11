@@ -27,7 +27,7 @@ export const recordSchemas = {
     cardType: z.enum(['debit', 'credit']).default('debit'),
     cardNumber: z.string().trim().optional(),
     cardNetwork: z.enum(['visa', 'mastercard', 'amex', 'discover', 'other']).default('visa'),
-    last4: z.string().trim().optional(),
+    last4: z.string().trim().regex(/^\d{4}$/, 'last4 must be exactly 4 digits').optional(),
     lastFourDigits: z.string().trim().optional(),
     expiryDate: z.string().trim().optional(),
     expiryMonth: z.coerce.number().int().min(1).max(12).optional(),
