@@ -68,6 +68,82 @@ export function AccountsTab() {
   // Clipboard copy state
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Transfer Funds Modal State
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [transferForm, setTransferForm] = useState({
+    fromEntity: '',
+    toEntity: '',
+    amount: '',
+    date: new Date().toISOString().slice(0, 10),
+    description: '',
+  });
+  const [transferError, setTransferError] = useState('');
+  const [isTransferring, setIsTransferring] = useState(false);
+
+  const submitTransfer = async () => {
+    if (!transferForm.fromEntity) {
+      setTransferError('Please select a source account, card, or cash wallet.');
+      return;
+    }
+    if (!transferForm.toEntity) {
+      setTransferError('Please select a destination account, card, or cash wallet.');
+      return;
+    }
+    if (transferForm.fromEntity === transferForm.toEntity) {
+      setTransferError('Source and destination accounts must be different.');
+      return;
+    }
+    const numAmount = Number(transferForm.amount);
+    if (!numAmount || numAmount <= 0) {
+      setTransferError('Please enter a valid positive transfer amount.');
+      return;
+    }
+    if (!transferForm.date) {
+      setTransferError('Please enter a valid transfer date.');
+      return;
+    }
+
+    let fromAccountId: string | null = null;
+    let fromCardId: string | null = null;
+    if (transferForm.fromEntity === 'cash') fromAccountId = 'cash';
+    else if (transferForm.fromEntity.startsWith('ba_')) fromAccountId = transferForm.fromEntity.slice(3);
+    else if (transferForm.fromEntity.startsWith('cd_')) fromCardId = transferForm.fromEntity.slice(3);
+
+    let toAccountId: string | null = null;
+    let toCardId: string | null = null;
+    if (transferForm.toEntity === 'cash') toAccountId = 'cash';
+    else if (transferForm.toEntity.startsWith('ba_')) toAccountId = transferForm.toEntity.slice(3);
+    else if (transferForm.toEntity.startsWith('cd_')) toCardId = transferForm.toEntity.slice(3);
+
+    setIsTransferring(true);
+    setTransferError('');
+    try {
+      await dispatch({
+        type: 'TRANSFER_FUNDS',
+        fromAccountId,
+        fromCardId,
+        toAccountId,
+        toCardId,
+        amount: numAmount,
+        date: transferForm.date,
+        description: transferForm.description.trim() || undefined,
+      });
+      toast.success(`Transferred ${formatRs(numAmount)} successfully`);
+      setIsTransferOpen(false);
+      setTransferForm({
+        fromEntity: '',
+        toEntity: '',
+        amount: '',
+        date: new Date().toISOString().slice(0, 10),
+        description: '',
+      });
+    } catch (err: any) {
+      setTransferError(err?.message || 'Transfer failed. Please try again.');
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
   const handleDeleteAccount = async (id: string, name: string) => {
     const ok = await confirm({
       title: 'Delete Bank Account',

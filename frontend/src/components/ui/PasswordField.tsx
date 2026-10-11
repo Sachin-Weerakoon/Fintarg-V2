@@ -4,18 +4,24 @@ import { Icon } from './Icon';
 
 export interface PasswordFieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
   hasError?: boolean;
+  iconLeft?: React.ReactNode;
 }
 
 export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldProps>(
-  function PasswordField({ hasError = false, className = '', ...props }, ref) {
+  function PasswordField({ hasError = false, iconLeft, className = '', ...props }, ref) {
     const [visible, setVisible] = useState(false);
 
     return (
       <div className="relative flex items-center w-full">
+        {iconLeft && (
+          <div className="absolute left-3.5 flex items-center pointer-events-none text-muted">
+            {iconLeft}
+          </div>
+        )}
         <input
           ref={ref}
           type={visible ? 'text' : 'password'}
-          className={`form-input w-full !pr-10 ${
+          className={`form-input w-full ${iconLeft ? '!pl-10' : ''} !pr-10 ${
             hasError ? '!border-danger-solid focus:!border-danger-solid' : ''
           } ${className}`.trim()}
           {...props}

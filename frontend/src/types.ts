@@ -80,6 +80,8 @@ export interface Card {
 export interface Transaction {
   id: string;
   type: 'income' | 'expense' | 'transfer';
+  transferDirection?: 'incoming' | 'outgoing';
+  transferGroupId?: string;
   amount: number;
   date: string;
   category?: string;

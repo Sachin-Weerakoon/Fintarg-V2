@@ -416,15 +416,53 @@ body:has(.dark-mode) {
   border-color: var(--color-primary-600);
   box-shadow: 0 0 0 2px var(--color-primary-tint);
 }
+.dark-mode .form-input {
+  background-color: #0E1626;
+  border-color: #24344D;
+  color: var(--color-text);
+}
 .dark-mode .form-input:hover {
   border-color: var(--color-primary-400);
 }
 .dark-mode .form-input:focus {
   border-color: var(--color-primary-400);
-  box-shadow: 0 0 0 2px rgba(53, 194, 208, 0.2);
+  background-color: #080E1A;
+  box-shadow: 0 0 0 2px rgba(53, 194, 208, 0.25);
 }
 .form-input::placeholder {
   color: var(--color-placeholder);
+}
+.dark-mode .form-input::placeholder {
+  color: #64748B;
+}
+
+/* Explicit dark input utility to match theme */
+.form-input-dark {
+  background-color: #0E1626 !important;
+  border: 1.5px solid #24344D !important;
+  color: #E8EEF7 !important;
+}
+.form-input-dark:hover {
+  border-color: #35C2D0 !important;
+}
+.form-input-dark:focus {
+  border-color: #35C2D0 !important;
+  background-color: #080E1A !important;
+  box-shadow: 0 0 0 2px rgba(53, 194, 208, 0.25) !important;
+}
+.form-input-dark::placeholder {
+  color: #64748B !important;
+}
+
+/* Onboarding & Auth Card */
+.onboarding-card {
+  background: rgba(14, 23, 38, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 24px 60px -15px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(16px);
+  color: #E8EEF7;
 }
 
 select option {

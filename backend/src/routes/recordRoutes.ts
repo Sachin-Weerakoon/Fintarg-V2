@@ -1,11 +1,13 @@
 import { Router } from 'express';
-import { contribute, create, getLoanPayoff, list, payFinancePayment, payPawnInterest, remove, repayLoan, transactionHistory, undoContribution, undoFinancePayment, undoLoanRepayment, undoPawnPayment, update } from '../controllers/recordController';
+import { contribute, create, createTransfer, getLoanPayoff, list, payFinancePayment, payPawnInterest, remove, repayLoan, transactionHistory, undoContribution, undoFinancePayment, undoLoanRepayment, undoPawnPayment, undoTransfer, update } from '../controllers/recordController';
 import { requireAuth, requireBusinessPlan } from '../middleware/auth';
 
 export const recordRoutes = Router();
 
 recordRoutes.use(requireAuth);
 recordRoutes.get('/transactions/history', transactionHistory);
+recordRoutes.post('/transfers', createTransfer);
+recordRoutes.delete('/transfers/:transferGroupId', undoTransfer);
 recordRoutes.use('/:kind', requireBusinessPlan);
 recordRoutes.post('/goals/:id/contributions', contribute);
 recordRoutes.delete('/goals/:id/contributions/:contributionId', undoContribution);

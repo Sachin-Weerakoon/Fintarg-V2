@@ -128,11 +128,19 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
       header: 'Type',
       render: t => (
         <Badge
-          tone={t.type === 'income' ? 'success' : t.type === 'transfer' ? 'primary' : 'neutral'}
+          tone={
+            t.type === 'income'
+              ? 'success'
+              : t.type === 'transfer'
+              ? (t.transferDirection === 'incoming' ? 'success' : 'primary')
+              : 'neutral'
+          }
           size="sm"
           className="capitalize text-[11px]"
         >
-          {t.type}
+          {t.type === 'transfer'
+            ? (t.transferDirection === 'incoming' ? 'Transfer (In)' : t.transferDirection === 'outgoing' ? 'Transfer (Out)' : 'Transfer')
+            : t.type}
         </Badge>
       ),
     },
@@ -174,7 +182,7 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
       header: 'Amount',
       align: 'right',
       render: t => {
-        const isPositive = t.type === 'income';
+        const isPositive = t.type === 'income' || (t.type === 'transfer' && t.transferDirection === 'incoming');
         return (
           <span className={`font-bold num ${isPositive ? 'text-success-text' : 'text-danger-text'}`}>
             {isPositive ? `+${formatRs(t.amount)}` : `-${formatRs(t.amount)}`}

@@ -427,6 +427,22 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
     case 'DELETE_TRANSACTION':
       return void (await send(`/api/backend/records/transactions/${id}`, 'DELETE'));
 
+    case 'TRANSFER_FUNDS': {
+      const res = await send('/api/backend/records/transfers', 'POST', {
+        fromAccountId: action.fromAccountId,
+        fromCardId: action.fromCardId,
+        toAccountId: action.toAccountId,
+        toCardId: action.toCardId,
+        amount: action.amount,
+        date: action.date,
+        description: action.description,
+        category: action.category,
+      });
+      return (res as any)?.data?.transferGroupId;
+    }
+    case 'DELETE_TRANSFER':
+      return void (await send(`/api/backend/records/transfers/${action.transferGroupId}`, 'DELETE'));
+
     case 'ADD_LOAN': {
       const payload: Record<string, any> = {
         lender: action.entry.lender,
@@ -584,6 +600,8 @@ export async function fetchTransactionHistory(filters: Record<string, any> = {})
     data: (res.data || []).map(row => ({
       id: row._id,
       type: row.type,
+      transferDirection: row.transferDirection,
+      transferGroupId: row.transferGroupId,
       amount: (row.amountCents || 0) / 100,
       date: row.date,
       category: row.category,

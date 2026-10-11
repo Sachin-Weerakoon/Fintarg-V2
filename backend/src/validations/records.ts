@@ -91,12 +91,61 @@ const transactionSchema = z.object({
   bankAccountId: z.string().optional().nullable(),
   cardId: z.string().optional().nullable(),
   type: z.enum(['income', 'expense', 'transfer']),
+  transferDirection: z.enum(['incoming', 'outgoing']).optional().nullable(),
+  transferGroupId: z.string().optional().nullable(),
   amount: money,
   date,
   category: z.string().trim().max(80).default('General'),
   description: optionalText,
   paymentMethod: paymentMethodEnum.default('cash'),
   referenceId: z.string().trim().max(120).default(''),
+});
+
+export const transferSchema = z.object({
+  fromAccountId: z.string().optional().nullable(),
+  fromCardId: z.string().optional().nullable(),
+  toAccountId: z.string().optional().nullable(),
+  toCardId: z.string().optional().nullable(),
+  amount: money,
+  date,
+  category: z.string().trim().max(80).default('Transfer'),
+  description: optionalText,
+}).superRefine((data, ctx) => {
+  const hasFromAccount = Boolean(data.fromAccountId && data.fromAccountId.trim());
+  const hasFromCard = Boolean(data.fromCardId && data.fromCardId.trim());
+  if ((!hasFromAccount && !hasFromCard) || (hasFromAccount && hasFromCard)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Source must be either a bank account, card, or cash wallet',
+      path: ['fromAccountId'],
+    });
+  }
+
+  const hasToAccount = Boolean(data.toAccountId && data.toAccountId.trim());
+  const hasToCard = Boolean(data.toCardId && data.toCardId.trim());
+  if ((!hasToAccount && !hasToCard) || (hasToAccount && hasToCard)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Destination must be either a bank account, card, or cash wallet',
+      path: ['toAccountId'],
+    });
+  }
+
+  if (hasFromAccount && hasToAccount && data.fromAccountId === data.toAccountId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Source and destination accounts must be different',
+      path: ['toAccountId'],
+    });
+  }
+
+  if (hasFromCard && hasToCard && data.fromCardId === data.toCardId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Source and destination cards must be different',
+      path: ['toCardId'],
+    });
+  }
 });
 
 const incomeBaseSchema = z.object({

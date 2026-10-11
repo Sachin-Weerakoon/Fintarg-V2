@@ -5,6 +5,8 @@ export interface ITransaction extends Document {
   bankAccountId?: mongoose.Types.ObjectId | null;
   cardId?: mongoose.Types.ObjectId | null;
   type: 'income' | 'expense' | 'transfer';
+  transferDirection?: 'incoming' | 'outgoing' | null;
+  transferGroupId?: string | null;
   amountCents: number;
   date: string;
   category: string;
@@ -21,6 +23,8 @@ const TransactionSchema = new Schema<ITransaction>({
   bankAccountId: { type: Schema.Types.ObjectId, ref: 'BankAccount', default: null, index: true },
   cardId: { type: Schema.Types.ObjectId, ref: 'Card', default: null },
   type: { type: String, enum: ['income', 'expense', 'transfer'], required: true },
+  transferDirection: { type: String, enum: ['incoming', 'outgoing'], default: null },
+  transferGroupId: { type: String, default: null, index: true },
   amountCents: { type: Number, required: true, min: 1 },
   date: { type: String, required: true },
   category: { type: String, default: 'General', trim: true },

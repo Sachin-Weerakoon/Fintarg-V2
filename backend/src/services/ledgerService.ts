@@ -8,6 +8,7 @@ import { logger } from '../config/logger';
 export interface PostTransactionParams {
   userId: string | mongoose.Types.ObjectId;
   type: 'income' | 'expense' | 'transfer';
+  transferDirection?: 'incoming' | 'outgoing' | null;
   amountCents: number;
   date: string;
   category?: string;
@@ -106,6 +107,10 @@ export async function postTransaction(
     let delta = 0;
     if (params.type === 'income') delta = amountCents;
     else if (params.type === 'expense') delta = -amountCents;
+    else if (params.type === 'transfer') {
+      if (params.transferDirection === 'incoming') delta = amountCents;
+      else if (params.transferDirection === 'outgoing') delta = -amountCents;
+    }
 
     if (delta !== 0) {
       const updateQuery = BankAccountModel.updateOne(
@@ -125,6 +130,10 @@ export async function postTransaction(
         let cardDelta = 0;
         if (params.type === 'expense') cardDelta = amountCents;
         else if (params.type === 'income') cardDelta = -amountCents;
+        else if (params.type === 'transfer') {
+          if (params.transferDirection === 'incoming') cardDelta = -amountCents;
+          else if (params.transferDirection === 'outgoing') cardDelta = amountCents;
+        }
 
         if (cardDelta !== 0) {
           const updateQuery = CardModel.updateOne(
@@ -139,6 +148,10 @@ export async function postTransaction(
         let delta = 0;
         if (params.type === 'income') delta = amountCents;
         else if (params.type === 'expense') delta = -amountCents;
+        else if (params.type === 'transfer') {
+          if (params.transferDirection === 'incoming') delta = amountCents;
+          else if (params.transferDirection === 'outgoing') delta = -amountCents;
+        }
         if (delta !== 0) {
           const updateQuery = BankAccountModel.updateOne(
             { _id: bankAccountId, userId: uId },
@@ -157,13 +170,14 @@ export async function postTransaction(
     bankAccountId: bankAccountId || null,
     cardId: cardId || null,
     type: params.type,
+    transferDirection: params.transferDirection || null,
+    transferGroupId: params.transferGroupId || null,
     amountCents,
     date: params.date,
     category: params.category || 'General',
     description: params.description || '',
     paymentMethod: params.paymentMethod || 'cash',
     referenceId: params.referenceId || '',
-    transferGroupId: params.transferGroupId || null,
   };
 
   const createdDocs = await TransactionModel.create([txData], session ? { session } : {});
@@ -171,7 +185,7 @@ export async function postTransaction(
 }
 
 /**
- * Reverses all ledger transactions associated with a referenceId.
+ * Reverses all ledger transactions associated with a referenceId or transferGroupId.
  */
 export async function reverseTransaction(
   userId: string | mongoose.Types.ObjectId,
@@ -179,7 +193,10 @@ export async function reverseTransaction(
   session?: mongoose.ClientSession,
 ): Promise<number> {
   const uId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
-  const findQuery = TransactionModel.find({ userId: uId, referenceId });
+  const findQuery = TransactionModel.find({
+    userId: uId,
+    $or: [{ referenceId }, { transferGroupId: referenceId }],
+  });
   if (session) findQuery.session(session);
   const transactions = await findQuery;
 
@@ -193,6 +210,10 @@ export async function reverseTransaction(
       let reverseDelta = 0;
       if (tx.type === 'income') reverseDelta = -tx.amountCents;
       else if (tx.type === 'expense') reverseDelta = tx.amountCents;
+      else if (tx.type === 'transfer') {
+        if (tx.transferDirection === 'incoming') reverseDelta = -tx.amountCents;
+        else if (tx.transferDirection === 'outgoing') reverseDelta = tx.amountCents;
+      }
 
       if (reverseDelta !== 0) {
         const updateQuery = BankAccountModel.updateOne(
@@ -211,6 +232,10 @@ export async function reverseTransaction(
         let cardReverseDelta = 0;
         if (tx.type === 'expense') cardReverseDelta = -tx.amountCents;
         else if (tx.type === 'income') cardReverseDelta = tx.amountCents;
+        else if (tx.type === 'transfer') {
+          if (tx.transferDirection === 'incoming') cardReverseDelta = tx.amountCents;
+          else if (tx.transferDirection === 'outgoing') cardReverseDelta = -tx.amountCents;
+        }
 
         if (cardReverseDelta !== 0) {
           const updateQuery = CardModel.updateOne(
@@ -268,12 +293,30 @@ export async function recomputeBalance(
         _id: null,
         incomeSum: {
           $sum: {
-            $cond: [{ $eq: ['$type', 'income'] }, '$amountCents', 0],
+            $cond: [
+              {
+                $or: [
+                  { $eq: ['$type', 'income'] },
+                  { $and: [{ $eq: ['$type', 'transfer'] }, { $eq: ['$transferDirection', 'incoming'] }] },
+                ],
+              },
+              '$amountCents',
+              0,
+            ],
           },
         },
         expenseSum: {
           $sum: {
-            $cond: [{ $eq: ['$type', 'expense'] }, '$amountCents', 0],
+            $cond: [
+              {
+                $or: [
+                  { $eq: ['$type', 'expense'] },
+                  { $and: [{ $eq: ['$type', 'transfer'] }, { $eq: ['$transferDirection', 'outgoing'] }] },
+                ],
+              },
+              '$amountCents',
+              0,
+            ],
           },
         },
       },
@@ -317,12 +360,30 @@ export async function backfillOpeningBalances(options: { dryRun?: boolean } = { 
           _id: null,
           incomeSum: {
             $sum: {
-              $cond: [{ $eq: ['$type', 'income'] }, '$amountCents', 0],
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ['$type', 'income'] },
+                    { $and: [{ $eq: ['$type', 'transfer'] }, { $eq: ['$transferDirection', 'incoming'] }] },
+                  ],
+                },
+                '$amountCents',
+                0,
+              ],
             },
           },
           expenseSum: {
             $sum: {
-              $cond: [{ $eq: ['$type', 'expense'] }, '$amountCents', 0],
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ['$type', 'expense'] },
+                    { $and: [{ $eq: ['$type', 'transfer'] }, { $eq: ['$transferDirection', 'outgoing'] }] },
+                  ],
+                },
+                '$amountCents',
+                0,
+              ],
             },
           },
         },
@@ -346,4 +407,210 @@ export async function backfillOpeningBalances(options: { dryRun?: boolean } = { 
   }
 
   return { totalAccounts: accounts.length, updatedCount, isDryRun };
+}
+
+export interface TransferFundsParams {
+  fromAccountId?: string | mongoose.Types.ObjectId | null;
+  fromCardId?: string | mongoose.Types.ObjectId | null;
+  toAccountId?: string | mongoose.Types.ObjectId | null;
+  toCardId?: string | mongoose.Types.ObjectId | null;
+  amountCents: number;
+  date: string;
+  description?: string;
+  category?: string;
+}
+
+/**
+ * Transfers funds between own accounts, cash, or cards atomically.
+ * Creates two linked ledger transactions sharing a unique transferGroupId.
+ */
+export async function transferFunds(
+  userId: string | mongoose.Types.ObjectId,
+  params: TransferFundsParams,
+): Promise<{ transferGroupId: string; outgoingTx: ITransaction; incomingTx: ITransaction }> {
+  return withLedgerSession(async (session) => {
+    const uId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+    const amountCents = Math.round(Number(params.amountCents));
+    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+      throw new HttpError(400, 'Transfer amount must be a positive number');
+    }
+
+    let fromAcc: IBankAccount | null = null;
+    let fromCard: any = null;
+    let fromAccId: mongoose.Types.ObjectId | null = null;
+    let fromCardId: mongoose.Types.ObjectId | null = null;
+
+    if (params.fromAccountId === 'cash') {
+      fromAcc = await ensureCashWallet(uId);
+      fromAccId = fromAcc._id as mongoose.Types.ObjectId;
+    } else if (params.fromAccountId) {
+      if (!mongoose.isValidObjectId(params.fromAccountId)) throw new HttpError(400, 'Invalid source bank account ID');
+      fromAcc = await BankAccountModel.findOne({ _id: params.fromAccountId, userId: uId });
+      if (!fromAcc) throw new HttpError(404, 'Source bank account not found');
+      fromAccId = fromAcc._id as mongoose.Types.ObjectId;
+    } else if (params.fromCardId) {
+      if (!mongoose.isValidObjectId(params.fromCardId)) throw new HttpError(400, 'Invalid source card ID');
+      fromCard = await CardModel.findOne({ _id: params.fromCardId, userId: uId });
+      if (!fromCard) throw new HttpError(404, 'Source card not found');
+      fromCardId = fromCard._id as mongoose.Types.ObjectId;
+    } else {
+      throw new HttpError(400, 'Source bank account, card, or cash wallet must be specified');
+    }
+
+    let toAcc: IBankAccount | null = null;
+    let toCard: any = null;
+    let toAccId: mongoose.Types.ObjectId | null = null;
+    let toCardId: mongoose.Types.ObjectId | null = null;
+
+    if (params.toAccountId === 'cash') {
+      toAcc = await ensureCashWallet(uId);
+      toAccId = toAcc._id as mongoose.Types.ObjectId;
+    } else if (params.toAccountId) {
+      if (!mongoose.isValidObjectId(params.toAccountId)) throw new HttpError(400, 'Invalid destination bank account ID');
+      toAcc = await BankAccountModel.findOne({ _id: params.toAccountId, userId: uId });
+      if (!toAcc) throw new HttpError(404, 'Destination bank account not found');
+      toAccId = toAcc._id as mongoose.Types.ObjectId;
+    } else if (params.toCardId) {
+      if (!mongoose.isValidObjectId(params.toCardId)) throw new HttpError(400, 'Invalid destination card ID');
+      toCard = await CardModel.findOne({ _id: params.toCardId, userId: uId });
+      if (!toCard) throw new HttpError(404, 'Destination card not found');
+      toCardId = toCard._id as mongoose.Types.ObjectId;
+    } else {
+      throw new HttpError(400, 'Destination bank account, card, or cash wallet must be specified');
+    }
+
+    if (fromAccId && toAccId && fromAccId.toString() === toAccId.toString()) {
+      throw new HttpError(400, 'Source and destination accounts must be different');
+    }
+    if (fromCardId && toCardId && fromCardId.toString() === toCardId.toString()) {
+      throw new HttpError(400, 'Source and destination cards must be different');
+    }
+
+    const transferGroupId = 'trf_' + new mongoose.Types.ObjectId().toString();
+
+    const srcName = fromAcc
+      ? `${fromAcc.bankName} (${fromAcc.accountName})`
+      : fromCard
+      ? `${fromCard.name} (•••• ${fromCard.last4})`
+      : 'Source';
+    const destName = toAcc
+      ? `${toAcc.bankName} (${toAcc.accountName})`
+      : toCard
+      ? `${toCard.name} (•••• ${toCard.last4})`
+      : 'Destination';
+
+    const baseDesc = params.description?.trim();
+    const outDesc = baseDesc ? `${baseDesc} (To ${destName})` : `Transfer to ${destName}`;
+    const inDesc = baseDesc ? `${baseDesc} (From ${srcName})` : `Transfer from ${srcName}`;
+
+    const fromMethod = fromCard
+      ? (fromCard.cardType === 'credit' ? 'credit_card' : 'card')
+      : (fromAcc?.accountType === 'cash' ? 'cash' : 'bank_transfer');
+    const toMethod = toCard
+      ? (toCard.cardType === 'credit' ? 'credit_card' : 'card')
+      : (toAcc?.accountType === 'cash' ? 'cash' : 'bank_transfer');
+
+    const outgoingTx = await postTransaction({
+      userId: uId,
+      type: 'transfer',
+      transferDirection: 'outgoing',
+      amountCents,
+      date: params.date,
+      category: params.category || 'Transfer',
+      description: outDesc,
+      paymentMethod: fromMethod,
+      bankAccountId: fromAccId,
+      cardId: fromCardId,
+      referenceId: transferGroupId,
+      transferGroupId,
+    }, session);
+
+    const incomingTx = await postTransaction({
+      userId: uId,
+      type: 'transfer',
+      transferDirection: 'incoming',
+      amountCents,
+      date: params.date,
+      category: params.category || 'Transfer',
+      description: inDesc,
+      paymentMethod: toMethod,
+      bankAccountId: toAccId,
+      cardId: toCardId,
+      referenceId: transferGroupId,
+      transferGroupId,
+    }, session);
+
+    return { transferGroupId, outgoingTx, incomingTx };
+  });
+}
+
+/**
+ * Deletes both legs of a transfer atomically and restores account and card balances.
+ */
+export async function deleteTransfer(
+  userId: string | mongoose.Types.ObjectId,
+  transferGroupId: string,
+): Promise<{ count: number }> {
+  return withLedgerSession(async (session) => {
+    const uId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+    const findQuery = TransactionModel.find({
+      userId: uId,
+      $or: [{ transferGroupId }, { referenceId: transferGroupId }],
+    });
+    if (session) findQuery.session(session);
+    const transactions = await findQuery;
+
+    if (transactions.length === 0) {
+      throw new HttpError(404, 'Transfer not found');
+    }
+
+    for (const tx of transactions) {
+      if (tx.bankAccountId) {
+        let reverseDelta = 0;
+        if (tx.type === 'income') reverseDelta = -tx.amountCents;
+        else if (tx.type === 'expense') reverseDelta = tx.amountCents;
+        else if (tx.type === 'transfer') {
+          if (tx.transferDirection === 'incoming') reverseDelta = -tx.amountCents;
+          else if (tx.transferDirection === 'outgoing') reverseDelta = tx.amountCents;
+        }
+
+        if (reverseDelta !== 0) {
+          const updateQuery = BankAccountModel.updateOne(
+            { _id: tx.bankAccountId, userId: uId },
+            { $inc: { balanceCents: reverseDelta } },
+          );
+          if (session) updateQuery.session(session);
+          await updateQuery;
+        }
+      }
+
+      if (tx.cardId) {
+        const card = await CardModel.findOne({ _id: tx.cardId, userId: uId });
+        if (card && (card.cardType === 'credit' || tx.paymentMethod === 'credit_card')) {
+          let cardReverseDelta = 0;
+          if (tx.type === 'expense') cardReverseDelta = -tx.amountCents;
+          else if (tx.type === 'income') cardReverseDelta = tx.amountCents;
+          else if (tx.type === 'transfer') {
+            if (tx.transferDirection === 'incoming') cardReverseDelta = tx.amountCents;
+            else if (tx.transferDirection === 'outgoing') cardReverseDelta = -tx.amountCents;
+          }
+
+          if (cardReverseDelta !== 0) {
+            const updateQuery = CardModel.updateOne(
+              { _id: tx.cardId, userId: uId },
+              { $inc: { balanceCents: cardReverseDelta } },
+            );
+            if (session) updateQuery.session(session);
+            await updateQuery;
+          }
+        }
+      }
+
+      const deleteQuery = TransactionModel.deleteOne({ _id: tx._id });
+      if (session) deleteQuery.session(session);
+      await deleteQuery;
+    }
+
+    return { count: transactions.length };
+  });
 }

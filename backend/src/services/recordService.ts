@@ -22,8 +22,8 @@ import { CardModel } from '../models/Card';
 import { TransactionModel } from '../models/Transaction';
 import { calculateAmortizationSchedule, calculateLoan } from '../utils/loanMath';
 import { HttpError } from '../middleware/errors';
-import { isValidIsoDate, type RecordKind } from '../validations/records';
-import { postTransaction, replaceTransaction, reverseTransaction } from './ledgerService';
+import { isValidIsoDate, transferSchema, type RecordKind } from '../validations/records';
+import { deleteTransfer, postTransaction, replaceTransaction, reverseTransaction, transferFunds } from './ledgerService';
 
 const models: Record<RecordKind, Model<any>> = {
   bankAccounts: BankAccountModel,
@@ -1177,10 +1177,10 @@ export async function getTransactionHistory(userId: string, filters: Transaction
   let totalExpenseCents = 0;
 
   const withRunningTotals = allTransactions.map((tx: any) => {
-    if (tx.type === 'income') {
+    if (tx.type === 'income' || (tx.type === 'transfer' && tx.transferDirection === 'incoming')) {
       runningTotalCents += tx.amountCents;
       totalIncomeCents += tx.amountCents;
-    } else if (tx.type === 'expense') {
+    } else if (tx.type === 'expense' || (tx.type === 'transfer' && tx.transferDirection === 'outgoing')) {
       runningTotalCents -= tx.amountCents;
       totalExpenseCents += tx.amountCents;
     }
@@ -1204,4 +1204,23 @@ export async function getTransactionHistory(userId: string, filters: Transaction
       closingBalanceCents: runningTotalCents,
     },
   };
+}
+
+export async function createTransferRecord(userId: string, data: unknown) {
+  const parsed = transferSchema.parse(data);
+  const amountCents = Math.round(parsed.amount * 100);
+  return transferFunds(userId, {
+    fromAccountId: parsed.fromAccountId,
+    fromCardId: parsed.fromCardId,
+    toAccountId: parsed.toAccountId,
+    toCardId: parsed.toCardId,
+    amountCents,
+    date: parsed.date,
+    description: parsed.description,
+    category: parsed.category,
+  });
+}
+
+export async function deleteTransferRecord(userId: string, transferGroupId: string) {
+  return deleteTransfer(userId, transferGroupId);
 }

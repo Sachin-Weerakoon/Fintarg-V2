@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import type { RequestHandler } from 'express';
 import { z } from 'zod';
 import { HttpError } from '../middleware/errors';
-import { addGoalContribution, calculateLoanPayoff, createRecord, deleteFinancePaymentPayment, deleteGoalContribution, deleteLoanRepayment, deletePawnPayment, deleteRecord, getTransactionHistory, listRecords, recordFinancePayment, recordLoanRepayment, recordPawnPayment, updateRecord } from '../services/recordService';
+import { addGoalContribution, calculateLoanPayoff, createRecord, createTransferRecord, deleteFinancePaymentPayment, deleteGoalContribution, deleteLoanRepayment, deletePawnPayment, deleteRecord, deleteTransferRecord, getTransactionHistory, listRecords, recordFinancePayment, recordLoanRepayment, recordPawnPayment, updateRecord } from '../services/recordService';
 import { optionalIsoDateSchema, paymentMethodEnum, recordKinds, recordSchemas, recordUpdateSchemas, type RecordKind } from '../validations/records';
 import { asyncHandler } from '../utils/asyncHandler';
 
@@ -206,4 +206,18 @@ export const transactionHistory: RequestHandler = asyncHandler(async (request, r
     skip: request.query.skip ? Number(request.query.skip) : undefined,
   };
   response.json(await getTransactionHistory(userId, filters));
+});
+
+export const createTransfer: RequestHandler = asyncHandler(async (request, response) => {
+  const userId = request.auth?.userId;
+  if (!userId) throw new HttpError(401, 'Authentication required');
+  const result = await createTransferRecord(userId, request.body);
+  response.status(201).json({ data: result });
+});
+
+export const undoTransfer: RequestHandler = asyncHandler(async (request, response) => {
+  const userId = request.auth?.userId;
+  if (!userId) throw new HttpError(401, 'Authentication required');
+  const result = await deleteTransferRecord(userId, request.params.transferGroupId);
+  response.json({ data: result });
 });

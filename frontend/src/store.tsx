@@ -162,6 +162,8 @@ type Action =
   | { type: 'DELETE_CARD'; id: string }
   | { type: 'ADD_TRANSACTION'; entry: Transaction }
   | { type: 'DELETE_TRANSACTION'; id: string }
+  | { type: 'TRANSFER_FUNDS'; fromAccountId?: string | null; fromCardId?: string | null; toAccountId?: string | null; toCardId?: string | null; amount: number; date: string; description?: string; category?: string }
+  | { type: 'DELETE_TRANSFER'; transferGroupId: string }
   | { type: 'ADD_LOAN'; entry: Loan }
   | { type: 'UPDATE_LOAN'; entry: Loan }
   | { type: 'RECORD_LOAN_REPAYMENT'; id: string; amount: number; note?: string; date?: string; paymentMethod?: string; bankAccountId?: string | null }
@@ -302,6 +304,40 @@ function reducer(state: AppState, action: Action): AppState {
     case 'DELETE_CARD': return { ...state, cards: state.cards.filter(c => c.id !== action.id) };
     case 'ADD_TRANSACTION': return { ...state, transactions: [action.entry, ...state.transactions] };
     case 'DELETE_TRANSACTION': return { ...state, transactions: state.transactions.filter(t => t.id !== action.id) };
+    case 'TRANSFER_FUNDS': {
+      let updatedAccounts = state.bankAccounts;
+      let updatedCards = state.cards;
+
+      if (action.fromAccountId) {
+        updatedAccounts = updatedAccounts.map(a =>
+          a.id === action.fromAccountId ? { ...a, currentBalance: (a.currentBalance || 0) - action.amount } : a
+        );
+      } else if (action.fromCardId) {
+        updatedCards = updatedCards.map(c =>
+          c.id === action.fromCardId ? { ...c, currentBalance: (c.currentBalance || 0) + action.amount } : c
+        );
+      }
+
+      if (action.toAccountId) {
+        updatedAccounts = updatedAccounts.map(a =>
+          a.id === action.toAccountId ? { ...a, currentBalance: (a.currentBalance || 0) + action.amount } : a
+        );
+      } else if (action.toCardId) {
+        updatedCards = updatedCards.map(c =>
+          c.id === action.toCardId ? { ...c, currentBalance: Math.max(0, (c.currentBalance || 0) - action.amount) } : c
+        );
+      }
+
+      return {
+        ...state,
+        bankAccounts: updatedAccounts,
+        cards: updatedCards,
+      };
+    }
+    case 'DELETE_TRANSFER': return {
+      ...state,
+      transactions: state.transactions.filter(t => t.transferGroupId !== action.transferGroupId),
+    };
     case 'ADD_LOAN': return { ...state, loans: [...state.loans, action.entry] };
     case 'UPDATE_LOAN': return { ...state, loans: state.loans.map(l => l.id === action.entry.id ? action.entry : l) };
     case 'RECORD_LOAN_REPAYMENT': return {
