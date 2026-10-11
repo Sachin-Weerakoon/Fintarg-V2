@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
@@ -30,7 +32,7 @@ export default function Goals() {
     dailyAmount: '',
   });
   const [goalError, setGoalError] = useState('');
-  const [saving, setSaving] = useState<Record<string, { amount: string; date: string; note: string }>>({});
+  const [saving, setSaving] = useState<Record<string, { amount: string; date: string; note: string; debitAccount?: boolean; paymentMethod?: string; bankAccountId?: string }>>({});
   const [adjusting, setAdjusting] = useState<string | null>(null);
   const [adjustForm, setAdjustForm] = useState({ dailyAmount: '' });
   const handleDeleteGoal = async (id: string, name: string) => {
@@ -124,15 +126,54 @@ export default function Goals() {
 
   const addContribution = (goalId: string) => {
     const s = saving[goalId];
-    if (!s || !s.amount || Number(s.amount) <= 0) return;
+    if (!s || !s.amount || Number(s.amount) <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+    const isBankMethod = s.debitAccount && ['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(s.paymentMethod || 'cash');
+    if (isBankMethod && !s.bankAccountId) {
+      toast.error('Please select a bank account to debit');
+      return;
+    }
     dispatch({
       type: 'ADD_SAVING_CONTRIBUTION',
       goalId,
       amount: Number(s.amount),
       date: s.date || new Date().toISOString().slice(0, 10),
       note: s.note,
+      debitAccount: s.debitAccount,
+      paymentMethod: s.paymentMethod || 'cash',
+      bankAccountId: s.bankAccountId || null,
     });
-    setSaving(prev => ({ ...prev, [goalId]: { amount: '', date: new Date().toISOString().slice(0, 10), note: '' } }));
+    toast.success(`Logged contribution of ${formatRs(Number(s.amount))}`);
+    setSaving(prev => ({
+      ...prev,
+      [goalId]: {
+        amount: '',
+        date: new Date().toISOString().slice(0, 10),
+        note: '',
+        debitAccount: false,
+        paymentMethod: 'cash',
+        bankAccountId: '',
+      },
+    }));
+  };
+
+  const handleUndoContribution = async (goalId: string, contributionId: string, amount: number) => {
+    const ok = await confirm({
+      title: 'Undo Contribution',
+      message: `Undo savings contribution of ${formatRs(amount)}? Saved balance and debited account balance will be restored.`,
+      confirmLabel: 'Yes, Undo',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    dispatch({
+      type: 'DELETE_SAVING_CONTRIBUTION',
+      goalId,
+      contributionId,
+    });
+    toast.success(`Contribution of ${formatRs(amount)} undone`);
   };
 
   const submitAdjust = (goalId: string) => {
@@ -442,35 +483,77 @@ export default function Goals() {
                 )}
 
                 {/* Add contribution form */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mt-3 items-end">
-                  <Field id={`contrib-amount-${goal.id}`} label="Contribution (Rs.)">
-                    <Input
-                      id={`contrib-amount-${goal.id}`}
-                      type="number"
-                      placeholder="1,000"
-                      value={sv.amount}
-                      onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, amount: e.target.value } }))}
+                <div className="space-y-3 mt-3 pt-3 border-t border-border/50">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                    <Field id={`contrib-amount-${goal.id}`} label="Contribution (Rs.)">
+                      <Input
+                        id={`contrib-amount-${goal.id}`}
+                        type="number"
+                        placeholder="1,000"
+                        value={sv.amount}
+                        onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, amount: e.target.value } }))}
+                      />
+                    </Field>
+                    <Field id={`contrib-date-${goal.id}`} label="Date">
+                      <Input
+                        id={`contrib-date-${goal.id}`}
+                        type="date"
+                        value={sv.date}
+                        onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, date: e.target.value } }))}
+                      />
+                    </Field>
+                    <Field id={`contrib-note-${goal.id}`} label="Note (optional)">
+                      <Input
+                        id={`contrib-note-${goal.id}`}
+                        placeholder="e.g. Salary deposit"
+                        value={sv.note}
+                        onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, note: e.target.value } }))}
+                      />
+                    </Field>
+                    <Button variant="primary" size="sm" onClick={() => addContribution(goal.id)}>
+                      Add Savings
+                    </Button>
+                  </div>
+
+                  {/* Optional Account Debit */}
+                  <div className="flex flex-wrap items-center gap-4 text-xs pt-0.5">
+                    <Checkbox
+                      id={`contrib-debit-${goal.id}`}
+                      checked={sv.debitAccount || false}
+                      onChange={chk => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, debitAccount: chk } }))}
+                      label={<span className="text-xs text-text">Debit account / cash wallet via ledger</span>}
                     />
-                  </Field>
-                  <Field id={`contrib-date-${goal.id}`} label="Date">
-                    <Input
-                      id={`contrib-date-${goal.id}`}
-                      type="date"
-                      value={sv.date}
-                      onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, date: e.target.value } }))}
-                    />
-                  </Field>
-                  <Field id={`contrib-note-${goal.id}`} label="Note (optional)">
-                    <Input
-                      id={`contrib-note-${goal.id}`}
-                      placeholder="e.g. Salary deposit"
-                      value={sv.note}
-                      onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, note: e.target.value } }))}
-                    />
-                  </Field>
-                  <Button variant="primary" size="sm" onClick={() => addContribution(goal.id)}>
-                    Add Savings
-                  </Button>
+                    {sv.debitAccount && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Select
+                          value={sv.paymentMethod || 'cash'}
+                          onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, paymentMethod: e.target.value } }))}
+                          className="text-xs py-1"
+                        >
+                          <option value="cash">Cash Wallet</option>
+                          <option value="bank_transfer">Bank Transfer</option>
+                          <option value="standing_order">Standing Order</option>
+                          <option value="debit_card">Debit Card</option>
+                          <option value="cheque">Cheque</option>
+                          <option value="online">Online</option>
+                        </Select>
+                        {['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(sv.paymentMethod || '') && (
+                          <Select
+                            value={sv.bankAccountId || ''}
+                            onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, bankAccountId: e.target.value } }))}
+                            className="text-xs py-1"
+                          >
+                            <option value="">Select Bank Account...</option>
+                            {state.bankAccounts.map(b => (
+                              <option key={b.id} value={b.id}>
+                                {b.bankName} - {b.accountNumber} ({formatRs(b.currentBalance)})
+                              </option>
+                            ))}
+                          </Select>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Recent contributions */}
@@ -478,14 +561,32 @@ export default function Goals() {
                   <div className="mt-4 pt-4 border-t border-border">
                     <div className="text-xs font-semibold mb-2 text-muted">Recent savings contributions</div>
                     <div className="space-y-1.5">
-                      {goal.contributions.slice(-6).reverse().map((c, i) => (
-                        <div key={i} className="flex justify-between text-xs">
-                          <span className="text-muted num">
-                            {c.date} {c.note ? `· ${c.note}` : ''}
-                          </span>
-                          <span className="font-semibold text-success-text num">{formatRs(c.amount)}</span>
-                        </div>
-                      ))}
+                      {goal.contributions.slice(-6).reverse().map((c, i) => {
+                        const contribId = c.id || c._id || '';
+                        return (
+                          <div key={i} className="flex justify-between items-center text-xs">
+                            <span className="text-muted num">
+                              {c.date} {c.note ? `· ${c.note}` : ''}
+                              {c.paymentMethod ? ` (${c.paymentMethod.replace('_', ' ')})` : ''}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-success-text num">{formatRs(c.amount)}</span>
+                              {contribId && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="!p-0.5 h-auto text-muted hover:text-danger-text"
+                                  onClick={() => handleUndoContribution(goal.id, contribId, c.amount)}
+                                  title="Undo contribution"
+                                  aria-label="Undo contribution"
+                                >
+                                  <Icon name="close" size={12} />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

@@ -174,7 +174,8 @@ type Action =
   | { type: 'ADD_GOAL'; entry: SavingsGoal }
   | { type: 'UPDATE_GOAL'; id: string; dailyAmount?: number; monthlyTarget?: number; targetAmount?: number; targetDate?: string; savedAmount?: number }
   | { type: 'DELETE_GOAL'; id: string }
-  | { type: 'ADD_SAVING_CONTRIBUTION'; goalId: string; amount: number; date: string; note?: string }
+  | { type: 'ADD_SAVING_CONTRIBUTION'; goalId: string; amount: number; date: string; note?: string; debitAccount?: boolean; paymentMethod?: string; bankAccountId?: string | null }
+  | { type: 'DELETE_SAVING_CONTRIBUTION'; goalId: string; contributionId: string }
   | { type: 'SET_PERSONAL_SPENDING_BUDGET'; budget: number }
   | { type: 'ADD_LETTER'; entry: Letter }
   | { type: 'DELETE_LETTER'; id: string }
@@ -454,9 +455,32 @@ function reducer(state: AppState, action: Action): AppState {
         ? {
             ...g,
             savedAmount: g.savedAmount + action.amount,
-            contributions: [...(g.contributions || []), { date: action.date, amount: action.amount, note: action.note }],
+            contributions: [
+              ...(g.contributions || []),
+              {
+                date: action.date,
+                amount: action.amount,
+                note: action.note,
+                paymentMethod: action.debitAccount ? (action.paymentMethod || 'cash') : undefined,
+                bankAccountId: action.bankAccountId,
+              },
+            ],
           }
         : g),
+    };
+    case 'DELETE_SAVING_CONTRIBUTION': return {
+      ...state,
+      savingsGoals: state.savingsGoals.map(g => {
+        if (g.id !== action.goalId) return g;
+        const target = (g.contributions || []).find(c => (c.id || c._id) === action.contributionId);
+        const contributions = (g.contributions || []).filter(c => (c.id || c._id) !== action.contributionId);
+        const savedAmount = target ? Math.max(0, g.savedAmount - target.amount) : g.savedAmount;
+        return {
+          ...g,
+          savedAmount,
+          contributions,
+        };
+      }),
     };
     case 'SET_PERSONAL_SPENDING_BUDGET': return { ...state, personalSpendingBudget: action.budget };
     case 'ADD_LETTER': return { ...state, letters: [...state.letters, action.entry] };

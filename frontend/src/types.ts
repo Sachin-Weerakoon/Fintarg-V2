@@ -197,6 +197,17 @@ export interface PawnedItem {
   payments?: PawnPayment[];
 }
 
+export interface GoalContribution {
+  id?: string;
+  _id?: string;
+  date: string;
+  amount: number;
+  paymentMethod?: string;
+  bankAccountId?: string | null;
+  transactionId?: string | null;
+  note?: string;
+}
+
 export interface SavingsGoal {
   id: string;
   name: string;
@@ -206,7 +217,7 @@ export interface SavingsGoal {
   savedAmount: number;
   targetAmount?: number;
   targetDate?: string;
-  contributions: { date: string; amount: number; note?: string }[];
+  contributions: GoalContribution[];
 }
 
 export interface Letter {

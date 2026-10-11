@@ -1,10 +1,11 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
-import { calculateLoanPayoff, createRecord, deleteFinancePaymentPayment, deleteLoanRepayment, deletePawnPayment, deriveNextDueDate, getRecord, listRecords, recordFinancePayment, recordLoanRepayment, recordPawnPayment, updateRecord } from './recordService';
+import { addGoalContribution, calculateLoanPayoff, createRecord, deleteFinancePaymentPayment, deleteGoalContribution, deleteLoanRepayment, deletePawnPayment, deriveNextDueDate, getRecord, listRecords, recordFinancePayment, recordLoanRepayment, recordPawnPayment, updateRecord } from './recordService';
 import { BankAccountModel } from '../models/BankAccount';
 import { FinancePaymentModel } from '../models/FinancePayment';
 import { PawnedItemModel } from '../models/PawnedItem';
+import { SavingsGoalModel } from '../models/SavingsGoal';
 import { TransactionModel } from '../models/Transaction';
 
 describe('recordService CRUD & Update partial isolation (1.1)', () => {
@@ -599,6 +600,102 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
         async () => {
           await recordFinancePayment(userId, String(fp._id), {
             paymentMethod: 'standing_order',
+          });
+        },
+        (err: any) => err.status === 400 && /Bank account is required/i.test(err.message),
+      );
+    });
+  });
+
+  describe('goal contributions and optional ledger debit (2.6)', () => {
+    it('adds contribution without debiting account (tracks savings progress only)', async () => {
+      const goal = await createRecord('goals', userId, {
+        name: 'New Laptop',
+        targetAmount: 250000,
+        dailyAmount: 1000,
+      });
+
+      const updated = await addGoalContribution(userId, String(goal._id), {
+        amount: 20000,
+        date: '2026-03-10',
+        note: 'Cash saved in envelope',
+        debitAccount: false,
+      });
+
+      assert.strictEqual(updated.savedAmountCents, 2000000);
+      assert.strictEqual(updated.contributions.length, 1);
+      assert.strictEqual(updated.contributions[0].amountCents, 2000000);
+      assert.strictEqual(updated.contributions[0].transactionId, null);
+    });
+
+    it('adds contribution with account debit, creates ledger transaction, and handles undo', async () => {
+      const bankAccount = await createRecord('bankAccounts', userId, {
+        bankName: 'NDB Bank',
+        accountNumber: '55667788',
+        balance: 100000,
+      });
+      const initialBalance = (bankAccount as any).balanceCents;
+
+      const goal = await createRecord('goals', userId, {
+        name: 'Vacation Fund',
+        targetAmount: 150000,
+        dailyAmount: 500,
+      });
+
+      const updated = await addGoalContribution(userId, String(goal._id), {
+        amount: 25000,
+        date: '2026-03-15',
+        note: 'Bank transfer to vacation goal',
+        debitAccount: true,
+        paymentMethod: 'bank_transfer',
+        bankAccountId: String(bankAccount._id),
+      });
+
+      assert.strictEqual(updated.savedAmountCents, 2500000);
+      assert.strictEqual(updated.contributions.length, 1);
+      const contrib = updated.contributions[0];
+      assert.ok(contrib.transactionId);
+      assert.strictEqual(contrib.paymentMethod, 'bank_transfer');
+
+      // Bank account debited
+      const debitedAccount = await BankAccountModel.findById(bankAccount._id);
+      assert.strictEqual(debitedAccount.balanceCents, initialBalance - 2500000);
+
+      // Transaction created
+      const tx = await TransactionModel.findById(contrib.transactionId);
+      assert.ok(tx);
+      assert.strictEqual(tx.category, 'Savings Contribution');
+      assert.strictEqual(tx.amountCents, 2500000);
+
+      // Undo contribution
+      const contribId = String(contrib._id);
+      const afterUndo = await deleteGoalContribution(userId, String(goal._id), contribId);
+
+      assert.strictEqual(afterUndo.savedAmountCents, 0);
+      assert.strictEqual(afterUndo.contributions.length, 0);
+
+      // Bank account restored
+      const restoredAccount = await BankAccountModel.findById(bankAccount._id);
+      assert.strictEqual(restoredAccount.balanceCents, initialBalance);
+
+      // Transaction removed
+      const txAfterUndo = await TransactionModel.findById(contrib.transactionId);
+      assert.strictEqual(txAfterUndo, null);
+    });
+
+    it('rejects bank contribution when bankAccountId is missing or unowned', async () => {
+      const goal = await createRecord('goals', userId, {
+        name: 'Investment Fund',
+        targetAmount: 500000,
+        dailyAmount: 1500,
+      });
+
+      await assert.rejects(
+        async () => {
+          await addGoalContribution(userId, String(goal._id), {
+            amount: 10000,
+            debitAccount: true,
+            paymentMethod: 'bank_transfer',
           });
         },
         (err: any) => err.status === 400 && /Bank account is required/i.test(err.message),

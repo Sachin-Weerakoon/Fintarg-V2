@@ -207,8 +207,13 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
       targetAmount: row.targetAmountCents ? row.targetAmountCents / 100 : undefined,
       targetDate: row.targetDate,
       contributions: (row.contributions || []).map((item: RawRecord) => ({
+        id: item._id,
+        _id: item._id,
         date: item.date,
         amount: (item.amountCents || 0) / 100,
+        paymentMethod: item.paymentMethod || undefined,
+        bankAccountId: item.bankAccountId ? String(item.bankAccountId) : undefined,
+        transactionId: item.transactionId ? String(item.transactionId) : undefined,
         note: item.note,
       })),
     })),
@@ -498,7 +503,19 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
       return void (await send(
         `/api/backend/records/goals/${encodeURIComponent(action.goalId)}/contributions`,
         'POST',
-        { amount: action.amount, date: action.date, note: action.note }
+        {
+          amount: action.amount,
+          date: action.date,
+          note: action.note,
+          debitAccount: action.debitAccount,
+          paymentMethod: action.paymentMethod,
+          bankAccountId: action.bankAccountId,
+        }
+      ));
+    case 'DELETE_SAVING_CONTRIBUTION':
+      return void (await send(
+        `/api/backend/records/goals/${encodeURIComponent(action.goalId)}/contributions/${encodeURIComponent(action.contributionId)}`,
+        'DELETE'
       ));
 
     case 'SET_PERSONAL_SPENDING_BUDGET':

@@ -591,17 +591,103 @@ export async function deleteRecord(kind: RecordKind, userId: string, id: string)
   await AuditLogModel.create({ userId, action: 'delete', resourceType: kind, resourceId: deleted._id });
 }
 
-export async function addGoalContribution(userId: string, goalId: string, amount: number, date: string, note = '') {
+export interface AddGoalContributionParams {
+  amount: number;
+  date?: string;
+  note?: string;
+  debitAccount?: boolean;
+  paymentMethod?: string;
+  bankAccountId?: string | null;
+}
+
+export async function addGoalContribution(
+  userId: string,
+  goalId: string,
+  amountOrParams: number | AddGoalContributionParams,
+  legacyDate?: string,
+  legacyNote: string = '',
+) {
   if (!mongoose.isValidObjectId(goalId)) throw new HttpError(400, 'Invalid goal id');
-  const amountCents = Math.round(amount * 100);
+  const params: AddGoalContributionParams = typeof amountOrParams === 'number'
+    ? { amount: amountOrParams, date: legacyDate, note: legacyNote }
+    : amountOrParams;
+
+  const amountCents = Math.round(params.amount * 100);
   if (!Number.isFinite(amountCents) || amountCents < 1) throw new HttpError(400, 'Contribution must be greater than zero');
-  const goal = await SavingsGoalModel.findOneAndUpdate(
-    { _id: goalId, userId },
-    { $inc: { savedAmountCents: amountCents }, $push: { contributions: { date, amountCents, note } } },
-    { new: true, runValidators: true },
-  );
+  const goal = await SavingsGoalModel.findOne({ _id: goalId, userId });
   if (!goal) throw new HttpError(404, 'Goal not found');
+
+  const paymentDate = params.date && isValidIsoDate(params.date) ? params.date : new Date().toISOString().slice(0, 10);
+  const subdocId = new mongoose.Types.ObjectId();
+  let transactionId: mongoose.Types.ObjectId | null = null;
+  let targetBankAccountId: mongoose.Types.ObjectId | null = null;
+
+  if (params.debitAccount) {
+    const method = params.paymentMethod || 'cash';
+    if (['debit_card', 'bank_transfer', 'cheque', 'standing_order'].includes(method)) {
+      if (!params.bankAccountId || !params.bankAccountId.trim()) {
+        throw new HttpError(400, `Bank account is required for ${method.replace('_', ' ')} contributions`);
+      }
+    }
+    if (params.bankAccountId && params.bankAccountId.trim() !== '') {
+      if (!mongoose.isValidObjectId(params.bankAccountId)) throw new HttpError(400, 'Invalid bank account id');
+      const bankAccount = await BankAccountModel.findOne({ _id: params.bankAccountId, userId });
+      if (!bankAccount) throw new HttpError(404, 'Bank account not found');
+      targetBankAccountId = bankAccount._id as mongoose.Types.ObjectId;
+    }
+
+    const tx = await postTransaction({
+      userId,
+      type: 'expense',
+      amountCents,
+      date: paymentDate,
+      category: 'Savings Contribution',
+      description: params.note || `Contribution to ${goal.name}`,
+      paymentMethod: method as any,
+      bankAccountId: targetBankAccountId,
+      referenceId: `goal_contribution_${goal._id}_${subdocId}`,
+    });
+    transactionId = tx._id;
+  }
+
+  goal.savedAmountCents = (goal.savedAmountCents || 0) + amountCents;
+  goal.contributions = goal.contributions || [];
+  goal.contributions.push({
+    _id: subdocId,
+    date: paymentDate,
+    amountCents,
+    paymentMethod: params.debitAccount ? (params.paymentMethod || 'cash') : '',
+    bankAccountId: targetBankAccountId,
+    transactionId,
+    note: params.note || '',
+  });
+
+  await goal.save();
   await AuditLogModel.create({ userId, action: 'contribute', resourceType: 'goals', resourceId: goal._id });
+  return goal;
+}
+
+export async function deleteGoalContribution(userId: string, goalId: string, contributionId: string) {
+  if (!mongoose.isValidObjectId(goalId)) throw new HttpError(400, 'Invalid goal id');
+  if (!mongoose.isValidObjectId(contributionId)) throw new HttpError(400, 'Invalid contribution id');
+
+  const goal = await SavingsGoalModel.findOne({ _id: goalId, userId });
+  if (!goal) throw new HttpError(404, 'Goal not found');
+
+  const idx = (goal.contributions || []).findIndex((c: any) => String(c._id) === String(contributionId));
+  if (idx === -1) throw new HttpError(404, 'Contribution not found');
+
+  const contrib = goal.contributions[idx];
+  if (contrib.transactionId) {
+    const refId = `goal_contribution_${goal._id}_${contrib._id}`;
+    await reverseTransaction(userId, refId);
+  }
+
+  goal.savedAmountCents = Math.max(0, (goal.savedAmountCents || 0) - contrib.amountCents);
+  goal.contributions.splice(idx, 1);
+  await goal.save();
+
+  await AuditLogModel.create({ userId, action: 'undo-contribution', resourceType: 'goals', resourceId: goal._id });
   return goal;
 }
 
