@@ -78,6 +78,10 @@ export function LoansTab() {
     defaultDue.setMonth(defaultDue.getMonth() + tenure);
     const dueDate = form.dueDate || defaultDue.toISOString().slice(0, 10);
 
+    const existingLoan = editId ? state.loans.find(l => l.id === editId) : null;
+    const totalRepaid = existingLoan ? (existingLoan.repayments || []).reduce((s, r) => s + r.amount, 0) : 0;
+    const newBalance = existingLoan ? Math.max(0, principal - totalRepaid) : principal;
+
     const entry: Loan = {
       id: editId || 'ln_' + Date.now(),
       lender: form.lender,
@@ -88,10 +92,10 @@ export function LoansTab() {
       tenureMonths: tenure,
       startDate,
       dueDate,
-      balance: principal,
+      balance: newBalance,
       monthlyPayment: calc.monthlyPayment,
       totalInterest: calc.totalInterest,
-      repayments: [],
+      repayments: existingLoan?.repayments || [],
     };
 
     if (editId) {

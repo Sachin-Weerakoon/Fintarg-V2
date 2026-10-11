@@ -379,21 +379,33 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
     case 'DELETE_TRANSACTION':
       return void (await send(`/api/backend/records/transactions/${id}`, 'DELETE'));
 
-    case 'ADD_LOAN':
-      return create('/api/backend/records/loans', {
+    case 'ADD_LOAN': {
+      const payload: Record<string, any> = {
         lender: action.entry.lender,
-        amount: action.entry.principal,
+        amount: action.entry.amount !== undefined ? action.entry.amount : action.entry.principal,
         rate: action.entry.rate,
         method: action.entry.method,
         startDate: action.entry.startDate,
         dueDate: action.entry.dueDate,
-        interestBasis: action.entry.interestBasis,
-        tenureMonths: action.entry.tenureMonths,
-        monthlyPayment: action.entry.monthlyPayment,
-        totalInterest: action.entry.totalInterest,
-      });
-    case 'UPDATE_LOAN':
-      return void (await send(`/api/backend/records/loans/${id}`, 'PATCH', action.entry));
+      };
+      if (action.entry.interestBasis) payload.interestBasis = action.entry.interestBasis;
+      if (action.entry.tenureMonths) payload.tenureMonths = action.entry.tenureMonths;
+      return create('/api/backend/records/loans', payload);
+    }
+    case 'UPDATE_LOAN': {
+      const payload: Record<string, any> = {};
+      const src = action.entry || {};
+      if (src.lender !== undefined) payload.lender = src.lender;
+      if (src.amount !== undefined) payload.amount = src.amount;
+      else if (src.principal !== undefined) payload.amount = src.principal;
+      if (src.rate !== undefined) payload.rate = src.rate;
+      if (src.method !== undefined) payload.method = src.method;
+      if (src.startDate !== undefined) payload.startDate = src.startDate;
+      if (src.dueDate !== undefined) payload.dueDate = src.dueDate;
+      if (src.interestBasis !== undefined) payload.interestBasis = src.interestBasis;
+      if (src.tenureMonths !== undefined) payload.tenureMonths = src.tenureMonths;
+      return void (await send(`/api/backend/records/loans/${id}`, 'PATCH', payload));
+    }
     case 'DELETE_LOAN':
       return void (await send(`/api/backend/records/loans/${id}`, 'DELETE'));
     case 'RECORD_LOAN_REPAYMENT':
