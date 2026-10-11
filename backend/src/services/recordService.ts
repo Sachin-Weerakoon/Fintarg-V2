@@ -20,9 +20,9 @@ import { FileModel } from '../models/File';
 import { BankAccountModel } from '../models/BankAccount';
 import { CardModel } from '../models/Card';
 import { TransactionModel } from '../models/Transaction';
-import { calculateLoan } from '../utils/loanMath';
+import { calculateAmortizationSchedule, calculateLoan } from '../utils/loanMath';
 import { HttpError } from '../middleware/errors';
-import type { RecordKind } from '../validations/records';
+import { isValidIsoDate, type RecordKind } from '../validations/records';
 import { postTransaction, replaceTransaction, reverseTransaction } from './ledgerService';
 
 const models: Record<RecordKind, Model<any>> = {
@@ -567,22 +567,171 @@ export async function addGoalContribution(userId: string, goalId: string, amount
   return goal;
 }
 
-export async function recordLoanRepayment(userId: string, loanId: string, amount: number, date?: string, note = '') {
+export async function recordLoanRepayment(
+  userId: string,
+  loanId: string,
+  amount: number,
+  date?: string,
+  note = '',
+  paymentMethod: string = 'cash',
+  bankAccountId?: string | null,
+) {
   if (!mongoose.isValidObjectId(loanId)) throw new HttpError(400, 'Invalid loan id');
   const amountCents = Math.round(amount * 100);
   if (!Number.isFinite(amountCents) || amountCents < 1) throw new HttpError(400, 'Repayment must be greater than zero');
   const loan = await LoanModel.findOne({ _id: loanId, userId });
   if (!loan) throw new HttpError(404, 'Loan not found');
-  loan.balanceCents = Math.max(0, loan.balanceCents - amountCents);
+
+  let targetBankAccountId: mongoose.Types.ObjectId | null = null;
+  if (['debit_card', 'bank_transfer', 'cheque', 'standing_order'].includes(paymentMethod)) {
+    if (!bankAccountId || !bankAccountId.trim()) {
+      throw new HttpError(400, `Bank account is required for ${paymentMethod.replace('_', ' ')} repayments`);
+    }
+  }
+
+  if (bankAccountId && bankAccountId.trim() !== '') {
+    if (!mongoose.isValidObjectId(bankAccountId)) throw new HttpError(400, 'Invalid bank account id');
+    const bankAccount = await BankAccountModel.findOne({ _id: bankAccountId, userId });
+    if (!bankAccount) throw new HttpError(404, 'Bank account not found');
+    targetBankAccountId = bankAccount._id as mongoose.Types.ObjectId;
+  }
+
+  const paymentDate = date && isValidIsoDate(date) ? date : new Date().toISOString().slice(0, 10);
+
+  // Split principal and interest using schedule / math
+  let principalCents = 0;
+  let interestCents = 0;
+
+  if (loan.method === 'simple') {
+    const monthlyInterestCents = loan.tenureMonths > 0 ? Math.round(loan.totalInterestCents / loan.tenureMonths) : 0;
+    interestCents = Math.min(amountCents, monthlyInterestCents);
+    principalCents = Math.max(0, amountCents - interestCents);
+  } else {
+    const schedule = calculateAmortizationSchedule(
+      loan.principalCents / 100,
+      loan.ratePercent,
+      loan.tenureMonths,
+      loan.interestBasis || 'annual',
+    );
+    const installmentIndex = (loan.repayments || []).length;
+    if (installmentIndex < schedule.length) {
+      const scheduledRow = schedule[installmentIndex];
+      const scheduledInterestCents = Math.round(scheduledRow.interest * 100);
+      const scheduledPrincipalCents = Math.round(scheduledRow.principal * 100);
+      if (amountCents === Math.round(scheduledRow.payment * 100)) {
+        interestCents = scheduledInterestCents;
+        principalCents = scheduledPrincipalCents;
+      } else {
+        interestCents = Math.min(amountCents, scheduledInterestCents);
+        principalCents = Math.max(0, amountCents - interestCents);
+      }
+    } else {
+      interestCents = 0;
+      principalCents = amountCents;
+    }
+  }
+
   loan.repayments = loan.repayments || [];
-  loan.repayments.push({
-    date: date || new Date().toISOString().slice(0, 10),
+  const repaymentSubdocId = new mongoose.Types.ObjectId();
+
+  // Create transaction via ledgerService
+  const tx = await postTransaction({
+    userId,
+    type: 'expense',
     amountCents,
-    note,
+    date: paymentDate,
+    category: 'Loan Repayment',
+    description: note || `Loan repayment to ${loan.lender}`,
+    paymentMethod: paymentMethod as any,
+    bankAccountId: targetBankAccountId,
+    referenceId: `loan_repayment_${loan._id}_${repaymentSubdocId}`,
   });
+
+  loan.repayments.push({
+    _id: repaymentSubdocId,
+    date: paymentDate,
+    amountCents,
+    principalCents,
+    interestCents,
+    note,
+    paymentMethod,
+    bankAccountId: targetBankAccountId,
+    transactionId: tx._id,
+  });
+
+  loan.balanceCents = Math.max(0, loan.balanceCents - amountCents);
   await loan.save();
   await AuditLogModel.create({ userId, action: 'repay', resourceType: 'loans', resourceId: loan._id });
   return loan;
+}
+
+export async function deleteLoanRepayment(userId: string, loanId: string, repaymentId: string) {
+  if (!mongoose.isValidObjectId(loanId)) throw new HttpError(400, 'Invalid loan id');
+  if (!mongoose.isValidObjectId(repaymentId)) throw new HttpError(400, 'Invalid repayment id');
+
+  const loan = await LoanModel.findOne({ _id: loanId, userId });
+  if (!loan) throw new HttpError(404, 'Loan not found');
+
+  const repaymentIndex = (loan.repayments || []).findIndex(
+    (r: any) => String(r._id) === String(repaymentId),
+  );
+  if (repaymentIndex === -1) throw new HttpError(404, 'Repayment not found');
+
+  const repayment = loan.repayments[repaymentIndex];
+  const refId = `loan_repayment_${loan._id}_${repayment._id}`;
+
+  await reverseTransaction(userId, refId);
+
+  loan.repayments.splice(repaymentIndex, 1);
+  const totalRepaidCents = (loan.repayments || []).reduce(
+    (sum: number, r: any) => sum + Number(r.amountCents || 0),
+    0,
+  );
+  loan.balanceCents = Math.max(0, loan.principalCents - totalRepaidCents);
+  await loan.save();
+
+  await AuditLogModel.create({ userId, action: 'undo-repay', resourceType: 'loans', resourceId: loan._id });
+  return loan;
+}
+
+export async function calculateLoanPayoff(userId: string, loanId: string) {
+  if (!mongoose.isValidObjectId(loanId)) throw new HttpError(400, 'Invalid loan id');
+
+  const loan = await LoanModel.findOne({ _id: loanId, userId });
+  if (!loan) throw new HttpError(404, 'Loan not found');
+
+  const totalRepaidCents = (loan.repayments || []).reduce(
+    (sum: number, r: any) => sum + Number(r.amountCents || 0),
+    0,
+  );
+  const totalPrincipalRepaidCents = (loan.repayments || []).reduce(
+    (sum: number, r: any) => sum + Number(r.principalCents || 0),
+    0,
+  );
+  const totalInterestRepaidCents = (loan.repayments || []).reduce(
+    (sum: number, r: any) => sum + Number(r.interestCents || 0),
+    0,
+  );
+
+  const totalContractCents = loan.principalCents + loan.totalInterestCents;
+  const remainingTotalContractCents = Math.max(0, totalContractCents - totalRepaidCents);
+  const remainingPrincipalCents = Math.max(0, loan.principalCents - totalRepaidCents);
+  const payoffAmountCents = remainingPrincipalCents;
+  const interestSavingsCents = Math.max(0, remainingTotalContractCents - payoffAmountCents);
+
+  return {
+    loanId: loan._id,
+    lender: loan.lender,
+    principalCents: loan.principalCents,
+    totalInterestCents: loan.totalInterestCents,
+    totalRepaidCents,
+    totalPrincipalRepaidCents,
+    totalInterestRepaidCents,
+    remainingBalanceCents: loan.balanceCents,
+    remainingTotalContractCents,
+    payoffAmountCents,
+    interestSavingsCents,
+  };
 }
 
 export async function recordPawnPayment(userId: string, pawnId: string) {
