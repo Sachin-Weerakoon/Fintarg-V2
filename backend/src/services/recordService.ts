@@ -23,7 +23,7 @@ import { TransactionModel } from '../models/Transaction';
 import { calculateAmortizationSchedule, calculateLoan } from '../utils/loanMath';
 import { HttpError } from '../middleware/errors';
 import { isValidIsoDate, transferSchema, type RecordKind } from '../validations/records';
-import { deleteTransfer, postTransaction, replaceTransaction, reverseTransaction, reverseTransactionById, transferFunds, updateTransactionById } from './ledgerService';
+import { deleteTransfer, ensureCashWallet, postTransaction, replaceTransaction, reverseTransaction, reverseTransactionById, transferFunds, updateTransactionById } from './ledgerService';
 
 const models: Record<RecordKind, Model<any>> = {
   bankAccounts: BankAccountModel,
@@ -1188,70 +1188,230 @@ export interface TransactionHistoryFilters {
   category?: string;
   type?: 'income' | 'expense' | 'transfer';
   paymentMethod?: string;
+  search?: string;
   limit?: number;
   skip?: number;
 }
 
 export async function getTransactionHistory(userId: string, filters: TransactionHistoryFilters = {}) {
-  const query: Record<string, any> = { userId: new mongoose.Types.ObjectId(userId) };
+  const uId = new mongoose.Types.ObjectId(userId);
+  const baseMatch: Record<string, any> = { userId: uId };
 
+  let targetAccount: any = null;
   if (filters.bankAccountId) {
-    if (mongoose.isValidObjectId(filters.bankAccountId)) {
-      query.bankAccountId = new mongoose.Types.ObjectId(filters.bankAccountId);
+    if (filters.bankAccountId === 'cash') {
+      targetAccount = await ensureCashWallet(uId);
+      baseMatch.bankAccountId = targetAccount._id;
+    } else {
+      if (!mongoose.isValidObjectId(filters.bankAccountId)) {
+        throw new HttpError(400, 'Invalid bank account id');
+      }
+      targetAccount = await BankAccountModel.findOne({ _id: filters.bankAccountId, userId: uId });
+      if (!targetAccount) {
+        throw new HttpError(404, 'Bank account not found');
+      }
+      baseMatch.bankAccountId = targetAccount._id;
     }
   }
+
   if (filters.cardId) {
-    if (mongoose.isValidObjectId(filters.cardId)) {
-      query.cardId = new mongoose.Types.ObjectId(filters.cardId);
+    if (!mongoose.isValidObjectId(filters.cardId)) {
+      throw new HttpError(400, 'Invalid card id');
     }
+    const targetCard = await CardModel.findOne({ _id: filters.cardId, userId: uId });
+    if (!targetCard) {
+      throw new HttpError(404, 'Card not found');
+    }
+    baseMatch.cardId = targetCard._id;
   }
+
+  const pipeline: any[] = [
+    { $match: baseMatch },
+    {
+      $addFields: {
+        signedDeltaCents: {
+          $cond: [
+            {
+              $or: [
+                { $eq: ['$type', 'income'] },
+                { $and: [{ $eq: ['$type', 'transfer'] }, { $eq: ['$transferDirection', 'incoming'] }] },
+              ],
+            },
+            '$amountCents',
+            {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ['$type', 'expense'] },
+                    { $and: [{ $eq: ['$type', 'transfer'] }, { $eq: ['$transferDirection', 'outgoing'] }] },
+                  ],
+                },
+                { $multiply: ['$amountCents', -1] },
+                0,
+              ],
+            },
+          ],
+        },
+      },
+    },
+    {
+      $setWindowFields: {
+        partitionBy: '$bankAccountId',
+        sortBy: { date: 1, createdAt: 1, _id: 1 },
+        output: {
+          cumulativeDeltaCents: {
+            $sum: '$signedDeltaCents',
+            window: { documents: ['unbounded', 'current'] },
+          },
+        },
+      },
+    },
+    {
+      $lookup: {
+        from: BankAccountModel.collection.name,
+        localField: 'bankAccountId',
+        foreignField: '_id',
+        as: 'accountDoc',
+      },
+    },
+    {
+      $addFields: {
+        runningBalanceCents: {
+          $add: [
+            { $ifNull: [{ $arrayElemAt: ['$accountDoc.openingBalanceCents', 0] }, 0] },
+            '$cumulativeDeltaCents',
+          ],
+        },
+        balanceAfterCents: {
+          $add: [
+            { $ifNull: [{ $arrayElemAt: ['$accountDoc.openingBalanceCents', 0] }, 0] },
+            '$cumulativeDeltaCents',
+          ],
+        },
+      },
+    },
+    {
+      $project: {
+        accountDoc: 0,
+        signedDeltaCents: 0,
+        cumulativeDeltaCents: 0,
+      },
+    },
+  ];
+
+  // Secondary filters (applied after computing the running balance)
+  const filterMatch: Record<string, any> = {};
   if (filters.type) {
-    query.type = filters.type;
+    filterMatch.type = filters.type;
   }
   if (filters.category) {
-    query.category = filters.category;
+    filterMatch.category = filters.category;
   }
   if (filters.paymentMethod) {
-    query.paymentMethod = filters.paymentMethod;
+    filterMatch.paymentMethod = filters.paymentMethod;
   }
   if (filters.startDate || filters.endDate) {
-    query.date = {};
-    if (filters.startDate) query.date.$gte = filters.startDate;
-    if (filters.endDate) query.date.$lte = filters.endDate;
+    filterMatch.date = {};
+    if (filters.startDate) filterMatch.date.$gte = filters.startDate;
+    if (filters.endDate) filterMatch.date.$lte = filters.endDate;
+  }
+  if (filters.search && filters.search.trim()) {
+    const escaped = filters.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = new RegExp(escaped, 'i');
+    filterMatch.$or = [
+      { description: searchRegex },
+      { category: searchRegex },
+      { referenceId: searchRegex },
+    ];
   }
 
-  const allTransactions = await TransactionModel.find(query).sort({ date: 1, createdAt: 1 }).lean();
+  if (Object.keys(filterMatch).length > 0) {
+    pipeline.push({ $match: filterMatch });
+  }
 
-  let runningTotalCents = 0;
-  let totalIncomeCents = 0;
-  let totalExpenseCents = 0;
+  // Stable sort descending
+  pipeline.push({ $sort: { date: -1, createdAt: -1, _id: -1 } });
 
-  const withRunningTotals = allTransactions.map((tx: any) => {
-    if (tx.type === 'income' || (tx.type === 'transfer' && tx.transferDirection === 'incoming')) {
-      runningTotalCents += tx.amountCents;
-      totalIncomeCents += tx.amountCents;
-    } else if (tx.type === 'expense' || (tx.type === 'transfer' && tx.transferDirection === 'outgoing')) {
-      runningTotalCents -= tx.amountCents;
-      totalExpenseCents += tx.amountCents;
-    }
-    return {
-      ...tx,
-      runningBalanceCents: runningTotalCents,
-    };
+  const limit = Math.min(Math.max(Number(filters.limit) || 100, 1), 1000);
+  const skip = Math.max(Number(filters.skip) || 0, 0);
+
+  pipeline.push({
+    $facet: {
+      paginatedResults: [
+        { $skip: skip },
+        { $limit: limit },
+      ],
+      totalCount: [
+        { $count: 'count' },
+      ],
+      summary: [
+        {
+          $group: {
+            _id: null,
+            totalIncomeCents: {
+              $sum: {
+                $cond: [
+                  {
+                    $or: [
+                      { $eq: ['$type', 'income'] },
+                      { $and: [{ $eq: ['$type', 'transfer'] }, { $eq: ['$transferDirection', 'incoming'] }] },
+                    ],
+                  },
+                  '$amountCents',
+                  0,
+                ],
+              },
+            },
+            totalExpenseCents: {
+              $sum: {
+                $cond: [
+                  {
+                    $or: [
+                      { $eq: ['$type', 'expense'] },
+                      { $and: [{ $eq: ['$type', 'transfer'] }, { $eq: ['$transferDirection', 'outgoing'] }] },
+                    ],
+                  },
+                  '$amountCents',
+                  0,
+                ],
+              },
+            },
+            firstRunningBalanceCents: { $first: '$runningBalanceCents' },
+          },
+        },
+      ],
+    },
   });
 
-  const limit = Math.min(filters.limit || 100, 1000);
-  const skip = filters.skip || 0;
-  const paginated = withRunningTotals.slice().reverse().slice(skip, skip + limit);
+  const aggResult = await TransactionModel.aggregate(pipeline);
+  const facetResult = aggResult[0] || {
+    paginatedResults: [],
+    totalCount: [],
+    summary: [],
+  };
+
+  const paginatedTransactions = facetResult.paginatedResults || [];
+  const totalCount = facetResult.totalCount[0]?.count || 0;
+  const summaryDoc = facetResult.summary[0];
+
+  const totalIncomeCents = summaryDoc?.totalIncomeCents || 0;
+  const totalExpenseCents = summaryDoc?.totalExpenseCents || 0;
+  const netCents = totalIncomeCents - totalExpenseCents;
+  const closingBalanceCents = summaryDoc?.firstRunningBalanceCents !== undefined
+    ? summaryDoc.firstRunningBalanceCents
+    : (targetAccount ? targetAccount.openingBalanceCents : 0);
 
   return {
-    transactions: paginated,
-    totalCount: withRunningTotals.length,
+    transactions: paginatedTransactions,
+    data: paginatedTransactions,
+    totalCount,
     summary: {
       totalIncomeCents,
       totalExpenseCents,
-      netCents: totalIncomeCents - totalExpenseCents,
-      closingBalanceCents: runningTotalCents,
+      netCents,
+      netFlowCents: netCents,
+      closingBalanceCents,
+      count: totalCount,
     },
   };
 }

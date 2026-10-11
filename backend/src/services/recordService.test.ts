@@ -1,7 +1,7 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
-import { addGoalContribution, calculateLoanPayoff, createRecord, deleteFinancePaymentPayment, deleteGoalContribution, deleteLoanRepayment, deletePawnPayment, deleteRecord, deriveNextDueDate, getRecord, listRecords, recordFinancePayment, recordLoanRepayment, recordPawnPayment, updateRecord } from './recordService';
+import { addGoalContribution, calculateLoanPayoff, createRecord, deleteFinancePaymentPayment, deleteGoalContribution, deleteLoanRepayment, deletePawnPayment, deleteRecord, deriveNextDueDate, getRecord, getTransactionHistory, listRecords, recordFinancePayment, recordLoanRepayment, recordPawnPayment, updateRecord } from './recordService';
 import { recomputeBalance } from './ledgerService';
 import { BankAccountModel } from '../models/BankAccount';
 import { FinancePaymentModel } from '../models/FinancePayment';
@@ -841,4 +841,248 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
       );
     });
   });
+
+  describe('Transaction history aggregation with true running balance and indexes (2.9)', () => {
+    it('computes true running balance per account taking into account openingBalanceCents and stable sort', async () => {
+      const account = await createRecord('bankAccounts', userId, {
+        bankName: 'History Bank',
+        accountNumber: '99887766',
+        accountName: 'Savings Main',
+        openingBalance: 1000, // 100,000 cents
+      });
+
+      // 1. Income on 2026-01-01 of Rs 500 (50,000 cents) -> running balance: 150,000 cents
+      await createRecord('transactions', userId, {
+        date: '2026-01-01',
+        type: 'income',
+        amount: 500,
+        category: 'Salary',
+        description: 'Monthly Salary January',
+        paymentMethod: 'bank_transfer',
+        bankAccountId: account._id.toString(),
+      });
+
+      // 2. Expense on 2026-01-02 of Rs 200 (20,000 cents) -> running balance: 130,000 cents
+      await createRecord('transactions', userId, {
+        date: '2026-01-02',
+        type: 'expense',
+        amount: 200,
+        category: 'Groceries',
+        description: 'Supermarket shopping',
+        paymentMethod: 'bank_transfer',
+        bankAccountId: account._id.toString(),
+      });
+
+      // 3. Expense on 2026-01-03 of Rs 100 (10,000 cents) -> running balance: 120,000 cents
+      await createRecord('transactions', userId, {
+        date: '2026-01-03',
+        type: 'expense',
+        amount: 100,
+        category: 'Utilities',
+        description: 'Electricity bill',
+        paymentMethod: 'bank_transfer',
+        bankAccountId: account._id.toString(),
+      });
+
+      const history = await getTransactionHistory(userId, {
+        bankAccountId: account._id.toString(),
+      });
+
+      assert.strictEqual(history.totalCount, 3);
+      assert.strictEqual(history.transactions.length, 3);
+      assert.strictEqual(history.summary.totalIncomeCents, 50000);
+      assert.strictEqual(history.summary.totalExpenseCents, 30000);
+      assert.strictEqual(history.summary.netCents, 20000);
+      assert.strictEqual(history.summary.netFlowCents, 20000);
+      assert.strictEqual(history.summary.closingBalanceCents, 120000);
+
+      // Verify descending order: 2026-01-03 first, then 01-02, then 01-01
+      const [tx3, tx2, tx1] = history.transactions;
+      assert.strictEqual(tx3.date, '2026-01-03');
+      assert.strictEqual(tx3.runningBalanceCents, 120000);
+      assert.strictEqual(tx3.balanceAfterCents, 120000);
+
+      assert.strictEqual(tx2.date, '2026-01-02');
+      assert.strictEqual(tx2.runningBalanceCents, 130000);
+      assert.strictEqual(tx2.balanceAfterCents, 130000);
+
+      assert.strictEqual(tx1.date, '2026-01-01');
+      assert.strictEqual(tx1.runningBalanceCents, 150000);
+      assert.strictEqual(tx1.balanceAfterCents, 150000);
+    });
+
+    it('supports pagination (skip, limit) and totalCount', async () => {
+      const account = await createRecord('bankAccounts', userId, {
+        bankName: 'Pagination Bank',
+        accountNumber: '11223344',
+        accountName: 'Pagination Account',
+        openingBalance: 500,
+      });
+
+      for (let i = 1; i <= 5; i++) {
+        await createRecord('transactions', userId, {
+          date: `2026-02-0${i}`,
+          type: 'income',
+          amount: 100 * i,
+          category: 'Income',
+          description: `Income ${i}`,
+          paymentMethod: 'bank_transfer',
+          bankAccountId: account._id.toString(),
+        });
+      }
+
+      // Page 1: limit 2, skip 0
+      const page1 = await getTransactionHistory(userId, {
+        bankAccountId: account._id.toString(),
+        limit: 2,
+        skip: 0,
+      });
+      assert.strictEqual(page1.totalCount, 5);
+      assert.strictEqual(page1.transactions.length, 2);
+      assert.strictEqual(page1.transactions[0].date, '2026-02-05');
+      assert.strictEqual(page1.transactions[1].date, '2026-02-04');
+
+      // Page 2: limit 2, skip 2
+      const page2 = await getTransactionHistory(userId, {
+        bankAccountId: account._id.toString(),
+        limit: 2,
+        skip: 2,
+      });
+      assert.strictEqual(page2.totalCount, 5);
+      assert.strictEqual(page2.transactions.length, 2);
+      assert.strictEqual(page2.transactions[0].date, '2026-02-03');
+      assert.strictEqual(page2.transactions[1].date, '2026-02-02');
+
+      // Page 3: limit 2, skip 4
+      const page3 = await getTransactionHistory(userId, {
+        bankAccountId: account._id.toString(),
+        limit: 2,
+        skip: 4,
+      });
+      assert.strictEqual(page3.totalCount, 5);
+      assert.strictEqual(page3.transactions.length, 1);
+      assert.strictEqual(page3.transactions[0].date, '2026-02-01');
+    });
+
+    it('supports filters for type, category, date range, and search keyword', async () => {
+      const account = await createRecord('bankAccounts', userId, {
+        bankName: 'Filter Bank',
+        accountNumber: '55667788',
+        accountName: 'Filter Account',
+        openingBalance: 0,
+      });
+
+      await createRecord('transactions', userId, {
+        date: '2026-03-01',
+        type: 'income',
+        amount: 300,
+        category: 'Consulting',
+        description: 'Client Project Alpha',
+        paymentMethod: 'bank_transfer',
+        bankAccountId: account._id.toString(),
+      });
+      await createRecord('transactions', userId, {
+        date: '2026-03-05',
+        type: 'expense',
+        amount: 150,
+        category: 'Software',
+        description: 'IDE Subscription License',
+        paymentMethod: 'bank_transfer',
+        bankAccountId: account._id.toString(),
+      });
+      await createRecord('transactions', userId, {
+        date: '2026-03-10',
+        type: 'expense',
+        amount: 50,
+        category: 'Food',
+        description: 'Team Lunch at Pizza Hut',
+        paymentMethod: 'bank_transfer',
+        bankAccountId: account._id.toString(),
+      });
+
+      // Filter by type
+      const expenseOnly = await getTransactionHistory(userId, {
+        bankAccountId: account._id.toString(),
+        type: 'expense',
+      });
+      assert.strictEqual(expenseOnly.totalCount, 2);
+      assert.strictEqual(expenseOnly.summary.totalExpenseCents, 20000);
+      assert.strictEqual(expenseOnly.summary.totalIncomeCents, 0);
+
+      // Filter by category
+      const softwareOnly = await getTransactionHistory(userId, {
+        bankAccountId: account._id.toString(),
+        category: 'Software',
+      });
+      assert.strictEqual(softwareOnly.totalCount, 1);
+      assert.strictEqual(softwareOnly.transactions[0].description, 'IDE Subscription License');
+
+      // Filter by date range
+      const march5to8 = await getTransactionHistory(userId, {
+        bankAccountId: account._id.toString(),
+        startDate: '2026-03-05',
+        endDate: '2026-03-08',
+      });
+      assert.strictEqual(march5to8.totalCount, 1);
+      assert.strictEqual(march5to8.transactions[0].date, '2026-03-05');
+
+      // Search keyword in description
+      const searchPizza = await getTransactionHistory(userId, {
+        bankAccountId: account._id.toString(),
+        search: 'Pizza',
+      });
+      assert.strictEqual(searchPizza.totalCount, 1);
+      assert.strictEqual(searchPizza.transactions[0].description, 'Team Lunch at Pizza Hut');
+    });
+
+    it('rejects invalid or unowned bankAccountId and cardId', async () => {
+      const otherUser = new mongoose.Types.ObjectId().toString();
+      const foreignAccount = await createRecord('bankAccounts', otherUser, {
+        bankName: 'Other Bank',
+        accountNumber: '99999999',
+        accountName: 'Foreign Account',
+        openingBalance: 100,
+      });
+
+      // Invalid bankAccountId format
+      await assert.rejects(
+        async () => {
+          await getTransactionHistory(userId, { bankAccountId: 'invalid-id' });
+        },
+        (err: any) => err.status === 400 && /Invalid bank account id/i.test(err.message),
+      );
+
+      // Unowned bankAccountId
+      await assert.rejects(
+        async () => {
+          await getTransactionHistory(userId, { bankAccountId: foreignAccount._id.toString() });
+        },
+        (err: any) => err.status === 404 && /Bank account not found/i.test(err.message),
+      );
+
+      // Invalid cardId format
+      await assert.rejects(
+        async () => {
+          await getTransactionHistory(userId, { cardId: 'invalid-card' });
+        },
+        (err: any) => err.status === 400 && /Invalid card id/i.test(err.message),
+      );
+
+      // Unowned cardId
+      const foreignCard = await createRecord('cards', otherUser, {
+        cardName: 'Foreign Card',
+        cardNumber: '4111111111119999',
+        cardType: 'credit',
+        expiryMonth: '12',
+        expiryYear: '2028',
+      });
+      await assert.rejects(
+        async () => {
+          await getTransactionHistory(userId, { cardId: foreignCard._id.toString() });
+        },
+        (err: any) => err.status === 404 && /Card not found/i.test(err.message),
+      );
+    });
+  });
 });
+
