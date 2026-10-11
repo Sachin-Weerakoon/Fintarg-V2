@@ -41,4 +41,25 @@ describe('loanMath frontend calculations', () => {
     expect(schedule[0].payment).toBe(8884.88);
     expect(schedule[11].balance).toBe(0);
   });
+
+  it('supports monthly interestBasis with rate * 12 equivalence', () => {
+    const monthlyLoan = calculateLoan(100000, 1, 12, 'reducing_balance', 'monthly');
+    expect(monthlyLoan.monthlyPayment).toBe(8884.88);
+    expect(monthlyLoan.totalInterest).toBe(6618.55);
+
+    const simpleMonthly = calculateLoan(100000, 1, 12, 'simple', 'monthly');
+    expect(simpleMonthly.totalInterest).toBe(12000);
+
+    const schedule = calculateAmortizationSchedule(100000, 1, 12, 'monthly');
+    expect(schedule).toHaveLength(12);
+    expect(schedule[0].payment).toBe(8884.88);
+    expect(schedule[11].balance).toBe(0);
+  });
+
+  it('treats compound and reducing_balance methods equivalently for installment loan math', () => {
+    const compoundLoan = calculateLoan(100000, 12, 12, 'compound');
+    const reducingLoan = calculateLoan(100000, 12, 12, 'reducing_balance');
+    expect(compoundLoan.monthlyPayment).toBe(reducingLoan.monthlyPayment);
+    expect(compoundLoan.totalInterest).toBe(reducingLoan.totalInterest);
+  });
 });

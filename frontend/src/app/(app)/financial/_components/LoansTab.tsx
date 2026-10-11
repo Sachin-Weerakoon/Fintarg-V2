@@ -61,8 +61,7 @@ export function LoansTab() {
   const previewTenure = Number(form.tenureMonths) || 12;
   const liveCalc = useMemo(() => {
     if (previewPrincipal <= 0) return null;
-    const effectiveRate = form.interestBasis === 'monthly' ? previewRate * 12 : previewRate;
-    return calculateLoan(previewPrincipal, effectiveRate, previewTenure, form.method);
+    return calculateLoan(previewPrincipal, previewRate, previewTenure, form.method, form.interestBasis);
   }, [previewPrincipal, previewRate, previewTenure, form.method, form.interestBasis]);
 
   const submit = () => {
@@ -70,8 +69,7 @@ export function LoansTab() {
     const principal = Number(form.amount);
     const rate = Number(form.rate) || 0;
     const tenure = Number(form.tenureMonths) || 12;
-    const effectiveRate = form.interestBasis === 'monthly' ? rate * 12 : rate;
-    const calc = calculateLoan(principal, effectiveRate, tenure, form.method);
+    const calc = calculateLoan(principal, rate, tenure, form.method, form.interestBasis);
 
     const startDate = form.startDate || new Date().toISOString().slice(0, 10);
     const defaultDue = new Date(startDate);
@@ -149,13 +147,11 @@ export function LoansTab() {
 
   const amortizationSchedule: AmortizationRow[] = useMemo(() => {
     if (!amortizingLoan) return [];
-    const effectiveRate = amortizingLoan.interestBasis === 'monthly'
-      ? (amortizingLoan.rate || 0) * 12
-      : amortizingLoan.rate || 0;
     return calculateAmortizationSchedule(
       amortizingLoan.principal,
-      effectiveRate,
-      amortizingLoan.tenureMonths || 12
+      amortizingLoan.rate || 0,
+      amortizingLoan.tenureMonths || 12,
+      amortizingLoan.interestBasis || 'annual'
     );
   }, [amortizingLoan]);
 
@@ -202,7 +198,7 @@ export function LoansTab() {
                       <div>
                         <div className="font-bold text-sm text-text">{ln.lender}</div>
                         <div className="text-xs text-muted mt-0.5">
-                          Principal <span className="font-semibold num text-text">{formatRs(ln.principal)}</span> · {ln.rate}% ({ln.interestBasis || 'annual'}) · {ln.tenureMonths || 12}M
+                          Principal <span className="font-semibold num text-text">{formatRs(ln.principal)}</span> · {ln.rate}% ({ln.interestBasis || 'annual'}) · {ln.method === 'simple' ? 'Flat' : 'Reducing Balance'} · {ln.tenureMonths || 12}M
                         </div>
                       </div>
                       <div className="text-right">

@@ -100,7 +100,8 @@ function toStoredForCreate(kind: RecordKind, input: Record<string, unknown>) {
     const rate = Number(stored.ratePercent || 0);
     const tenure = Number(stored.tenureMonths || 12);
     const method = (stored.method as any) || 'simple';
-    const calc = calculateLoan(principal, rate, tenure, method);
+    const interestBasis = (stored.interestBasis as any) || 'annual';
+    const calc = calculateLoan(principal, rate, tenure, method, interestBasis);
     stored.monthlyPaymentCents = Math.round(calc.monthlyPayment * 100);
     stored.totalInterestCents = Math.round(calc.totalInterest * 100);
   }
@@ -215,7 +216,8 @@ function toStoredForUpdate(kind: RecordKind, input: Record<string, unknown>, exi
       const rate = 'ratePercent' in stored ? Number(stored.ratePercent) : Number(existingDoc.ratePercent || 0);
       const tenure = 'tenureMonths' in stored ? Number(stored.tenureMonths) : Number(existingDoc.tenureMonths || 12);
       const method = (('method' in stored ? stored.method : existingDoc.method) as any) || 'simple';
-      const calc = calculateLoan(principal, rate, tenure, method);
+      const interestBasis = (('interestBasis' in stored ? stored.interestBasis : existingDoc.interestBasis) as any) || 'annual';
+      const calc = calculateLoan(principal, rate, tenure, method, interestBasis);
       stored.monthlyPaymentCents = Math.round(calc.monthlyPayment * 100);
       stored.totalInterestCents = Math.round(calc.totalInterest * 100);
 
