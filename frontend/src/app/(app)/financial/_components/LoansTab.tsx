@@ -326,17 +326,16 @@ export function LoansTab() {
                                 </span>
                                 <div className="flex items-center gap-1.5">
                                   <span className="font-medium text-success-text num">-{formatRs(r.amount)}</span>
-                                  {repId && (
-                                    <button
-                                      type="button"
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
                                       onClick={() => handleUndoRepayment(ln.id, repId, r.amount)}
-                                      className="p-0.5 text-muted hover:text-danger-text transition-colors rounded cursor-pointer"
+                                      className="!p-0.5 h-auto text-muted hover:text-danger-text"
                                       title="Undo repayment"
                                       aria-label="Undo repayment"
                                     >
                                       <Icon name="close" size={12} />
-                                    </button>
-                                  )}
+                                    </Button>
                                 </div>
                               </div>
                             );
