@@ -449,6 +449,7 @@ export function AccountsTab() {
 
               <Field id="acc-bank" label="Bank Name" hint="Select standard preset or enter custom bank">
                 <Select
+                  id="acc-bank"
                   value={
                     SRI_LANKAN_BANKS.includes(accountForm.bankName)
                       ? accountForm.bankName

@@ -47,6 +47,7 @@ export function ProgressBar({
       )}
       <div
         role="progressbar"
+        aria-label={label || 'Progress'}
         aria-valuenow={value}
         aria-valuemin={0}
         aria-valuemax={max}

@@ -90,7 +90,11 @@ function FinancialContent() {
 
 export default function Financial() {
   return (
-    <Suspense fallback={<PageContainer><div className="py-12 text-center text-muted text-sm">Loading ledger...</div></PageContainer>}>
+    <Suspense fallback={
+      <PageContainer>
+        <PageHeader title="Financial Ledger" description="Loading financial ledger..." />
+      </PageContainer>
+    }>
       <FinancialContent />
     </Suspense>
   );

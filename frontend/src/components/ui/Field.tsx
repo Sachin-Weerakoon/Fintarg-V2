@@ -39,14 +39,18 @@ export function Field({
         </label>
       )}
 
-      {/* Clone children to automatically pass aria-describedby and aria-invalid if applicable */}
-      {React.isValidElement(children)
-        ? React.cloneElement(children as React.ReactElement<any>, {
-            id,
+      {/* Map children to automatically pass id, aria-describedby and aria-invalid to the primary control */}
+      {React.Children.map(children, (child, idx) => {
+        if (!React.isValidElement(child)) return child;
+        if (idx === 0) {
+          return React.cloneElement(child as React.ReactElement<any>, {
+            id: (child as any).props.id || id,
             'aria-describedby': describedBy,
             'aria-invalid': error ? 'true' : undefined,
-          })
-        : children}
+          });
+        }
+        return child;
+      })}
 
       {hint && !error && (
         <p id={hintId} className="text-xs text-muted">

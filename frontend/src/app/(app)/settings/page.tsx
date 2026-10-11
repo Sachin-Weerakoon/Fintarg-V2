@@ -69,6 +69,7 @@ function ColorPickerRow({
             />
             <Input
               type="color"
+              aria-label={`Select ${label} color`}
               value={effective}
               onChange={e => onChange(e.target.value)}
               className="sr-only"
@@ -78,6 +79,7 @@ function ColorPickerRow({
           {/* Hex string input */}
           <div className="w-24">
             <Input
+              aria-label={`${label} hex code`}
               value={effective}
               onChange={e => {
                 const v = e.target.value;
@@ -378,6 +380,7 @@ function ProfileTab() {
             <Input
               ref={avatarInputRef}
               type="file"
+              aria-label="Upload avatar image"
               accept="image/jpeg,image/png,image/jpg,image/webp"
               className="hidden"
               onChange={handleAvatarUpload}
@@ -750,6 +753,7 @@ function DocumentsTab() {
           <Input
             ref={fileInputRef}
             type="file"
+            aria-label="Upload document file"
             accept=".pdf,.jpg,.jpeg,.png,.docx"
             className="hidden"
             onChange={handleFile}

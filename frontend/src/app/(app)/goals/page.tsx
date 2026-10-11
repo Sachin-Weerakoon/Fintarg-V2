@@ -229,16 +229,16 @@ export default function Goals() {
           <Badge tone="neutral" size="sm">Auto-tracked from expenses</Badge>
         </div>
         <div className="flex flex-wrap items-end gap-6 mb-3">
-          <div>
-            <label className="block text-xs font-semibold text-text mb-1">Monthly budget (Rs.)</label>
+          <Field id="personal-budget" label="Monthly budget (Rs.)">
             <Input
+              id="personal-budget"
               className="!w-36"
               type="number"
               min="0"
               value={budget}
               onChange={e => dispatch({ type: 'SET_PERSONAL_SPENDING_BUDGET', budget: Number(e.target.value) })}
             />
-          </div>
+          </Field>
           <div>
             <div className="text-xs text-muted mb-1">Actual spent (Personal category)</div>
             <div className="text-lg font-bold text-text num">{formatRs(personalSpent)}</div>
@@ -422,9 +422,9 @@ export default function Goals() {
                   <div className="p-4 rounded-xl mb-3 border border-border bg-surface-hover/70">
                     <div className="font-semibold text-xs mb-2 text-text">Adjust goal</div>
                     <div className="flex gap-2 items-end">
-                      <div className="flex-1">
-                        <label className="block text-xs font-medium text-muted mb-1">New daily amount (Rs.)</label>
+                      <Field id={`adjust-daily-${goal.id}`} label="New daily amount (Rs.)" className="flex-1">
                         <Input
+                          id={`adjust-daily-${goal.id}`}
                           type="number"
                           value={adjustForm.dailyAmount}
                           onChange={e => setAdjustForm({ dailyAmount: e.target.value })}
@@ -434,7 +434,7 @@ export default function Goals() {
                             Monthly: <span className="num font-semibold text-text">{formatRs(Number(adjustForm.dailyAmount) * 30)}</span>
                           </p>
                         )}
-                      </div>
+                      </Field>
                       <Button variant="primary" size="sm" onClick={() => submitAdjust(goal.id)}>Save</Button>
                       <Button variant="secondary" size="sm" onClick={() => setAdjusting(null)}>Cancel</Button>
                     </div>
@@ -443,31 +443,31 @@ export default function Goals() {
 
                 {/* Add contribution form */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mt-3 items-end">
-                  <div>
-                    <label className="block text-xs font-medium text-muted mb-1">Contribution (Rs.)</label>
+                  <Field id={`contrib-amount-${goal.id}`} label="Contribution (Rs.)">
                     <Input
+                      id={`contrib-amount-${goal.id}`}
                       type="number"
                       placeholder="1,000"
                       value={sv.amount}
                       onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, amount: e.target.value } }))}
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-muted mb-1">Date</label>
+                  </Field>
+                  <Field id={`contrib-date-${goal.id}`} label="Date">
                     <Input
+                      id={`contrib-date-${goal.id}`}
                       type="date"
                       value={sv.date}
                       onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, date: e.target.value } }))}
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-muted mb-1">Note (optional)</label>
+                  </Field>
+                  <Field id={`contrib-note-${goal.id}`} label="Note (optional)">
                     <Input
+                      id={`contrib-note-${goal.id}`}
                       placeholder="e.g. Salary deposit"
                       value={sv.note}
                       onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, note: e.target.value } }))}
                     />
-                  </div>
+                  </Field>
                   <Button variant="primary" size="sm" onClick={() => addContribution(goal.id)}>
                     Add Savings
                   </Button>
