@@ -1,7 +1,9 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
-import { createRecord, updateRecord, getRecord, listRecords } from './recordService';
+import { calculateLoanPayoff, createRecord, deleteLoanRepayment, getRecord, listRecords, recordLoanRepayment, updateRecord } from './recordService';
+import { BankAccountModel } from '../models/BankAccount';
+import { TransactionModel } from '../models/Transaction';
 
 describe('recordService CRUD & Update partial isolation (1.1)', () => {
   let memoryServer: any = null;
@@ -238,5 +240,141 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
       },
       (err: any) => err.status === 404 && /Card not found/i.test(err.message)
     );
+  });
+
+  describe('Loan repayment, ledger integration & payoff calculation (2.3)', () => {
+    it('records cash loan repayment, creates transaction, updates cash wallet, and splits principal/interest', async () => {
+      // 100,000 principal, 12% reducing balance, 12 months -> EMI 8,884.88
+      const loan = await createRecord('loans', userId, {
+        lender: 'Commercial Bank',
+        amount: 100000,
+        rate: 12,
+        method: 'reducing_balance',
+        tenureMonths: 12,
+        startDate: '2026-01-01',
+        dueDate: '2027-01-01',
+      });
+
+      const updated = await recordLoanRepayment(
+        userId,
+        String(loan._id),
+        8884.88,
+        '2026-02-01',
+        'Month 1 Installment',
+        'cash',
+      );
+
+      assert.strictEqual(updated.repayments.length, 1);
+      const r1 = updated.repayments[0];
+      assert.strictEqual(r1.amountCents, 888488);
+      // Month 1 interest on 100,000 @ 1% per month is 1,000 (100,000 cents)
+      assert.strictEqual(r1.interestCents, 100000);
+      // Month 1 principal is 8,884.88 - 1,000.00 = 7,884.88 (788,488 cents)
+      assert.strictEqual(r1.principalCents, 788488);
+      assert.strictEqual(r1.paymentMethod, 'cash');
+
+      // Balance reduced
+      assert.strictEqual(updated.balanceCents, 10000000 - 888488);
+
+      // Linked transaction verified
+      assert.ok(r1.transactionId);
+      const tx = await TransactionModel.findById(r1.transactionId);
+      assert.ok(tx);
+      assert.strictEqual(tx.amountCents, 888488);
+      assert.strictEqual(tx.type, 'expense');
+      assert.strictEqual(tx.category, 'Loan Repayment');
+      assert.strictEqual(tx.paymentMethod, 'cash');
+
+      // Cash wallet debited
+      const cashWallet = await BankAccountModel.findOne({ userId, accountType: 'cash' });
+      assert.ok(cashWallet);
+      assert.strictEqual(cashWallet.balanceCents, -888488);
+    });
+
+    it('records bank-linked loan repayment, debits bank account, and creates transaction', async () => {
+      const bankAccount = await createRecord('bankAccounts', userId, {
+        bankName: 'HNB',
+        accountNumber: '88889999',
+        balance: 150000,
+      });
+      const initialBalanceCents = (bankAccount as any).balanceCents;
+
+      const loan = await createRecord('loans', userId, {
+        lender: 'HNB Personal Loan',
+        amount: 50000,
+        rate: 10,
+        method: 'simple',
+        tenureMonths: 10,
+        startDate: '2026-01-01',
+      });
+
+      const updated = await recordLoanRepayment(
+        userId,
+        String(loan._id),
+        5000,
+        '2026-02-01',
+        'Bank Transfer Repayment',
+        'bank_transfer',
+        String(bankAccount._id),
+      );
+
+      assert.strictEqual(updated.repayments.length, 1);
+      const r1 = updated.repayments[0];
+      assert.strictEqual(r1.amountCents, 500000);
+      assert.strictEqual(r1.paymentMethod, 'bank_transfer');
+      assert.strictEqual(String(r1.bankAccountId), String(bankAccount._id));
+
+      // Bank account debited
+      const updatedAccount = await BankAccountModel.findById(bankAccount._id);
+      assert.strictEqual(updatedAccount.balanceCents, initialBalanceCents - 500000);
+
+      // Test payoff calculation
+      const payoff = await calculateLoanPayoff(userId, String(loan._id));
+      assert.strictEqual(payoff.totalRepaidCents, 500000);
+      assert.strictEqual(payoff.remainingBalanceCents, 5000000 - 500000);
+      assert.strictEqual(payoff.payoffAmountCents, 5000000 - 500000);
+
+      // Test undo / delete repayment
+      const undone = await deleteLoanRepayment(userId, String(loan._id), String(r1._id));
+      assert.strictEqual(undone.repayments.length, 0);
+      assert.strictEqual(undone.balanceCents, 5000000);
+
+      // Bank account balance restored
+      const restoredAccount = await BankAccountModel.findById(bankAccount._id);
+      assert.strictEqual(restoredAccount.balanceCents, initialBalanceCents);
+
+      // Transaction deleted
+      const txAfterUndo = await TransactionModel.findById(r1.transactionId);
+      assert.strictEqual(txAfterUndo, null);
+    });
+
+    it('rejects bank repayment without bankAccountId or unowned account', async () => {
+      const loan = await createRecord('loans', userId, {
+        lender: 'Seylan Bank',
+        amount: 25000,
+        rate: 12,
+        startDate: '2026-01-01',
+      });
+
+      await assert.rejects(
+        async () => {
+          await recordLoanRepayment(userId, String(loan._id), 2500, '2026-02-01', 'No account', 'bank_transfer');
+        },
+        (err: any) => err.status === 400 && /Bank account is required/i.test(err.message),
+      );
+
+      const otherUser = new mongoose.Types.ObjectId().toString();
+      const otherAccount = await createRecord('bankAccounts', otherUser, {
+        bankName: 'Other Bank',
+        accountNumber: '112233',
+      });
+
+      await assert.rejects(
+        async () => {
+          await recordLoanRepayment(userId, String(loan._id), 2500, '2026-02-01', 'Other account', 'bank_transfer', String(otherAccount._id));
+        },
+        (err: any) => err.status === 404 && /Bank account not found/i.test(err.message),
+      );
+    });
   });
 });

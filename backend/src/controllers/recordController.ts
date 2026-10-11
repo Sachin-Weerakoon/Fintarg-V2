@@ -2,8 +2,8 @@ import mongoose from 'mongoose';
 import type { RequestHandler } from 'express';
 import { z } from 'zod';
 import { HttpError } from '../middleware/errors';
-import { addGoalContribution, createRecord, deleteRecord, getTransactionHistory, listRecords, recordLoanRepayment, recordPawnPayment, updateRecord } from '../services/recordService';
-import { recordKinds, recordSchemas, recordUpdateSchemas, type RecordKind } from '../validations/records';
+import { addGoalContribution, calculateLoanPayoff, createRecord, deleteLoanRepayment, deleteRecord, getTransactionHistory, listRecords, recordLoanRepayment, recordPawnPayment, updateRecord } from '../services/recordService';
+import { optionalIsoDateSchema, paymentMethodEnum, recordKinds, recordSchemas, recordUpdateSchemas, type RecordKind } from '../validations/records';
 import { asyncHandler } from '../utils/asyncHandler';
 
 function getKind(value: string): RecordKind {
@@ -53,8 +53,52 @@ export const contribute: RequestHandler = asyncHandler(async (request, response)
 export const repayLoan: RequestHandler = asyncHandler(async (request, response) => {
   const userId = request.auth?.userId;
   if (!userId) throw new HttpError(401, 'Authentication required');
-  const { amount, date, note } = z.object({ amount: z.coerce.number().positive(), date: z.string().optional(), note: z.string().optional() }).parse(request.body);
-  response.json({ data: await recordLoanRepayment(userId, request.params.id, amount, date, note) });
+  const schema = z.object({
+    amount: z.coerce.number().positive(),
+    date: optionalIsoDateSchema.optional(),
+    note: z.string().optional(),
+    paymentMethod: paymentMethodEnum.optional().default('cash'),
+    bankAccountId: z.string().optional().nullable(),
+  }).superRefine((data, ctx) => {
+    const method = data.paymentMethod;
+    if (['debit_card', 'bank_transfer', 'cheque', 'standing_order'].includes(method)) {
+      if (!data.bankAccountId || data.bankAccountId.trim() === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Bank account is required for ${method.replace('_', ' ')} repayments`,
+          path: ['bankAccountId'],
+        });
+      }
+    }
+  });
+  const { amount, date, note, paymentMethod, bankAccountId } = schema.parse(request.body);
+  response.json({
+    data: await recordLoanRepayment(
+      userId,
+      request.params.id,
+      amount,
+      date,
+      note,
+      paymentMethod,
+      bankAccountId,
+    ),
+  });
+});
+
+export const undoLoanRepayment: RequestHandler = asyncHandler(async (request, response) => {
+  const userId = request.auth?.userId;
+  if (!userId) throw new HttpError(401, 'Authentication required');
+  response.json({
+    data: await deleteLoanRepayment(userId, request.params.id, request.params.repaymentId),
+  });
+});
+
+export const getLoanPayoff: RequestHandler = asyncHandler(async (request, response) => {
+  const userId = request.auth?.userId;
+  if (!userId) throw new HttpError(401, 'Authentication required');
+  response.json({
+    data: await calculateLoanPayoff(userId, request.params.id),
+  });
 });
 
 export const payPawnInterest: RequestHandler = asyncHandler(async (request, response) => {

@@ -45,6 +45,8 @@ export function LoansTab() {
     amount: '',
     date: new Date().toISOString().slice(0, 10),
     note: '',
+    paymentMethod: 'cash',
+    bankAccountId: '',
   });
 
   // Amortization sheet state
@@ -119,16 +121,46 @@ export function LoansTab() {
 
   const handleRecordRepayment = () => {
     if (!repayingLoan || !repaymentForm.amount || Number(repaymentForm.amount) <= 0) return;
+    const isBankMethod = ['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(repaymentForm.paymentMethod);
+    if (isBankMethod && !repaymentForm.bankAccountId) {
+      toast.error('Please select a bank account for this payment method');
+      return;
+    }
     dispatch({
       type: 'RECORD_LOAN_REPAYMENT',
       id: repayingLoan.id,
       amount: Number(repaymentForm.amount),
       note: repaymentForm.note,
       date: repaymentForm.date,
+      paymentMethod: repaymentForm.paymentMethod,
+      bankAccountId: repaymentForm.bankAccountId || null,
     });
     toast.success(`Repayment of ${formatRs(Number(repaymentForm.amount))} logged`);
     setRepayingLoan(null);
-    setRepaymentForm({ amount: '', date: new Date().toISOString().slice(0, 10), note: '' });
+    setRepaymentForm({
+      amount: '',
+      date: new Date().toISOString().slice(0, 10),
+      note: '',
+      paymentMethod: 'cash',
+      bankAccountId: '',
+    });
+  };
+
+  const handleUndoRepayment = async (loanId: string, repaymentId: string, amount: number) => {
+    const ok = await confirm({
+      title: 'Undo Repayment',
+      message: `Undo repayment of ${formatRs(amount)}? Account balance and loan balance will be restored.`,
+      confirmLabel: 'Yes, Undo',
+      cancelLabel: 'No, Keep',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    dispatch({
+      type: 'DELETE_LOAN_REPAYMENT',
+      id: loanId,
+      repaymentId,
+    });
+    toast.success(`Repayment of ${formatRs(amount)} undone`);
   };
 
   const handleDelete = async (id: string, lender: string) => {
@@ -222,17 +254,41 @@ export function LoansTab() {
 
                     {/* Actions */}
                     <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Button
                           variant="secondary"
                           size="sm"
                           onClick={() => {
                             setRepayingLoan(ln);
-                            setRepaymentForm({ amount: '', date: new Date().toISOString().slice(0, 10), note: '' });
+                            setRepaymentForm({
+                              amount: '',
+                              date: new Date().toISOString().slice(0, 10),
+                              note: '',
+                              paymentMethod: 'cash',
+                              bankAccountId: '',
+                            });
                           }}
                         >
                           Log Repayment
                         </Button>
+                        {ln.balance > 0 && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setRepayingLoan(ln);
+                              setRepaymentForm({
+                                amount: String(ln.balance),
+                                date: new Date().toISOString().slice(0, 10),
+                                note: 'Full payoff / Early settlement',
+                                paymentMethod: 'cash',
+                                bankAccountId: '',
+                              });
+                            }}
+                          >
+                            Settle Loan
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -259,12 +315,32 @@ export function LoansTab() {
                       <div className="pt-2 border-t border-border/40 text-xs">
                         <span className="text-[11px] font-semibold text-muted mb-1 block">Recent Repayments:</span>
                         <div className="space-y-1">
-                          {ln.repayments.slice(-3).reverse().map((r, idx) => (
-                            <div key={idx} className="flex justify-between text-muted text-[11px]">
-                              <span>{r.date} {r.note ? `· ${r.note}` : ''}</span>
-                              <span className="font-medium text-success-text num">-{formatRs(r.amount)}</span>
-                            </div>
-                          ))}
+                          {ln.repayments.slice(-3).reverse().map((r, idx) => {
+                            const repId = r.id || r._id;
+                            return (
+                              <div key={idx} className="flex justify-between items-center text-muted text-[11px]">
+                                <span>
+                                  {r.date} {r.note ? `· ${r.note}` : ''}
+                                  {r.paymentMethod && r.paymentMethod !== 'cash' ? ` (${r.paymentMethod.replace('_', ' ')})` : ''}
+                                  {r.principal !== undefined && r.interest !== undefined ? ` [P: ${formatRs(r.principal)} | I: ${formatRs(r.interest)}]` : ''}
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-medium text-success-text num">-{formatRs(r.amount)}</span>
+                                  {repId && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUndoRepayment(ln.id, repId, r.amount)}
+                                      className="p-0.5 text-muted hover:text-danger-text transition-colors rounded cursor-pointer"
+                                      title="Undo repayment"
+                                      aria-label="Undo repayment"
+                                    >
+                                      <Icon name="x" size={12} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -385,6 +461,34 @@ export function LoansTab() {
         description={repayingLoan ? `Log a payment for ${repayingLoan.lender}` : ''}
       >
         <div className="space-y-4 pt-2">
+          <Field id="repay-method" label="Payment Method">
+            <Select
+              value={repaymentForm.paymentMethod}
+              onChange={e => setRepaymentForm(f => ({ ...f, paymentMethod: e.target.value }))}
+            >
+              <option value="cash">Cash</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="standing_order">Standing Order</option>
+              <option value="cheque">Cheque</option>
+              <option value="online">Online</option>
+              <option value="other">Other</option>
+            </Select>
+          </Field>
+          {['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(repaymentForm.paymentMethod) && (
+            <Field id="repay-account" label="Debit Bank Account">
+              <Select
+                value={repaymentForm.bankAccountId}
+                onChange={e => setRepaymentForm(f => ({ ...f, bankAccountId: e.target.value }))}
+              >
+                <option value="">Select Account...</option>
+                {state.bankAccounts.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.bankName} - {b.accountNumber} ({formatRs(b.currentBalance)})
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
           <Field id="repay-amount" label="Repayment Amount (Rs.)">
             <MoneyField
               value={repaymentForm.amount}

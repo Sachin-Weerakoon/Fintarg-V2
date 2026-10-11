@@ -129,6 +129,19 @@ export interface FinancePayment {
   status?: 'active' | 'cleared' | 'cancelled' | 'pending';
 }
 
+export interface LoanRepayment {
+  id?: string;
+  _id?: string;
+  date: string;
+  amount: number;
+  principal?: number;
+  interest?: number;
+  note?: string;
+  paymentMethod?: string;
+  bankAccountId?: string | null;
+  transactionId?: string | null;
+}
+
 export interface Loan {
   id: string;
   lender: string;
@@ -142,7 +155,7 @@ export interface Loan {
   tenureMonths?: number;
   monthlyPayment?: number;
   totalInterest?: number;
-  repayments?: { date: string; amount: number; note?: string }[];
+  repayments?: LoanRepayment[];
 }
 
 export interface PawnedItem {

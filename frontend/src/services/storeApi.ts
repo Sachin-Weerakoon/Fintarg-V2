@@ -106,9 +106,16 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
       monthlyPayment: row.monthlyPaymentCents ? row.monthlyPaymentCents / 100 : undefined,
       totalInterest: row.totalInterestCents ? row.totalInterestCents / 100 : undefined,
       repayments: (row.repayments || []).map((r: RawRecord) => ({
+        id: r._id,
+        _id: r._id,
         date: r.date,
         amount: (r.amountCents || 0) / 100,
+        principal: (r.principalCents || 0) / 100,
+        interest: (r.interestCents || 0) / 100,
         note: r.note,
+        paymentMethod: r.paymentMethod,
+        bankAccountId: r.bankAccountId,
+        transactionId: r.transactionId,
       })),
     })),
     bankAccounts: bankAccounts.map(row => ({
@@ -411,8 +418,13 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
     case 'RECORD_LOAN_REPAYMENT':
       return void (await send(`/api/backend/records/loans/${id}/repay`, 'POST', {
         amount: action.amount,
+        date: action.date,
         note: action.note,
+        paymentMethod: action.paymentMethod,
+        bankAccountId: action.bankAccountId,
       }));
+    case 'DELETE_LOAN_REPAYMENT':
+      return void (await send(`/api/backend/records/loans/${id}/repayments/${action.repaymentId}`, 'DELETE'));
 
     case 'ADD_PAWNED':
       return create('/api/backend/records/pawnedItems', action.entry);

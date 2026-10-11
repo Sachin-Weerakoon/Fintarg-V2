@@ -162,7 +162,8 @@ type Action =
   | { type: 'DELETE_TRANSACTION'; id: string }
   | { type: 'ADD_LOAN'; entry: Loan }
   | { type: 'UPDATE_LOAN'; entry: Loan }
-  | { type: 'RECORD_LOAN_REPAYMENT'; id: string; amount: number; note?: string; date?: string }
+  | { type: 'RECORD_LOAN_REPAYMENT'; id: string; amount: number; note?: string; date?: string; paymentMethod?: string; bankAccountId?: string | null }
+  | { type: 'DELETE_LOAN_REPAYMENT'; id: string; repaymentId: string }
   | { type: 'DELETE_LOAN'; id: string }
   | { type: 'ADD_PAWNED'; entry: PawnedItem }
   | { type: 'RECORD_PAWN_PAYMENT'; id: string }
@@ -238,9 +239,28 @@ function reducer(state: AppState, action: Action): AppState {
         balance: Math.max(0, l.balance - action.amount),
         repayments: [
           ...(l.repayments || []),
-          { date: action.date || new Date().toISOString().slice(0, 10), amount: action.amount, note: action.note },
+          {
+            date: action.date || new Date().toISOString().slice(0, 10),
+            amount: action.amount,
+            note: action.note,
+            paymentMethod: action.paymentMethod || 'cash',
+            bankAccountId: action.bankAccountId,
+          },
         ],
       } : l),
+    };
+    case 'DELETE_LOAN_REPAYMENT': return {
+      ...state,
+      loans: state.loans.map(l => {
+        if (l.id !== action.id) return l;
+        const reps = (l.repayments || []).filter(r => (r.id || r._id) !== action.repaymentId);
+        const totalRepaid = reps.reduce((sum, r) => sum + r.amount, 0);
+        return {
+          ...l,
+          balance: Math.max(0, l.principal - totalRepaid),
+          repayments: reps,
+        };
+      }),
     };
     case 'DELETE_LOAN': return { ...state, loans: state.loans.filter(l => l.id !== action.id) };
     case 'ADD_PAWNED': return { ...state, pawnedItems: [...state.pawnedItems, action.entry] };

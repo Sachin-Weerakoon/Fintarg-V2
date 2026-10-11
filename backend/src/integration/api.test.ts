@@ -693,8 +693,8 @@ describe('Backend API Integration Tests', () => {
       assert.ok(historyData.transactions.length >= 2); // income + expense created earlier
       assert.ok(historyData.summary);
       assert.strictEqual(historyData.summary.totalIncomeCents, 5000000);
-      assert.strictEqual(historyData.summary.totalExpenseCents, 1500000);
-      assert.strictEqual(historyData.summary.netCents, 3500000);
+      assert.strictEqual(historyData.summary.totalExpenseCents, 1500000 + 888488);
+      assert.strictEqual(historyData.summary.netCents, 5000000 - (1500000 + 888488));
 
       // 2. Fetch with filter by bankAccountId
       const filterRes = await fetch(`${baseUrl}/api/transactions/history?bankAccountId=${userABankAccountId}`, {
