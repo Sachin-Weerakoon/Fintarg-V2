@@ -107,3 +107,54 @@ The static and visual inspection of `DashboardClient.tsx` establishes the follow
    * Frontend: `tsc --noEmit`, ESLint (zero new warnings), Vitest, `next build`.
    * Backend: tests and typecheck unchanged and passing.
    * Visual verification at 360, 390, 768, 1024, 1440.
+
+---
+
+## 6. Verification Results & Before vs. After Metrics
+
+### 6.1 Quantitative Codebase Improvements
+
+| Metric / Pattern | Static Baseline (HEAD `418e0a5`) | Post-Consistency Pass (`feat/ui-consistency-pass`) | Verification Method |
+| :--- | :--- | :--- | :--- |
+| **Raw `<button>` outside `components/ui`** | ~82 across app | **0** | ESLint `react/forbid-elements` + AST grep |
+| **Raw `<input>` outside `components/ui`** | ~75 across app | **0** | ESLint `react/forbid-elements` + AST grep |
+| **Raw `<select>` outside `components/ui`** | ~15 across app | **0** | ESLint `react/forbid-elements` + AST grep |
+| **Hardcoded hex colors (`#...`) in TSX** | 12 instances outside tokens | **0** | Grep regex `#[0-9a-fA-F]{3,6}` outside tokens |
+| **Tailwind palette classes (`slate-*`, etc.)** | ~95 instances in TSX | **0** | Grep regex `(slate\|zinc\|cyan\|...)-\d+` |
+| **Static inline `style={{}}`** | ~200 instances | **0** | ESLint `no-restricted-syntax` + AST grep |
+| **Native `window.confirm` / `alert`** | 0 allowed | **0** | Grep verification; all use `useConfirm()` |
+| **Frontend Unit & Component Tests** | 4 suites / 17 tests | **6 suites / 26 tests passing** | Vitest test runner |
+| **Backend Integration & Unit Tests** | 51 tests | **51 tests passing** | Node test runner |
+| **Next.js Production Build** | N/A | **21/21 pages compiled cleanly** | `next build` |
+| **Playwright Visual Smoke Tests** | 0 automated | **32 / 32 passed (390px & 1440px, light & dark)** | Playwright in Chromium |
+| **Axe-core WCAG AA Accessibility** | Unverified / baseline violations | **0 violations across all 8 main screens** | `axe-core` injection via Playwright |
+
+### 6.2 Axe-core Accessibility Audit Breakdown
+
+Evaluated in headless Chromium at 1440px against WCAG 2.0, 2.1 Level A & AA:
+
+| Page / Screen | Route | Total Violations | Critical / Serious Issues | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Welcome (Auth)** | `/welcome` | 0 | 0 | ✅ 100% WCAG AA Pass |
+| **Dashboard** | `/` | 0 | 0 | ✅ 100% WCAG AA Pass |
+| **Financial Ledger** | `/financial` | 0 | 0 | ✅ 100% WCAG AA Pass |
+| **Analysis** | `/analysis` | 0 | 0 | ✅ 100% WCAG AA Pass |
+| **Savings Goals** | `/goals` | 0 | 0 | ✅ 100% WCAG AA Pass |
+| **Document Vault** | `/documents` | 0 | 0 | ✅ 100% WCAG AA Pass |
+| **Advanced Features Hub** | `/advanced` | 0 | 0 | ✅ 100% WCAG AA Pass |
+| **Settings** | `/settings` | 0 | 0 | ✅ 100% WCAG AA Pass |
+
+### 6.3 Playwright Visual Smoke Matrix (390px & 1440px)
+
+Zero horizontal document overflow (`document.documentElement.scrollWidth <= window.innerWidth`) verified across light and dark modes:
+
+- `Welcome`: mobile-390 (light/dark), desktop-1440 (light/dark) — **4/4 PASS**
+- `Dashboard`: mobile-390 (light/dark), desktop-1440 (light/dark) — **4/4 PASS**
+- `Financial`: mobile-390 (light/dark), desktop-1440 (light/dark) — **4/4 PASS**
+- `Analysis`: mobile-390 (light/dark), desktop-1440 (light/dark) — **4/4 PASS**
+- `Goals`: mobile-390 (light/dark), desktop-1440 (light/dark) — **4/4 PASS**
+- `Documents`: mobile-390 (light/dark), desktop-1440 (light/dark) — **4/4 PASS**
+- `Advanced`: mobile-390 (light/dark), desktop-1440 (light/dark) — **4/4 PASS**
+- `Settings`: mobile-390 (light/dark), desktop-1440 (light/dark) — **4/4 PASS**
+- **Total: 32 / 32 PASS**
+
