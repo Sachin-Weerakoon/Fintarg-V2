@@ -12,7 +12,7 @@ export interface PostTransactionParams {
   date: string;
   category?: string;
   description?: string;
-  paymentMethod?: 'cash' | 'card' | 'bank_transfer' | 'cheque' | 'standing_order' | 'online' | 'other';
+  paymentMethod?: 'cash' | 'card' | 'debit_card' | 'credit_card' | 'bank_transfer' | 'cheque' | 'standing_order' | 'online' | 'other';
   bankAccountId?: string | mongoose.Types.ObjectId | null;
   cardId?: string | mongoose.Types.ObjectId | null;
   referenceId?: string;
@@ -119,17 +119,35 @@ export async function postTransaction(
 
   // 2. Adjust credit card balance (outstanding increases on expense, decreases on payment/refund)
   if (cardId) {
-    let cardDelta = 0;
-    if (params.type === 'expense') cardDelta = amountCents;
-    else if (params.type === 'income') cardDelta = -amountCents;
+    const card = await CardModel.findOne({ _id: cardId, userId: uId });
+    if (card) {
+      if (card.cardType === 'credit' || params.paymentMethod === 'credit_card') {
+        let cardDelta = 0;
+        if (params.type === 'expense') cardDelta = amountCents;
+        else if (params.type === 'income') cardDelta = -amountCents;
 
-    if (cardDelta !== 0) {
-      const updateQuery = CardModel.updateOne(
-        { _id: cardId, userId: uId },
-        { $inc: { balanceCents: cardDelta } },
-      );
-      if (session) updateQuery.session(session);
-      await updateQuery;
+        if (cardDelta !== 0) {
+          const updateQuery = CardModel.updateOne(
+            { _id: cardId, userId: uId },
+            { $inc: { balanceCents: cardDelta } },
+          );
+          if (session) updateQuery.session(session);
+          await updateQuery;
+        }
+      } else if (card.cardType === 'debit' && !bankAccountId && card.bankAccountId) {
+        bankAccountId = card.bankAccountId;
+        let delta = 0;
+        if (params.type === 'income') delta = amountCents;
+        else if (params.type === 'expense') delta = -amountCents;
+        if (delta !== 0) {
+          const updateQuery = BankAccountModel.updateOne(
+            { _id: bankAccountId, userId: uId },
+            { $inc: { balanceCents: delta } },
+          );
+          if (session) updateQuery.session(session);
+          await updateQuery;
+        }
+      }
     }
   }
 
@@ -188,17 +206,20 @@ export async function reverseTransaction(
 
     // Reverse card balance
     if (tx.cardId) {
-      let cardReverseDelta = 0;
-      if (tx.type === 'expense') cardReverseDelta = -tx.amountCents;
-      else if (tx.type === 'income') cardReverseDelta = tx.amountCents;
+      const card = await CardModel.findOne({ _id: tx.cardId, userId: uId });
+      if (card && (card.cardType === 'credit' || tx.paymentMethod === 'credit_card')) {
+        let cardReverseDelta = 0;
+        if (tx.type === 'expense') cardReverseDelta = -tx.amountCents;
+        else if (tx.type === 'income') cardReverseDelta = tx.amountCents;
 
-      if (cardReverseDelta !== 0) {
-        const updateQuery = CardModel.updateOne(
-          { _id: tx.cardId, userId: uId },
-          { $inc: { balanceCents: cardReverseDelta } },
-        );
-        if (session) updateQuery.session(session);
-        await updateQuery;
+        if (cardReverseDelta !== 0) {
+          const updateQuery = CardModel.updateOne(
+            { _id: tx.cardId, userId: uId },
+            { $inc: { balanceCents: cardReverseDelta } },
+          );
+          if (session) updateQuery.session(session);
+          await updateQuery;
+        }
       }
     }
 

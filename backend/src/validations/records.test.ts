@@ -70,6 +70,7 @@ describe('Financial Record Validation Schemas', () => {
         amount: 2500,
         category: 'Utilities',
         paymentMethod: 'standing_order',
+        bankAccountId: '64b0f0000000000000000001',
       };
       assert.strictEqual(recordSchemas.expenses.safeParse(expense).success, true);
 
@@ -90,6 +91,70 @@ describe('Financial Record Validation Schemas', () => {
         paymentMethod: 'standing_order',
       };
       assert.strictEqual(recordSchemas.transactions.safeParse(tx).success, true);
+    });
+  });
+
+  describe('payment method and account combinations (2.2)', () => {
+    it('rejects bank-linked payment methods without bankAccountId on expenses and incomes', () => {
+      const bankMethods = ['debit_card', 'bank_transfer', 'cheque', 'standing_order'] as const;
+      for (const method of bankMethods) {
+        const expResult = recordSchemas.expenses.safeParse({
+          date: '2026-10-02',
+          amount: 2500,
+          category: 'Utilities',
+          paymentMethod: method,
+        });
+        assert.strictEqual(expResult.success, false, `Expected ${method} without bankAccountId to fail for expenses`);
+
+        const incResult = recordSchemas.incomes.safeParse({
+          source: 'Salary',
+          type: 'salary',
+          amount: 100000,
+          frequency: 'monthly',
+          date: '2026-10-02',
+          paymentMethod: method,
+        });
+        assert.strictEqual(incResult.success, false, `Expected ${method} without bankAccountId to fail for incomes`);
+      }
+    });
+
+    it('rejects credit_card expense without cardId, but accepts with cardId', () => {
+      const failResult = recordSchemas.expenses.safeParse({
+        date: '2026-10-02',
+        amount: 2500,
+        category: 'Shopping',
+        paymentMethod: 'credit_card',
+      });
+      assert.strictEqual(failResult.success, false);
+
+      const passResult = recordSchemas.expenses.safeParse({
+        date: '2026-10-02',
+        amount: 2500,
+        category: 'Shopping',
+        paymentMethod: 'credit_card',
+        cardId: '64b0f0000000000000000002',
+      });
+      assert.strictEqual(passResult.success, true);
+    });
+
+    it('accepts cash expense and income without bankAccountId', () => {
+      const exp = recordSchemas.expenses.safeParse({
+        date: '2026-10-02',
+        amount: 500,
+        category: 'Snacks',
+        paymentMethod: 'cash',
+      });
+      assert.strictEqual(exp.success, true);
+
+      const inc = recordSchemas.incomes.safeParse({
+        source: 'Gift',
+        type: 'other',
+        amount: 5000,
+        frequency: 'one-time',
+        date: '2026-10-02',
+        paymentMethod: 'cash',
+      });
+      assert.strictEqual(inc.success, true);
     });
   });
 

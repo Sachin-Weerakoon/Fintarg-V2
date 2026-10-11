@@ -23,6 +23,7 @@ import { TransactionModel } from '../models/Transaction';
 import { calculateLoan } from '../utils/loanMath';
 import { HttpError } from '../middleware/errors';
 import type { RecordKind } from '../validations/records';
+import { postTransaction, replaceTransaction, reverseTransaction } from './ledgerService';
 
 const models: Record<RecordKind, Model<any>> = {
   bankAccounts: BankAccountModel,
@@ -419,32 +420,30 @@ export async function createRecord(kind: RecordKind, userId: string, input: Reco
   if (kind === 'ownerDraws') data.companyId = new mongoose.Types.ObjectId(String(input.companyId));
   const record = await models[kind].create({ ...data, userId: new mongoose.Types.ObjectId(userId) });
 
-  if (kind === 'expenses' && data.bankAccountId) {
-    await BankAccountModel.updateOne({ _id: data.bankAccountId, userId }, { $inc: { balanceCents: -Number(data.amountCents || 0) } });
-    await TransactionModel.create({
-      userId: new mongoose.Types.ObjectId(userId),
-      bankAccountId: data.bankAccountId,
-      cardId: data.cardId || null,
+  if (kind === 'expenses') {
+    await postTransaction({
+      userId,
       type: 'expense',
-      amountCents: data.amountCents,
-      date: data.date,
-      category: data.category || 'General',
-      description: data.note || 'Expense',
-      paymentMethod: data.paymentMethod || 'cash',
+      amountCents: Number(data.amountCents || 0),
+      date: String(data.date),
+      category: String(data.category || 'General'),
+      description: String(data.note || 'Expense'),
+      paymentMethod: (data.paymentMethod as any) || 'cash',
+      bankAccountId: data.bankAccountId ? new mongoose.Types.ObjectId(String(data.bankAccountId)) : null,
+      cardId: data.cardId ? new mongoose.Types.ObjectId(String(data.cardId)) : null,
       referenceId: record._id.toString(),
     });
   }
-  if (kind === 'incomes' && data.bankAccountId) {
-    await BankAccountModel.updateOne({ _id: data.bankAccountId, userId }, { $inc: { balanceCents: Number(data.amountCents || 0) } });
-    await TransactionModel.create({
-      userId: new mongoose.Types.ObjectId(userId),
-      bankAccountId: data.bankAccountId,
+  if (kind === 'incomes') {
+    await postTransaction({
+      userId,
       type: 'income',
-      amountCents: data.amountCents,
-      date: data.date,
-      category: data.source || 'General',
-      description: data.source || 'Income',
-      paymentMethod: data.paymentMethod || 'bank_transfer',
+      amountCents: Number(data.amountCents || 0),
+      date: String(data.date),
+      category: String(data.source || 'General'),
+      description: String(data.source || 'Income'),
+      paymentMethod: (data.paymentMethod as any) || 'bank_transfer',
+      bankAccountId: data.bankAccountId ? new mongoose.Types.ObjectId(String(data.bankAccountId)) : null,
       referenceId: record._id.toString(),
     });
   }
@@ -495,6 +494,33 @@ export async function updateRecord(kind: RecordKind, userId: string, id: string,
       }
     }
   }
+  if (kind === 'expenses') {
+    await replaceTransaction(userId, updated._id.toString(), {
+      userId,
+      type: 'expense',
+      amountCents: Number(updated.amountCents || 0),
+      date: String(updated.date),
+      category: String(updated.category || 'General'),
+      description: String(updated.note || 'Expense'),
+      paymentMethod: (updated.paymentMethod as any) || 'cash',
+      bankAccountId: updated.bankAccountId ? new mongoose.Types.ObjectId(String(updated.bankAccountId)) : null,
+      cardId: updated.cardId ? new mongoose.Types.ObjectId(String(updated.cardId)) : null,
+      referenceId: updated._id.toString(),
+    });
+  }
+  if (kind === 'incomes') {
+    await replaceTransaction(userId, updated._id.toString(), {
+      userId,
+      type: 'income',
+      amountCents: Number(updated.amountCents || 0),
+      date: String(updated.date),
+      category: String(updated.source || 'General'),
+      description: String(updated.source || 'Income'),
+      paymentMethod: (updated.paymentMethod as any) || 'bank_transfer',
+      bankAccountId: updated.bankAccountId ? new mongoose.Types.ObjectId(String(updated.bankAccountId)) : null,
+      referenceId: updated._id.toString(),
+    });
+  }
   await AuditLogModel.create({ userId, action: 'update', resourceType: kind, resourceId: updated._id });
   return updated;
 }
@@ -517,13 +543,8 @@ export async function deleteRecord(kind: RecordKind, userId: string, id: string)
   }
   if (kind === 'businessBranches') await BranchEntryModel.deleteMany({ branchId: deleted._id, userId });
   if (kind === 'documents' && deleted.fileId) await FileModel.deleteOne({ _id: deleted.fileId, userId });
-  if (kind === 'expenses' && deleted.bankAccountId) {
-    await BankAccountModel.updateOne({ _id: deleted.bankAccountId, userId }, { $inc: { balanceCents: Number(deleted.amountCents || 0) } });
-    await TransactionModel.deleteOne({ userId, referenceId: deleted._id.toString() });
-  }
-  if (kind === 'incomes' && deleted.bankAccountId) {
-    await BankAccountModel.updateOne({ _id: deleted.bankAccountId, userId }, { $inc: { balanceCents: -Number(deleted.amountCents || 0) } });
-    await TransactionModel.deleteOne({ userId, referenceId: deleted._id.toString() });
+  if (kind === 'expenses' || kind === 'incomes') {
+    await reverseTransaction(userId, deleted._id.toString());
   }
   if (kind === 'bankAccounts') {
     await CardModel.deleteMany({ bankAccountId: deleted._id, userId });

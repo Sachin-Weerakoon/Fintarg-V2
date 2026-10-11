@@ -3,7 +3,7 @@ import type { RequestHandler } from 'express';
 import { z } from 'zod';
 import { HttpError } from '../middleware/errors';
 import { addGoalContribution, createRecord, deleteRecord, getTransactionHistory, listRecords, recordLoanRepayment, recordPawnPayment, updateRecord } from '../services/recordService';
-import { recordKinds, recordSchemas, type RecordKind } from '../validations/records';
+import { recordKinds, recordSchemas, recordUpdateSchemas, type RecordKind } from '../validations/records';
 import { asyncHandler } from '../utils/asyncHandler';
 
 function getKind(value: string): RecordKind {
@@ -31,7 +31,7 @@ export const update: RequestHandler = asyncHandler(async (request, response) => 
   const userId = request.auth?.userId;
   if (!userId) throw new HttpError(401, 'Authentication required');
   if (!mongoose.isValidObjectId(request.params.id)) throw new HttpError(400, 'Invalid record id');
-  const input = recordSchemas[kind].partial().parse(request.body);
+  const input = recordUpdateSchemas[kind].parse(request.body);
   response.json({ data: await updateRecord(kind, userId, request.params.id, input as Record<string, unknown>) });
 });
 

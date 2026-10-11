@@ -9,7 +9,7 @@ export interface ITransaction extends Document {
   date: string;
   category: string;
   description: string;
-  paymentMethod: 'cash' | 'card' | 'bank_transfer' | 'cheque' | 'standing_order' | 'online' | 'other';
+  paymentMethod: 'cash' | 'card' | 'debit_card' | 'credit_card' | 'bank_transfer' | 'cheque' | 'standing_order' | 'online' | 'other';
   referenceId: string;
   runningBalanceCents?: number;
   createdAt: Date;
@@ -25,7 +25,7 @@ const TransactionSchema = new Schema<ITransaction>({
   date: { type: String, required: true },
   category: { type: String, default: 'General', trim: true },
   description: { type: String, default: '', trim: true },
-  paymentMethod: { type: String, enum: ['cash', 'card', 'bank_transfer', 'cheque', 'standing_order', 'online', 'other'], default: 'cash' },
+  paymentMethod: { type: String, enum: ['cash', 'card', 'debit_card', 'credit_card', 'bank_transfer', 'cheque', 'standing_order', 'online', 'other'], default: 'cash' },
   referenceId: { type: String, default: '', trim: true },
   runningBalanceCents: { type: Number },
 }, { timestamps: true });

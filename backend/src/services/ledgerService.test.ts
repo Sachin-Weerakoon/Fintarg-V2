@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { BankAccountModel } from '../models/BankAccount';
+import { CardModel } from '../models/Card';
 import { TransactionModel } from '../models/Transaction';
 import {
   ensureCashWallet,
@@ -11,7 +12,7 @@ import {
   reverseTransaction,
   backfillOpeningBalances,
 } from './ledgerService';
-import { createRecord, deleteRecord, getRecord } from './recordService';
+import { createRecord, deleteRecord, getRecord, updateRecord } from './recordService';
 
 describe('Ledger Service & Opening Balance Integrity (2.1)', () => {
   let mongoServer: MongoMemoryServer;
@@ -171,5 +172,105 @@ describe('Ledger Service & Opening Balance Integrity (2.1)', () => {
     assert.strictEqual(liveRes.updatedCount, 1);
     const updated = await BankAccountModel.findById(rawAccount._id);
     assert.strictEqual(updated?.openingBalanceCents, 5000000);
+  });
+});
+
+describe('Expenses and Incomes Ledger Integration (2.2)', () => {
+  let mongoServer: MongoMemoryServer;
+  const testUserId = new mongoose.Types.ObjectId().toString();
+
+  before(async () => {
+    mongoServer = await MongoMemoryServer.create();
+    await mongoose.connect(mongoServer.getUri());
+  });
+
+  after(async () => {
+    await mongoose.disconnect();
+    await mongoServer.stop();
+  });
+
+  beforeEach(async () => {
+    await BankAccountModel.deleteMany({});
+    await CardModel.deleteMany({});
+    await TransactionModel.deleteMany({});
+  });
+
+  it('cash expense automatically routes to cash wallet and updates its balance', async () => {
+    const cashWallet = await ensureCashWallet(testUserId);
+    assert.strictEqual(cashWallet.balanceCents, 0);
+
+    const expense = await createRecord('expenses', testUserId, {
+      date: '2026-10-10',
+      amount: 1200, // 120,000 cents
+      category: 'Food',
+      note: 'Lunch at cafe',
+      paymentMethod: 'cash',
+    });
+
+    const updatedWallet = await BankAccountModel.findById(cashWallet._id);
+    assert.strictEqual(updatedWallet?.balanceCents, -120000);
+
+    const tx = await TransactionModel.findOne({ referenceId: expense._id.toString() });
+    assert.ok(tx);
+    assert.strictEqual(tx.type, 'expense');
+    assert.strictEqual(tx.amountCents, 120000);
+    assert.strictEqual(tx.bankAccountId?.toString(), cashWallet._id.toString());
+  });
+
+  it('updating an expense adjusts account balance and updates the transaction', async () => {
+    const account = await createRecord('bankAccounts', testUserId, {
+      bankName: 'Sampath Bank',
+      accountNumber: '99001122',
+      openingBalance: 50000, // 5,000,000 cents
+    });
+
+    const expense = await createRecord('expenses', testUserId, {
+      date: '2026-10-10',
+      amount: 5000, // 500,000 cents
+      category: 'Utilities',
+      paymentMethod: 'bank_transfer',
+      bankAccountId: account._id.toString(),
+    });
+
+    const accAfterCreate = await BankAccountModel.findById(account._id);
+    assert.strictEqual(accAfterCreate?.balanceCents, 4500000);
+
+    // Now update expense amount from 5,000 to 8,000 (800,000 cents)
+    await updateRecord('expenses', testUserId, expense._id.toString(), {
+      amount: 8000,
+    });
+
+    const accAfterUpdate = await BankAccountModel.findById(account._id);
+    // 5,000,000 - 800,000 = 4,200,000 cents
+    assert.strictEqual(accAfterUpdate?.balanceCents, 4200000);
+
+    const tx = await TransactionModel.findOne({ referenceId: expense._id.toString() });
+    assert.ok(tx);
+    assert.strictEqual(tx.amountCents, 800000);
+  });
+
+  it('credit card expense increases credit card outstanding balance', async () => {
+    const card = await createRecord('cards', testUserId, {
+      cardName: 'Gold Credit',
+      cardType: 'credit',
+      last4: '4321',
+      creditLimit: 200000,
+    });
+
+    const expense = await createRecord('expenses', testUserId, {
+      date: '2026-10-10',
+      amount: 15000, // 1,500,000 cents
+      category: 'Electronics',
+      paymentMethod: 'credit_card',
+      cardId: card._id.toString(),
+    });
+
+    const updatedCard = await CardModel.findById(card._id);
+    assert.strictEqual(updatedCard?.balanceCents, 1500000);
+
+    // Delete expense restores card balance
+    await deleteRecord('expenses', testUserId, expense._id.toString());
+    const afterDeleteCard = await CardModel.findById(card._id);
+    assert.strictEqual(afterDeleteCard?.balanceCents, 0);
   });
 });
