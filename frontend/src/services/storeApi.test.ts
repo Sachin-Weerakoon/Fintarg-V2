@@ -167,4 +167,62 @@ describe('storeApi loan mapping and readonly field stripping (1.2)', () => {
     expect(capturedBody.balance).toBeUndefined();
     expect(capturedBody.currentBalance).toBeUndefined();
   });
+
+  it('TRANSFER_FUNDS posts to /api/backend/records/transfers and returns transferGroupId (2.7)', async () => {
+    let capturedUrl: string | undefined;
+    let capturedMethod: string | undefined;
+    let capturedBody: any;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (url, init) => {
+      capturedUrl = String(url);
+      capturedMethod = init?.method;
+      capturedBody = JSON.parse(init?.body as string);
+      return new Response(JSON.stringify({ data: { transferGroupId: 'trf_999' } }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    const result = await persistStoreAction({
+      type: 'TRANSFER_FUNDS',
+      fromAccountId: 'ba_111',
+      toAccountId: 'ba_222',
+      amount: 5000,
+      date: '2026-10-12',
+      description: 'Savings top-up',
+    });
+
+    expect(result).toBe('trf_999');
+    expect(capturedUrl).toContain('/api/backend/records/transfers');
+    expect(capturedMethod).toBe('POST');
+    expect(capturedBody).toEqual({
+      fromAccountId: 'ba_111',
+      toAccountId: 'ba_222',
+      amount: 5000,
+      date: '2026-10-12',
+      description: 'Savings top-up',
+    });
+  });
+
+  it('DELETE_TRANSFER sends DELETE to /api/backend/records/transfers/:transferGroupId (2.7)', async () => {
+    let capturedUrl: string | undefined;
+    let capturedMethod: string | undefined;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (url, init) => {
+      capturedUrl = String(url);
+      capturedMethod = init?.method;
+      return new Response(JSON.stringify({ data: { count: 2 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    await persistStoreAction({
+      type: 'DELETE_TRANSFER',
+      transferGroupId: 'trf_999',
+    });
+
+    expect(capturedUrl).toContain('/api/backend/records/transfers/trf_999');
+    expect(capturedMethod).toBe('DELETE');
+  });
 });
