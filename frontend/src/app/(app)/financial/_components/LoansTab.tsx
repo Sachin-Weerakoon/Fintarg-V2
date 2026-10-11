@@ -334,7 +334,7 @@ export function LoansTab() {
                                       title="Undo repayment"
                                       aria-label="Undo repayment"
                                     >
-                                      <Icon name="x" size={12} />
+                                      <Icon name="close" size={12} />
                                     </button>
                                   )}
                                 </div>
