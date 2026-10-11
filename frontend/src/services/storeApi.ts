@@ -329,8 +329,6 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
         branchCode: action.entry.branchCode || '',
         swiftCode: action.entry.swiftCode || '',
         accountType: action.entry.accountType === 'checking' ? 'current' : action.entry.accountType || 'savings',
-        balance: Number(action.entry.currentBalance || 0),
-        currentBalance: Number(action.entry.currentBalance || 0),
         currency: action.entry.currency || 'LKR',
         notes: action.entry.notes || '',
       }));

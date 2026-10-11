@@ -36,6 +36,26 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
     assert.strictEqual((updated as any).branch, 'Colombo 07');
   });
 
+  it('bankAccounts: update does not overwrite existing balanceCents even if balance/currentBalance is passed (1.4)', async () => {
+    const created = await createRecord('bankAccounts', userId, {
+      bankName: 'Commercial Bank',
+      accountNumber: '88776655',
+      name: 'Business Checking',
+      balance: 100000, // 100,000 balance (10,000,000 cents)
+    });
+    assert.strictEqual((created as any).balanceCents, 10000000);
+
+    // Update account with branch change and a stale balance/currentBalance payload
+    const updated = await updateRecord('bankAccounts', userId, String(created._id), {
+      branch: 'Kandy City',
+      balance: 500, // Should be ignored by updateRecord to protect ledger
+      currentBalance: 500,
+    });
+
+    assert.strictEqual((updated as any).branch, 'Kandy City');
+    assert.strictEqual((updated as any).balanceCents, 10000000, 'Existing ledger balance must remain untouched');
+  });
+
   it('cards: update does not overwrite cardName with Payment Card or last4 with 0000', async () => {
     const created = await createRecord('cards', userId, {
       cardName: 'Commercial Platinum',

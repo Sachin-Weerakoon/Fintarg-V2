@@ -241,10 +241,10 @@ function toStoredForUpdate(kind: RecordKind, input: Record<string, unknown>, exi
     if ('accountName' in stored && !('name' in stored)) {
       stored.name = stored.accountName;
     }
-    if ('currentBalance' in stored && !('balance' in stored) && !('balanceCents' in stored)) {
-      stored.balanceCents = Math.round(Number(stored.currentBalance || 0) * 100);
-      delete stored.currentBalance;
-    }
+    // Ledger balance integrity: never overwrite balance on account metadata update
+    delete stored.balance;
+    delete stored.balanceCents;
+    delete stored.currentBalance;
     if (stored.accountType === 'checking') {
       stored.accountType = 'current';
     }

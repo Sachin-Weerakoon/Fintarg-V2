@@ -116,4 +116,55 @@ describe('storeApi loan mapping and readonly field stripping (1.2)', () => {
     expect(capturedBody.totalInterest).toBeUndefined();
     expect(capturedBody.repayments).toBeUndefined();
   });
+
+  it('UPDATE_BANK_ACCOUNT strips balance and currentBalance from update payload (1.4)', async () => {
+    let capturedUrl: string | undefined;
+    let capturedMethod: string | undefined;
+    let capturedBody: any;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (url, init) => {
+      capturedUrl = String(url);
+      capturedMethod = init?.method;
+      capturedBody = JSON.parse(init?.body as string);
+      return new Response(JSON.stringify({ data: { _id: 'bank_456' } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    await persistStoreAction({
+      type: 'UPDATE_BANK_ACCOUNT',
+      entry: {
+        id: 'bank_456',
+        name: 'Salary Account',
+        bankName: 'Sampath Bank',
+        accountNumber: '99887766',
+        branch: 'Colombo 03',
+        branchCode: '003',
+        swiftCode: 'BSAMLKLX',
+        accountType: 'savings',
+        currentBalance: 75000,
+        currency: 'LKR',
+        notes: 'Updated payroll notes',
+      },
+    });
+
+    expect(capturedUrl).toContain('/api/backend/records/bankAccounts/bank_456');
+    expect(capturedMethod).toBe('PATCH');
+    expect(capturedBody).toEqual({
+      name: 'Salary Account',
+      accountName: 'Salary Account',
+      bankName: 'Sampath Bank',
+      accountNumber: '99887766',
+      branch: 'Colombo 03',
+      branchCode: '003',
+      swiftCode: 'BSAMLKLX',
+      accountType: 'savings',
+      currency: 'LKR',
+      notes: 'Updated payroll notes',
+    });
+    // Critical: balance/currentBalance must not be sent
+    expect(capturedBody.balance).toBeUndefined();
+    expect(capturedBody.currentBalance).toBeUndefined();
+  });
 });
