@@ -164,3 +164,119 @@ Every screen in Fintarg must match the design quality, layout rhythm, and token 
   * **Empty**: `<EmptyState>` with descriptive message and primary call-to-action button that populates the view.
   * **Error**: `<ErrorState>` with clear message and retry button.
 
+---
+
+## 7. Component Catalog (Extended Primitives)
+
+All primitives are located in `frontend/src/components/ui/` and exported via `@/components/ui`:
+
+| Component | Purpose & Accessibility | Props / Usage |
+| :--- | :--- | :--- |
+| **`FormField`** | Accessible form control wrapper with label, required asterisk, helper text, and error binding (`aria-describedby`). | `label`, `hint`, `error`, `required`, `id`, `children` |
+| **`FormGrid`** | Responsive form layout (1 column on mobile, 2 columns at >=768px). | `cols` (1 \| 2 \| 3), `className`, `children` |
+| **`MoneyField`** | Sri Lankan currency numeric input with `Rs.` prefix, thousand separators, and decimal support. | `value`, `onChange`, `currency`, `placeholder`, `hasError` |
+| **`DateField`** | Standardized HTML date input styled according to design tokens. | `value`, `onChange`, `min`, `max`, `hasError` |
+| **`Checkbox`** | Custom themed checkbox with checkmark SVG, focus ring, and disabled states. | `checked`, `onChange`, `label`, `description`, `disabled` |
+| **`RadioGroup`** | Accessible radio group supporting vertical, horizontal, or card layout. | `options`, `value`, `onChange`, `layout` |
+| **`SettingRow`** | Key-value settings row with title, description, and right-aligned interactive control. | `label`, `description`, `control`, `badge` |
+| **`SectionHeader`** | Section title block with heading, subtitle, and optional action slot. | `title`, `description`, `action` |
+| **`PageSection`** | Standardized layout wrapper with 24px vertical separation and semantic structure. | `title`, `description`, `action`, `children` |
+| **`ListRow`** | Compact stacked row for mobile-adapted data lists. | `title`, `subtitle`, `badge`, `amount`, `actions` |
+| **`DataTable`** | Dual-mode responsive table: renders tabular data on desktop (>=768px) and card list on mobile (<768px). | `columns`, `data`, `keyField`, `loading`, `emptyState` |
+| **`FilterBar`** | Standardized search input and filter chip toolbar with `Clear all` trigger. | `search`, `onSearchChange`, `filters`, `onClear` |
+| **`Tooltip`** | Accessible hover/focus popup explanation. | `content`, `children`, `position` |
+| **`IconChip`** | Tone-tinted icon container (primary, success, warning, danger). | `icon`, `tone`, `size` |
+| **`Avatar`** | User avatar with profile image fallback to initials gradient chip. | `name`, `src`, `fileId`, `size` ('sm' \| 'md' \| 'lg' \| 'xl') |
+| **`ColorSwatch`** | Themed color circle button with selection ring and accessibility labeling. | `color`, `selected`, `onClick`, `ariaLabel` |
+| **`ErrorState`** | Standard error presentation card with failure message and `Retry` action. | `title`, `message`, `onRetry` |
+| **`Divider`** | Border-token divider with optional label chip. | `label`, `className` |
+
+---
+
+## 8. Do's and Don'ts (Hard Guardrails)
+
+### Styling & Tokens
+- **DO** use semantic CSS variables (`bg-surface`, `text-text`, `border-border`, `text-primary-text`, `bg-primary-tint`).
+- **DO NOT** use raw Tailwind palette classes (`slate-900`, `zinc-500`, `teal-600`, `emerald-500`, etc.) in TSX.
+- **DO NOT** use hardcoded hex colors (`#0FA3B1`, `#FFFFFF`, etc.) outside `globals.css` and `lib/theme.ts`.
+- **DO NOT** use static inline styles (`style={{ background: '...' }}`). Static styling must always use Tailwind token classes.
+- **DO** use inline `style={{}}` only for genuinely dynamic values (e.g. progress bar width percentages, chart bar heights, or dynamic user theme swatches).
+
+### Components & Form Controls
+- **DO** use `<Button>`, `<Input>`, `<Select>`, `<Textarea>`, `<Switch>`, `<Checkbox>` from `@/components/ui`.
+- **DO NOT** introduce raw `<button>`, `<input>`, `<select>` outside `components/ui/`.
+- **DO** use `useConfirm()` from `ConfirmProvider` for all destructive actions (centered Yes/No dialog).
+- **DO NOT** introduce native `window.confirm()` or `window.alert()`.
+
+### Layout & Spacing
+- **DO** wrap full screens in `<PageContainer>` and `<PageHeader>`.
+- **DO** separate distinct card sections by 24px (`gap-6` or `space-y-6`).
+- **DO NOT** nest arbitrary per-section `max-w-4xl/5xl/6xl` wrappers inside standard pages.
+
+---
+
+## 9. How to Add a New Screen (Developer Workflow)
+
+When creating a new route or screen in Fintarg V2, follow this checklist:
+
+1. **Page Container & Header**:
+   ```tsx
+   import { PageContainer } from '@/components/ui/PageContainer';
+   import { PageHeader } from '@/components/ui/PageHeader';
+   import { PageSection } from '@/components/ui/PageSection';
+   import { Button } from '@/components/ui/Button';
+
+   export default function MyNewScreen() {
+     return (
+       <PageContainer>
+         <PageHeader
+           eyebrow="Financial Management"
+           title="My Feature"
+           description="Manage and track your feature data in one place."
+           actions={
+             <Button variant="primary" onClick={handleCreate}>
+               Add Record
+             </Button>
+           }
+         />
+         <PageSection title="Overview">
+           {/* Section content */}
+         </PageSection>
+       </PageContainer>
+     );
+   }
+   ```
+
+2. **Tabbed Navigation**:
+   If the screen has multiple views, use `<SegmentedTabs>` and synchronize active state to the URL search parameter:
+   ```tsx
+   const searchParams = useSearchParams();
+   const activeTab = searchParams?.get('tab') || 'overview';
+   ```
+
+3. **Forms**:
+   Use `<FormGrid>` and `<FormField>`:
+   ```tsx
+   <FormGrid cols={2}>
+     <FormField id="amount" label="Amount (LKR)" required error={errors.amount}>
+       <MoneyField value={form.amount} onChange={val => setForm({ ...form, amount: val })} />
+     </FormField>
+     <FormField id="date" label="Date" required>
+       <DateField value={form.date} onChange={val => setForm({ ...form, date: val })} />
+     </FormField>
+   </FormGrid>
+   ```
+
+4. **Data Lists**:
+   Render tabular records using `<DataTable>` with responsive mobile card fallback.
+
+5. **State Handling**:
+   - Initial fetch: render `<Skeleton>` matching the card or table layout.
+   - Zero items: render `<EmptyState>` with a descriptive explanation and action button.
+   - Fetch error: render `<ErrorState>` with `onRetry` handler.
+
+6. **Mutations & Destruction**:
+   - Creation / update: show pending spinner on `<Button loading={isPending}>` and trigger `toast.success('Record added successfully')`.
+   - Deletion: trigger `const ok = await confirm({ title: 'Delete Record', message: '...' })`.
+
+
