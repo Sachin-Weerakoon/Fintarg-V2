@@ -84,13 +84,24 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
       lender: row.lender,
       amount: (row.amountCents || 0) / 100,
       dueDay: row.dueDay,
+      nextDueDate: row.nextDueDate || '',
       monthsRemaining: row.monthsRemaining,
       paymentKind: row.paymentKind,
       chequeNumber: row.chequeNumber,
-      bankAccountId: row.bankAccountId,
+      bankAccountId: row.bankAccountId ? String(row.bankAccountId) : undefined,
       payee: row.payee,
       frequency: row.frequency,
       status: row.status,
+      payments: (row.payments || []).map((p: RawRecord) => ({
+        id: p._id,
+        _id: p._id,
+        date: p.date,
+        amount: (p.amountCents || 0) / 100,
+        paymentMethod: p.paymentMethod || 'bank_transfer',
+        bankAccountId: p.bankAccountId ? String(p.bankAccountId) : null,
+        transactionId: p.transactionId ? String(p.transactionId) : null,
+        note: p.note,
+      })),
     })),
     loans: loans.map(row => ({
       id: row._id,
@@ -325,6 +336,16 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
       return void (await send(`/api/backend/records/financePayments/${id}`, 'PATCH', action.entry));
     case 'DELETE_FINANCE_PAYMENT':
       return void (await send(`/api/backend/records/financePayments/${id}`, 'DELETE'));
+    case 'MARK_FINANCE_PAYMENT_PAID':
+      return void (await send(`/api/backend/records/financePayments/${id}/pay`, 'POST', {
+        amount: action.amount,
+        paymentMethod: action.paymentMethod,
+        bankAccountId: action.bankAccountId,
+        date: action.date,
+        note: action.note,
+      }));
+    case 'DELETE_FINANCE_PAYMENT_PAYMENT':
+      return void (await send(`/api/backend/records/financePayments/${id}/payments/${action.paymentId}`, 'DELETE'));
 
     case 'ADD_BANK_ACCOUNT':
       return create('/api/backend/records/bankAccounts', {

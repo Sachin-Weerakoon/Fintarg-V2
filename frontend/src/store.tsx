@@ -152,6 +152,8 @@ type Action =
   | { type: 'ADD_FINANCE_PAYMENT'; entry: FinancePayment }
   | { type: 'UPDATE_FINANCE_PAYMENT'; entry: FinancePayment }
   | { type: 'DELETE_FINANCE_PAYMENT'; id: string }
+  | { type: 'MARK_FINANCE_PAYMENT_PAID'; id: string; amount?: number; paymentMethod?: string; bankAccountId?: string | null; date?: string; note?: string }
+  | { type: 'DELETE_FINANCE_PAYMENT_PAYMENT'; id: string; paymentId: string }
   | { type: 'ADD_BANK_ACCOUNT'; entry: BankAccount }
   | { type: 'UPDATE_BANK_ACCOUNT'; entry: BankAccount }
   | { type: 'DELETE_BANK_ACCOUNT'; id: string }
@@ -223,6 +225,74 @@ function reducer(state: AppState, action: Action): AppState {
     case 'ADD_FINANCE_PAYMENT': return { ...state, financePayments: [...state.financePayments, action.entry] };
     case 'UPDATE_FINANCE_PAYMENT': return { ...state, financePayments: state.financePayments.map(f => f.id === action.entry.id ? action.entry : f) };
     case 'DELETE_FINANCE_PAYMENT': return { ...state, financePayments: state.financePayments.filter(f => f.id !== action.id) };
+    case 'MARK_FINANCE_PAYMENT_PAID': {
+      const fp = state.financePayments.find(f => f.id === action.id);
+      if (!fp) return state;
+      const paymentDate = action.date || new Date().toISOString().slice(0, 10);
+      const payAmount = action.amount !== undefined ? action.amount : fp.amount;
+      const newMonths = Math.max(0, (fp.monthsRemaining || 1) - 1);
+      const newStatus = newMonths === 0 ? 'completed' : fp.status || 'active';
+
+      let nextDue = fp.nextDueDate;
+      if (nextDue) {
+        const d = new Date(`${nextDue}T00:00:00.000Z`);
+        d.setUTCMonth(d.getUTCMonth() + 1);
+        nextDue = d.toISOString().slice(0, 10);
+      } else {
+        const d = new Date();
+        d.setMonth(d.getMonth() + 1);
+        d.setDate(fp.dueDay || 1);
+        nextDue = d.toISOString().slice(0, 10);
+      }
+
+      return {
+        ...state,
+        financePayments: state.financePayments.map(f => f.id === action.id ? {
+          ...f,
+          monthsRemaining: newMonths,
+          status: newStatus,
+          nextDueDate: nextDue,
+          payments: [
+            ...(f.payments || []),
+            {
+              date: paymentDate,
+              amount: payAmount,
+              paymentMethod: action.paymentMethod || 'bank_transfer',
+              bankAccountId: action.bankAccountId,
+              note: action.note,
+            },
+          ],
+        } : f),
+      };
+    }
+    case 'DELETE_FINANCE_PAYMENT_PAYMENT': {
+      return {
+        ...state,
+        financePayments: state.financePayments.map(f => {
+          if (f.id !== action.id) return f;
+          const target = (f.payments || []).find(p => (p.id || p._id) === action.paymentId);
+          const payments = (f.payments || []).filter(p => (p.id || p._id) !== action.paymentId);
+          if (!target) return { ...f, payments };
+
+          const newMonths = (f.monthsRemaining || 0) + 1;
+          const newStatus = f.status === 'completed' ? 'active' : f.status;
+          let nextDue = f.nextDueDate;
+          if (nextDue) {
+            const d = new Date(`${nextDue}T00:00:00.000Z`);
+            d.setUTCMonth(d.getUTCMonth() - 1);
+            nextDue = d.toISOString().slice(0, 10);
+          }
+
+          return {
+            ...f,
+            monthsRemaining: newMonths,
+            status: newStatus,
+            nextDueDate: nextDue,
+            payments,
+          };
+        }),
+      };
+    }
     case 'ADD_BANK_ACCOUNT': return { ...state, bankAccounts: [...state.bankAccounts, action.entry] };
     case 'UPDATE_BANK_ACCOUNT': return { ...state, bankAccounts: state.bankAccounts.map(b => b.id === action.entry.id ? action.entry : b) };
     case 'DELETE_BANK_ACCOUNT': return { ...state, bankAccounts: state.bankAccounts.filter(b => b.id !== action.id) };

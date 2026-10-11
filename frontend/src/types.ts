@@ -115,18 +115,31 @@ export interface ExpenseEntry {
   cardId?: string;
 }
 
+export interface FinancePaymentHistory {
+  id?: string;
+  _id?: string;
+  date: string;
+  amount: number;
+  paymentMethod: string;
+  bankAccountId?: string | null;
+  transactionId?: string | null;
+  note?: string;
+}
+
 export interface FinancePayment {
   id: string;
   lender: string;
   amount: number;
   dueDay: number;
+  nextDueDate?: string;
   monthsRemaining: number;
   paymentKind?: 'instalment' | 'lease' | 'cheque' | 'standing_order';
   chequeNumber?: string;
   bankAccountId?: string;
   payee?: string;
   frequency?: 'monthly' | 'weekly' | 'quarterly' | 'annually' | 'one-time';
-  status?: 'active' | 'cleared' | 'cancelled' | 'pending';
+  status?: 'active' | 'cleared' | 'cancelled' | 'pending' | 'completed';
+  payments?: FinancePaymentHistory[];
 }
 
 export interface LoanRepayment {

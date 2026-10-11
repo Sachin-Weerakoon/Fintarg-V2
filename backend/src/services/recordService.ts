@@ -65,6 +65,28 @@ const moneyFields: Partial<Record<RecordKind, Record<string, string>>> = {
   agreements: { value: 'valueCents' },
 };
 
+export function deriveNextDueDate(dueDay: number, fromDate: Date = new Date()): string {
+  const d = Math.min(31, Math.max(1, Math.floor(dueDay || 1)));
+  const y = fromDate.getUTCFullYear();
+  const m = fromDate.getUTCMonth();
+  const todayDate = fromDate.getUTCDate();
+
+  let targetYear = y;
+  let targetMonth = m;
+  if (todayDate > d) {
+    targetMonth += 1;
+    if (targetMonth > 11) {
+      targetMonth = 0;
+      targetYear += 1;
+    }
+  }
+
+  const daysInMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const safeDay = Math.min(d, daysInMonth);
+
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`;
+}
+
 function toStoredForCreate(kind: RecordKind, input: Record<string, unknown>) {
   const stored: Record<string, unknown> = { ...input };
   for (const [inputKey, modelKey] of Object.entries(moneyFields[kind] ?? {})) {
@@ -119,6 +141,11 @@ function toStoredForCreate(kind: RecordKind, input: Record<string, unknown>) {
     }
     if (!('status' in stored)) {
       stored.status = 'active';
+    }
+  }
+  if (kind === 'financePayments') {
+    if (!stored.nextDueDate && stored.dueDay) {
+      stored.nextDueDate = deriveNextDueDate(Number(stored.dueDay));
     }
   }
   if (kind === 'bankAccounts') {
@@ -881,6 +908,139 @@ export async function deletePawnPayment(userId: string, pawnId: string, paymentI
   await item.save();
 
   await AuditLogModel.create({ userId, action: 'undo-pawn-payment', resourceType: 'pawnedItems', resourceId: item._id });
+  return item;
+}
+
+export interface RecordFinancePaymentParams {
+  amount?: number;
+  paymentMethod?: string;
+  bankAccountId?: string | null;
+  date?: string;
+  note?: string;
+}
+
+export async function recordFinancePayment(
+  userId: string,
+  paymentId: string,
+  params: RecordFinancePaymentParams = {},
+) {
+  if (!mongoose.isValidObjectId(paymentId)) throw new HttpError(400, 'Invalid finance payment id');
+  const item = await FinancePaymentModel.findOne({ _id: paymentId, userId });
+  if (!item) throw new HttpError(404, 'Finance payment not found');
+  if (item.status === 'completed' || item.status === 'cancelled') {
+    throw new HttpError(400, `Cannot make payment on a finance payment that is ${item.status}`);
+  }
+
+  const paymentDate = params.date && isValidIsoDate(params.date) ? params.date : new Date().toISOString().slice(0, 10);
+  const paymentMethod = params.paymentMethod || (item.paymentKind === 'standing_order' ? 'standing_order' : item.paymentKind === 'cheque' ? 'cheque' : 'bank_transfer');
+
+  let targetBankAccountId: mongoose.Types.ObjectId | null = null;
+  const inputBankId = params.bankAccountId !== undefined ? params.bankAccountId : (item.bankAccountId ? String(item.bankAccountId) : null);
+
+  if (['debit_card', 'bank_transfer', 'cheque', 'standing_order'].includes(paymentMethod)) {
+    if (!inputBankId || !inputBankId.trim()) {
+      throw new HttpError(400, `Bank account is required for ${paymentMethod.replace('_', ' ')} payments`);
+    }
+  }
+
+  if (inputBankId && inputBankId.trim() !== '') {
+    if (!mongoose.isValidObjectId(inputBankId)) throw new HttpError(400, 'Invalid bank account id');
+    const bankAccount = await BankAccountModel.findOne({ _id: inputBankId, userId });
+    if (!bankAccount) throw new HttpError(404, 'Bank account not found');
+    targetBankAccountId = bankAccount._id as mongoose.Types.ObjectId;
+  }
+
+  const amountCents = params.amount !== undefined && params.amount !== null && params.amount > 0
+    ? Math.round(params.amount * 100)
+    : item.amountCents;
+
+  const subdocId = new mongoose.Types.ObjectId();
+
+  const label = item.lender || item.payee || 'Finance Payment';
+  const tx = await postTransaction({
+    userId,
+    type: 'expense',
+    amountCents,
+    date: paymentDate,
+    category: 'Finance Payment',
+    description: params.note || `${item.paymentKind || 'Instalment'} payment for ${label}`,
+    paymentMethod: paymentMethod as any,
+    bankAccountId: targetBankAccountId,
+    referenceId: `finance_payment_${item._id}_${subdocId}`,
+  });
+
+  // Advance nextDueDate
+  const currentDueDateStr = item.nextDueDate || deriveNextDueDate(item.dueDay);
+  const currentDueDate = new Date(`${currentDueDateStr}T00:00:00.000Z`);
+  currentDueDate.setUTCMonth(currentDueDate.getUTCMonth() + 1);
+  item.nextDueDate = currentDueDate.toISOString().slice(0, 10);
+
+  // Decrement monthsRemaining
+  const newMonths = Math.max(0, (item.monthsRemaining || 1) - 1);
+  item.monthsRemaining = newMonths;
+  if (newMonths === 0) {
+    item.status = 'completed';
+  }
+
+  item.payments = item.payments || [];
+  item.payments.push({
+    _id: subdocId,
+    date: paymentDate,
+    amountCents,
+    paymentMethod,
+    bankAccountId: targetBankAccountId,
+    transactionId: tx._id,
+    note: params.note || '',
+  });
+
+  await item.save();
+  await AuditLogModel.create({
+    userId,
+    action: 'mark-as-paid',
+    resourceType: 'financePayments',
+    resourceId: item._id,
+  });
+
+  return item;
+}
+
+export async function deleteFinancePaymentPayment(userId: string, financePaymentId: string, paymentHistoryId: string) {
+  if (!mongoose.isValidObjectId(financePaymentId)) throw new HttpError(400, 'Invalid finance payment id');
+  if (!mongoose.isValidObjectId(paymentHistoryId)) throw new HttpError(400, 'Invalid payment id');
+
+  const item = await FinancePaymentModel.findOne({ _id: financePaymentId, userId });
+  if (!item) throw new HttpError(404, 'Finance payment not found');
+
+  const idx = (item.payments || []).findIndex((p: any) => String(p._id) === String(paymentHistoryId));
+  if (idx === -1) throw new HttpError(404, 'Payment not found');
+
+  const payment = item.payments[idx];
+  const refId = `finance_payment_${item._id}_${payment._id}`;
+
+  await reverseTransaction(userId, refId);
+
+  // Restore monthsRemaining and nextDueDate
+  item.monthsRemaining = (item.monthsRemaining || 0) + 1;
+  if (item.status === 'completed' && item.monthsRemaining > 0) {
+    item.status = 'active';
+  }
+
+  if (item.nextDueDate) {
+    const currentDueDate = new Date(`${item.nextDueDate}T00:00:00.000Z`);
+    currentDueDate.setUTCMonth(currentDueDate.getUTCMonth() - 1);
+    item.nextDueDate = currentDueDate.toISOString().slice(0, 10);
+  }
+
+  item.payments.splice(idx, 1);
+  await item.save();
+
+  await AuditLogModel.create({
+    userId,
+    action: 'undo-payment',
+    resourceType: 'financePayments',
+    resourceId: item._id,
+  });
+
   return item;
 }
 

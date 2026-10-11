@@ -1,8 +1,9 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
-import { calculateLoanPayoff, createRecord, deleteLoanRepayment, deletePawnPayment, getRecord, listRecords, recordLoanRepayment, recordPawnPayment, updateRecord } from './recordService';
+import { calculateLoanPayoff, createRecord, deleteFinancePaymentPayment, deleteLoanRepayment, deletePawnPayment, deriveNextDueDate, getRecord, listRecords, recordFinancePayment, recordLoanRepayment, recordPawnPayment, updateRecord } from './recordService';
 import { BankAccountModel } from '../models/BankAccount';
+import { FinancePaymentModel } from '../models/FinancePayment';
 import { PawnedItemModel } from '../models/PawnedItem';
 import { TransactionModel } from '../models/Transaction';
 
@@ -479,6 +480,125 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
           await recordPawnPayment(userId, String(item._id), {
             paymentType: 'interest',
             paymentMethod: 'bank_transfer',
+          });
+        },
+        (err: any) => err.status === 400 && /Bank account is required/i.test(err.message),
+      );
+    });
+  });
+
+  describe('finance payments, mark as paid, nextDueDate derivation, and undo (2.5)', () => {
+    it('deriveNextDueDate calculates future due date correctly based on dueDay', () => {
+      const baseDate = new Date('2026-03-25T10:00:00.000Z');
+      // Due day 10 has already passed in March -> should be 2026-04-10
+      assert.strictEqual(deriveNextDueDate(10, baseDate), '2026-04-10');
+      // Due day 28 hasn't passed in March -> should be 2026-03-28
+      assert.strictEqual(deriveNextDueDate(28, baseDate), '2026-03-28');
+    });
+
+    it('creates finance payment with auto-derived nextDueDate when not specified', async () => {
+      const fp = await createRecord('financePayments', userId, {
+        lender: 'Singer Sri Lanka',
+        amount: 15000,
+        dueDay: 15,
+        monthsRemaining: 12,
+        paymentKind: 'instalment',
+      });
+
+      assert.strictEqual((fp as any).amountCents, 1500000);
+      assert.strictEqual((fp as any).status, 'active');
+      assert.strictEqual((fp as any).monthsRemaining, 12);
+      assert.ok((fp as any).nextDueDate, 'nextDueDate should be derived');
+      assert.ok((fp as any).nextDueDate.endsWith('-15'), 'nextDueDate should end with due day');
+    });
+
+    it('marks finance payment as paid: debits account, advances nextDueDate, decrements monthsRemaining, and creates transaction', async () => {
+      const bankAccount = await createRecord('bankAccounts', userId, {
+        bankName: 'Commercial Bank',
+        accountNumber: '99887766',
+        balance: 100000,
+      });
+      const initialBalance = (bankAccount as any).balanceCents;
+
+      const fp = await createRecord('financePayments', userId, {
+        lender: 'Central Finance Lease',
+        amount: 25000,
+        dueDay: 10,
+        nextDueDate: '2026-05-10',
+        monthsRemaining: 2,
+        paymentKind: 'lease',
+        bankAccountId: String(bankAccount._id),
+      });
+
+      const updated = await recordFinancePayment(userId, String(fp._id), {
+        paymentMethod: 'bank_transfer',
+        bankAccountId: String(bankAccount._id),
+        date: '2026-05-09',
+        note: 'May Lease Installment',
+      });
+
+      assert.strictEqual(updated.monthsRemaining, 1);
+      assert.strictEqual(updated.nextDueDate, '2026-06-10');
+      assert.strictEqual(updated.status, 'active');
+      assert.strictEqual(updated.payments.length, 1);
+
+      const payRecord = updated.payments[0];
+      assert.strictEqual(payRecord.amountCents, 2500000);
+      assert.strictEqual(payRecord.paymentMethod, 'bank_transfer');
+
+      // Bank account debited
+      const debitedAccount = await BankAccountModel.findById(bankAccount._id);
+      assert.strictEqual(debitedAccount.balanceCents, initialBalance - 2500000);
+
+      // Transaction created
+      const tx = await TransactionModel.findById(payRecord.transactionId);
+      assert.ok(tx);
+      assert.strictEqual(tx.category, 'Finance Payment');
+      assert.strictEqual(tx.amountCents, 2500000);
+    });
+
+    it('completes obligation when monthsRemaining reaches 0 and restores upon undo', async () => {
+      const fp = await createRecord('financePayments', userId, {
+        lender: 'Final Month Equipment Lease',
+        amount: 10000,
+        dueDay: 5,
+        nextDueDate: '2026-06-05',
+        monthsRemaining: 1,
+        paymentKind: 'instalment',
+      });
+
+      const afterPayment = await recordFinancePayment(userId, String(fp._id), {
+        paymentMethod: 'cash',
+        date: '2026-06-05',
+      });
+
+      assert.strictEqual(afterPayment.monthsRemaining, 0);
+      assert.strictEqual(afterPayment.status, 'completed');
+      assert.strictEqual(afterPayment.payments.length, 1);
+
+      // Undo the final payment
+      const paymentId = String(afterPayment.payments[0]._id);
+      const afterUndo = await deleteFinancePaymentPayment(userId, String(fp._id), paymentId);
+
+      assert.strictEqual(afterUndo.monthsRemaining, 1);
+      assert.strictEqual(afterUndo.status, 'active');
+      assert.strictEqual(afterUndo.nextDueDate, '2026-06-05');
+      assert.strictEqual(afterUndo.payments.length, 0);
+    });
+
+    it('rejects bank payment without bankAccountId', async () => {
+      const fp = await createRecord('financePayments', userId, {
+        lender: 'Standing Order Obligation',
+        amount: 8000,
+        dueDay: 20,
+        monthsRemaining: 6,
+        paymentKind: 'standing_order',
+      });
+
+      await assert.rejects(
+        async () => {
+          await recordFinancePayment(userId, String(fp._id), {
+            paymentMethod: 'standing_order',
           });
         },
         (err: any) => err.status === 400 && /Bank account is required/i.test(err.message),
