@@ -11,6 +11,7 @@ export interface IBankAccount extends Document {
   accountType: 'savings' | 'current' | 'checking' | 'business' | 'other';
   balanceCents: number;
   currency: string;
+  notes?: string;
   isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -27,6 +28,7 @@ const BankAccountSchema = new Schema<IBankAccount>({
   accountType: { type: String, enum: ['savings', 'current', 'checking', 'business', 'other'], default: 'savings' },
   balanceCents: { type: Number, default: 0 },
   currency: { type: String, default: 'LKR', trim: true },
+  notes: { type: String, default: '', trim: true },
   isDefault: { type: Boolean, default: false },
 }, { timestamps: true });
 

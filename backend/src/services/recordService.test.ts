@@ -36,6 +36,25 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
     assert.strictEqual((updated as any).branch, 'Colombo 07');
   });
 
+  it('bankAccounts: persists notes field correctly on create and update (1.5)', async () => {
+    const created = await createRecord('bankAccounts', userId, {
+      bankName: 'HNB Bank',
+      accountNumber: '44332211',
+      name: 'Tax Savings Account',
+      notes: 'Initial account creation note',
+      balance: 10000,
+    });
+    assert.strictEqual((created as any).notes, 'Initial account creation note');
+
+    const updated = await updateRecord('bankAccounts', userId, String(created._id), {
+      notes: 'Updated account tax note',
+    });
+    assert.strictEqual((updated as any).notes, 'Updated account tax note');
+
+    const doc = await getRecord('bankAccounts', userId, String(created._id));
+    assert.strictEqual((doc as any).notes, 'Updated account tax note');
+  });
+
   it('bankAccounts: update does not overwrite existing balanceCents even if balance/currentBalance is passed (1.4)', async () => {
     const created = await createRecord('bankAccounts', userId, {
       bankName: 'Commercial Bank',

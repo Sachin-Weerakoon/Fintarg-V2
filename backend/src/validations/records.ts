@@ -24,6 +24,7 @@ export const recordSchemas = {
     bankAccountId: z.string().optional().nullable(),
     cardName: z.string().trim().max(120).optional(),
     name: z.string().trim().max(120).optional(),
+    cardHolder: optionalText,
     cardType: z.enum(['debit', 'credit']).default('debit'),
     cardNumber: z.string().trim().optional(),
     cardNetwork: z.enum(['visa', 'mastercard', 'amex', 'discover', 'other']).default('visa'),
