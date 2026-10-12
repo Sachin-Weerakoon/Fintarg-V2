@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   useApp,
   formatRs,
@@ -28,11 +29,21 @@ import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import { MoneyField } from '@/components/ui/MoneyField';
 
-export default function Goals() {
+function GoalsContent() {
+  const _router = useRouter();
+  const searchParams = useSearchParams();
+  const urlMonth = searchParams.get('month');
+
   const { state, dispatch } = useApp();
   const confirm = useConfirm();
   const toast = useToast();
-  const month = state.selectedMonth;
+  const month = urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) ? urlMonth : state.selectedMonth;
+
+  useEffect(() => {
+    if (urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) && urlMonth !== state.selectedMonth) {
+      dispatch({ type: 'SET_MONTH', month: urlMonth });
+    }
+  }, [urlMonth, state.selectedMonth, dispatch]);
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [goalForm, setGoalForm] = useState({
     name: '',
@@ -644,5 +655,17 @@ export default function Goals() {
 
 
     </PageContainer>
+  );
+}
+
+export default function Goals() {
+  return (
+    <Suspense fallback={
+      <PageContainer>
+        <PageHeader title="Savings Goals & Daily Target" description="Loading goals..." />
+      </PageContainer>
+    }>
+      <GoalsContent />
+    </Suspense>
   );
 }

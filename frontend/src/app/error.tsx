@@ -1,40 +1,62 @@
 'use client';
+import { useEffect } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 
-export default function Error({
+export default function RootErrorBoundary({
   error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    console.error('Root error boundary caught error:', error);
+  }, [error]);
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-bg">
-      <Card className="max-w-md w-full text-center p-8 space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-danger-tint border border-danger-solid/20 flex items-center justify-center text-danger-text mx-auto">
-          <Icon name="alert" size={24} />
+    <div className="min-h-screen bg-bg text-text flex items-center justify-center p-6">
+      <div className="w-full max-w-lg p-6 sm:p-8 rounded-3xl border border-danger-solid/30 bg-surface shadow-2xl text-center space-y-5 animate-rise-in">
+        <div className="w-14 h-14 rounded-2xl bg-danger-tint text-danger-text mx-auto flex items-center justify-center">
+          <Icon name="alert" size={28} />
         </div>
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-text">
-            Something went wrong
-          </h2>
-          <p className="text-sm text-muted mt-1.5">
-            {error.message || 'An unexpected error occurred while loading this view.'}
+          <span className="inline-block text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-danger-tint text-danger-text mb-2">
+            System Alert
+          </span>
+          <h1 className="text-xl sm:text-2xl font-bold text-text">Service Temporarily Unavailable</h1>
+          <p className="text-xs sm:text-sm text-muted mt-2 leading-relaxed">
+            {error?.message || 'We encountered an unexpected issue connecting to the application server. Your session and records are safe.'}
           </p>
-          {error.digest && (
-            <p className="text-xs text-muted/70 mt-2 font-mono">
-              Error ID: {error.digest}
+          {error?.digest && (
+            <p className="text-[10px] text-muted font-mono mt-1">
+              Ref: {error.digest}
             </p>
           )}
         </div>
-        <div className="pt-2 flex justify-center gap-3">
-          <Button variant="primary" onClick={reset}>
-            Try again
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => reset()}
+            iconLeft={<Icon name="refresh" size={15} />}
+            className="w-full sm:w-auto"
+          >
+            Retry Connection
           </Button>
+          <Link href="/" className="w-full sm:w-auto">
+            <Button
+              variant="secondary"
+              size="md"
+              iconLeft={<Icon name="home" size={15} />}
+              className="w-full sm:w-auto"
+            >
+              Reload Application
+            </Button>
+          </Link>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

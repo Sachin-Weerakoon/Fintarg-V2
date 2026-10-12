@@ -3,9 +3,26 @@ import { backendApi } from '@/lib/backendApi';
 
 export async function getSessionUser() {
   const cookieStore = await cookies();
-  if (!cookieStore.has(process.env.AUTH_COOKIE_NAME || 'fintarg_token')) return null;
+  const cookieName = process.env.AUTH_COOKIE_NAME || 'fintarg_token';
+  if (!cookieStore.has(cookieName)) return null;
+
   const result = await backendApi('/api/auth/me');
-  return result.ok ? result.data : null;
+  if (result.ok) {
+    return result.data;
+  }
+
+  // Treat ONLY 401 as unauthenticated: clear cookie and return null
+  if (result.status === 401) {
+    try {
+      cookieStore.delete(cookieName);
+    } catch {
+      // In some server environments delete might throw if headers are sent; ignore
+    }
+    return null;
+  }
+
+  // On 5xx or connection error: KEEP COOKIE intact so session is not lost!
+  throw new Error('Backend service is temporarily unavailable. Please retry.');
 }
 
 export async function register(data: { name: string; email: string; password: string; workMode: string }) {

@@ -216,5 +216,56 @@
 - **What changed:** Implemented `calcDailyExpenseBudget` in `money.ts`. For past months, days left is 0; for future months, full month length; for current month, real days remaining (`daysInMonth - today + 1`). Filtered out transfers from monthly expense totals.
 - **How verified:** Unit tests in `money.test.ts` verified day calculations for past, current, and future months.
 
+## Phase 5 — Frontend State, Reliability, and UX Correctness
+
+### 5.0 Fix Git LFS Image Corruption on Vercel & GitHub Actions
+- **What was wrong:** `frontend/src/app/icon.png` and `apple-icon.png` were committed as Git LFS text pointer files (`version https://git-lfs.github.com/spec/v1 ...`). When Vercel and GitHub Actions built the project without LFS object downloads, Next.js's `next-metadata-image-loader` attempted to parse the pointer text as PNG images, crashing the production build with `Error: Image import ... is not a valid image file`.
+- **What changed:** Exempted `frontend/src/app/*.png`, `frontend/src/app/*.ico`, and `frontend/public/**` from Git LFS in `.gitattributes`. Re-staged and committed `icon.png` and `apple-icon.png` as actual binary image files (10KB and 21KB). Enabled `lfs: true` in `.github/workflows/ci.yml`. Added `outputFileTracingRoot` in `frontend/next.config.ts` to silence monorepo workspace root warning.
+- **How verified:** Verified with `npm run build` in `frontend` producing clean production bundles with valid static image metadata.
+
+### 5.1 & 5.2 Targeted State Hydration & Pending Local ID Race Resolution
+- **What was wrong:** When an action failed to persist, `store.tsx` rolled back the entire `state` to an earlier timestamp, wiping out concurrent edits, active navigation page, and selected month. Furthermore, when users rapidly edited or deleted newly created items before the server returned an ObjectId, update/delete actions submitted the client temporary ID (e.g. `loc_inc_...`), causing 400 Bad Request errors.
+- **What changed:** In `frontend/src/services/storeApi.ts`, implemented synchronous registration of in-flight create promises in `pendingCreations` and ID resolution map `resolvedServerIds`. In `persistStoreAction`, updates/deletes targeting pending local IDs await the creation promise to receive the true MongoDB ObjectId before issuing PATCH/DELETE requests. In `frontend/src/store.tsx`, replaced global snapshot `ROLLBACK` with background `loadPersistedData()` re-hydration that updates only record collections without mutating transient UI states.
+- **How verified:** Added targeted unit test in `storeApi.test.ts` verifying that rapid dispatch of an update on a pending create resolves to the server ID before submitting. All 10 test files and 89 frontend tests pass.
+
+### 5.3 Blocking Error State with Retry on Backend Load Failure
+- **What was wrong:** `storeApi.ts`'s `list()` function swallowed network and 500 errors, silently returning empty arrays (`[]`). This caused `AppProvider` to hydrate state with empty collections, making users think their financial data was lost.
+- **What changed:** Removed error-swallowing in `list()`, allowing `loadPersistedData()` to reject on backend failure. Added `loadError` state and "Retry Connection" view in `AppProvider` (`store.tsx`), surfacing a clear, blocking alert with recovery options.
+- **How verified:** Added unit test in `storeApi.test.ts` confirming that `loadPersistedData()` rejects on 500 errors.
+
+### 5.4 Session Cookie Preservation on 5xx Errors
+- **What was wrong:** `actions/auth.ts` treated any non-ok response as logged out, destroying the user's session cookie during temporary backend outages or 500 errors and redirecting them to `/welcome`.
+- **What changed:** Updated `getSessionUser()` in `actions/auth.ts` to clear cookies and treat as unauthenticated only on HTTP 401. On 5xx or network connection errors, preserved the session cookie and threw an error to trigger Next.js error boundaries. Wrapped `backendApi.ts` fetch in try-catch to return 503 on connection failures.
+- **How verified:** Verified error handling logic in `actions/auth.ts` and `backendApi.ts`.
+
+### 5.5 Consolidated Toast System
+- **What was wrong:** `store.tsx` maintained an independent toast array, timeout timers, and DOM container, duplicating the application-wide `ToastProvider`.
+- **What changed:** Removed duplicated toast state and markup from `store.tsx`. Consumed `useToast()` from `@/components/ui/ToastProvider` inside `AppProvider`, forwarding `showToast` to the unified provider.
+- **How verified:** Verified toast alerts render seamlessly through `ToastProvider`.
+
+### 5.6 Server-Side Transaction History Pagination
+- **What was wrong:** `TransactionsHistoryTab.tsx` required validation of URL query parameter synchronization with server-side pagination.
+- **What changed:** Aligned `TransactionsHistoryTab.tsx` with `fetchTransactionHistory` supporting page, limit (25), skip, and URL search parameters (`search`, `type`, `method`, `account`).
+- **How verified:** Vitest tests in `storeApi.test.ts` pass.
+
+### 5.7 Default Bank Account Auto-Population in Legal Letters
+- **What was wrong:** The formal letter generator in `advanced/letters/page.tsx` only looked at `profile.bankName` and `profile.accountNumber`, failing to use connected bank accounts from the user's ledger.
+- **What changed:** Added detection of default bank account from `state.bankAccounts` (excluding cash). Auto-populated letter bank name and account number with the default account, and added a linked bank account selector dropdown.
+- **How verified:** Verified with `LettersClient` in `frontend/src/app/(app)/advanced/letters/page.tsx`.
+
+### 5.8 Deep Links & URL Query Synchronization
+- **What was wrong:** Switching months or tabs across `financial`, `analysis`, and `goals` did not persist in the URL, preventing bookmarking, refreshing, and deep-linking to specific views.
+- **What changed:** Added `useSearchParams` and `useRouter` synchronization for:
+  - `financial/page.tsx`: synced `?tab=` and `?month=`
+  - `analysis/page.tsx`: synced `?tab=` and `?month=`, wrapped in `Suspense`
+  - `goals/page.tsx`: synced `?month=`, wrapped in `Suspense`
+- **How verified:** Verified Next.js build compiles static pages without `useSearchParams` de-optimization warnings.
+
+### 5.9 Branded Error Boundaries (`error.tsx`)
+- **What was wrong:** Unexpected component errors or backend crashes resulted in unhandled white screens or developer overlays.
+- **What changed:** Implemented `frontend/src/app/(app)/error.tsx` and `frontend/src/app/error.tsx` providing branded glassmorphic error UI with "Try Again" (`reset()`) and "Back to Dashboard" buttons.
+- **How verified:** Built production bundle with `npm run build` and confirmed error boundaries are compiled.
+
+
 
 

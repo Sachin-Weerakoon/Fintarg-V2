@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fetchTransactionHistory, persistStoreAction } from './storeApi';
+import { fetchTransactionHistory, persistStoreAction, loadPersistedData } from './storeApi';
 
 describe('storeApi loan mapping and readonly field stripping (1.2)', () => {
   beforeEach(() => {
@@ -341,6 +341,74 @@ describe('fetchTransactionHistory contract alignment (2.10)', () => {
       budget: 25000,
       month: '2026-09',
     });
+  });
+
+  it('handles local ID race: pending create resolves before update/delete is submitted (5.2)', async () => {
+    let addResolved = false;
+    let patchUrl: string | undefined;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      const u = String(url);
+      if (u.includes('/api/backend/records/incomes') && init?.method === 'POST') {
+        await new Promise(r => setTimeout(r, 20));
+        addResolved = true;
+        return new Response(JSON.stringify({ data: { _id: 'srv_income_555' } }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (init?.method === 'PATCH') {
+        patchUrl = u;
+        return new Response(JSON.stringify({ data: { _id: 'srv_income_555' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ data: {} }), { status: 200 });
+    });
+
+    const localId = 'loc_inc_' + Date.now();
+    const addPromise = persistStoreAction({
+      type: 'ADD_INCOME',
+      entry: {
+        id: localId,
+        source: 'Freelance',
+        amount: 50000,
+        type: 'side_income',
+        date: '2026-09-10',
+        frequency: 'one_time',
+      },
+    });
+
+    const updatePromise = persistStoreAction({
+      type: 'UPDATE_INCOME',
+      id: localId,
+      entry: {
+        id: localId,
+        source: 'Freelance Design',
+        amount: 60000,
+        type: 'side_income',
+        date: '2026-09-10',
+        frequency: 'one_time',
+      },
+    });
+
+    const [createdId] = await Promise.all([addPromise, updatePromise]);
+
+    expect(createdId).toBe('srv_income_555');
+    expect(addResolved).toBe(true);
+    expect(patchUrl).toBe('/api/backend/records/incomes/srv_income_555');
+  });
+
+  it('loadPersistedData rejects on backend API failure rather than silently wiping data (5.3)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
+      return new Response(JSON.stringify({ error: 'Database connection failed' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    await expect(loadPersistedData()).rejects.toThrow('Database connection failed');
   });
 });
 
