@@ -1,7 +1,14 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useApp, calcMonthlyIncome, calcMonthlyExpenses, formatRs } from '@/store';
+import {
+  useApp,
+  calcMonthlyIncome,
+  calcMonthlyExpenses,
+  calcFinancePayments,
+  calcDailyExpenseBudget,
+  formatRs,
+} from '@/store';
 import { StatCard } from '@/components/ui/StatCard';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -39,13 +46,16 @@ export default function DashboardClient() {
   // Liquidity and daily budget calculations
   const totalBankLiquidity = state.bankAccounts.reduce((s, a) => s + (a.currentBalance || 0), 0);
   const today = new Date();
-  const [yStr, mStr] = selectedMonth.split('-');
-  const isCurrentMonth = Number(yStr) === today.getFullYear() && Number(mStr) === (today.getMonth() + 1);
-  const daysInMonth = new Date(Number(yStr) || today.getFullYear(), Number(mStr) || (today.getMonth() + 1), 0).getDate();
-  const daysLeft = isCurrentMonth ? Math.max(1, daysInMonth - today.getDate() + 1) : daysInMonth;
-  const recurringObligations = state.financePayments.reduce((s, f) => s + f.amount, 0);
-  const freeCashLeft = Math.max(0, monthlyIncome - recurringObligations - monthlyExpenses);
-  const dailyBudget = Math.round(freeCashLeft / daysLeft);
+  const recurringObligations = calcFinancePayments(state.financePayments);
+  const budgetCalculation = calcDailyExpenseBudget({
+    monthlyIncome,
+    obligations: recurringObligations,
+    monthlyExpenses,
+    month: selectedMonth,
+    asOfDate: today,
+  });
+  const daysLeft = budgetCalculation.daysLeft;
+  const dailyBudget = budgetCalculation.dailyBudget;
 
   // Determine net position detail
   const netDetail = !hasFinancialData

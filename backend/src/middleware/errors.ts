@@ -23,10 +23,34 @@ export const errorHandler: ErrorRequestHandler = (error, _request, response, _ne
     return;
   }
 
+  // SyntaxError on JSON body parsing
+  if (error instanceof SyntaxError && 'status' in error && (error as { status: unknown }).status === 400 && 'body' in error) {
+    response.status(400).json({ error: 'Malformed JSON payload' });
+    return;
+  }
+
   if (error && typeof error === 'object' && ('code' in error) && (error as { code: unknown }).code === 11000) {
     const keyPattern = (error as { keyPattern?: Record<string, unknown> }).keyPattern;
     const field = keyPattern ? Object.keys(keyPattern)[0] : 'field';
     response.status(409).json({ error: `${field === 'email' ? 'Email' : field} already registered` });
+    return;
+  }
+
+  // Mongoose ValidationError
+  if (error && typeof error === 'object' && 'name' in error && error.name === 'ValidationError' && 'errors' in error) {
+    const mongooseErrors = (error as { errors: Record<string, { message: string; path?: string }> }).errors;
+    const details = Object.values(mongooseErrors).map(err => ({
+      path: err.path || '',
+      message: err.message,
+    }));
+    response.status(400).json({ error: 'Database validation failed', details });
+    return;
+  }
+
+  // Mongoose CastError (e.g. invalid ObjectId)
+  if (error && typeof error === 'object' && 'name' in error && error.name === 'CastError') {
+    const castErr = error as { path?: string; value?: unknown };
+    response.status(400).json({ error: `Invalid ${castErr.path || 'identifier'}: ${String(castErr.value)}` });
     return;
   }
 

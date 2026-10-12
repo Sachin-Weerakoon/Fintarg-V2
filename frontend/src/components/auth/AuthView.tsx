@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PasswordField } from '@/components/ui/PasswordField';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 export type WorkMode = 'salary' | 'business' | 'both';
 
@@ -111,19 +112,9 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
         <div className="absolute bottom-1/4 right-0 w-96 h-96 rounded-full bg-primary-700/10 blur-3xl pointer-events-none" />
 
         {/* Top brand header */}
-        <div className="flex items-center gap-3 relative z-10">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-white/10 p-2 shadow-lg border border-white/15 flex-shrink-0 backdrop-blur-md">
-            <img src="/brand/fintarg-logo.svg" alt="Fintarg logo" className="w-7 h-7 object-contain" />
-          </div>
-          <div>
-            <div className="text-white font-extrabold text-xl tracking-tight flex items-center gap-2">
-              <span>Fintarg</span>
-              <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full text-primary-400 bg-primary-400/15 border border-primary-400/30">
-                v2.0
-              </span>
-            </div>
-            <div className="text-xs text-slate-400 font-medium">Personal & Business Finance OS</div>
-          </div>
+        <div className="flex flex-col gap-1.5 relative z-10">
+          <BrandLogo variant="full" height={44} className="self-start" />
+          <div className="text-xs text-slate-400 font-medium">Personal & Business Finance OS</div>
         </div>
 
         {/* Hero headline & key highlights */}
@@ -185,10 +176,7 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
           {/* Card Mobile Brand Header */}
           <div className="flex md:hidden items-center justify-between mb-5">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-white/10 p-1.5 border border-white/10">
-                <img src="/brand/fintarg-logo.svg" alt="Fintarg logo" className="w-6 h-6 object-contain" />
-              </div>
-              <span className="font-bold text-lg text-white tracking-tight">Fintarg</span>
+              <BrandLogo variant="full" height={30} />
             </div>
             <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded text-primary-300 bg-primary-500/15 border border-primary-400/30">
               v2.0

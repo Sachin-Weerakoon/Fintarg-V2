@@ -6,6 +6,42 @@ export interface MoneyFieldProps extends Omit<React.InputHTMLAttributes<HTMLInpu
   onChange: (val: number | string, rawValue?: string) => void;
   currency?: string;
   hasError?: boolean;
+  allowNegative?: boolean;
+}
+
+/**
+ * Sanitizes raw money input:
+ * - strips non-numeric characters (except single decimal point)
+ * - enforces 2-decimal maximum precision
+ * - rejects negative values unless allowNegative is true
+ */
+export function sanitizeMoneyInput(raw: string, allowNegative = false): string {
+  const isNeg = allowNegative && raw.trim().startsWith('-');
+  const digitsOnly = raw.replace(/[^0-9.]/g, '');
+  const parts = digitsOnly.split('.');
+  let cleanRaw = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : digitsOnly;
+
+  if (cleanRaw.includes('.')) {
+    const [intPart, decPart] = cleanRaw.split('.');
+    cleanRaw = `${intPart}.${decPart.slice(0, 2)}`;
+  }
+
+  return isNeg && cleanRaw ? `-${cleanRaw}` : cleanRaw;
+}
+
+/**
+ * Formats a money value for display with thousand separators.
+ * Rejects NaN, infinite, and unallowed negative values.
+ */
+export function formatMoneyValue(v: number | string, allowNegative = false): string {
+  if (v === '' || v === undefined || v === null) return '';
+  const num = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, ''));
+  if (isNaN(num) || !isFinite(num)) return '';
+  if (!allowNegative && num < 0) return '0.00';
+  const rounded = Math.round(num * 100) / 100;
+  const parts = String(rounded).split('.');
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.length > 1 ? `${intPart}.${parts[1]}` : intPart;
 }
 
 export const MoneyField = React.forwardRef<HTMLInputElement, MoneyFieldProps>(function MoneyField(
@@ -14,42 +50,45 @@ export const MoneyField = React.forwardRef<HTMLInputElement, MoneyFieldProps>(fu
     onChange,
     currency = 'Rs.',
     hasError = false,
+    allowNegative = false,
     className = '',
     placeholder = '0.00',
     ...props
   },
   ref
 ) {
-  // Format numeric values with thousand separators for display
-  const formatValue = (v: number | string) => {
-    if (v === '' || v === undefined || v === null) return '';
-    const num = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, ''));
-    if (isNaN(num)) return String(v);
-    const parts = String(v).split('.');
-    const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return parts.length > 1 ? `${intPart}.${parts[1]}` : intPart;
-  };
-
-  const [displayValue, setDisplayValue] = useState<string>(() => formatValue(value));
+  const [displayValue, setDisplayValue] = useState<string>(() => formatMoneyValue(value, allowNegative));
 
   useEffect(() => {
-    setDisplayValue(formatValue(value));
-  }, [value]);
+    setDisplayValue(formatMoneyValue(value, allowNegative));
+  }, [value, allowNegative]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/[^0-9.]/g, '');
-    // Allow only one decimal point
-    const parts = raw.split('.');
-    const cleanRaw = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : raw;
-
+    const cleanRaw = sanitizeMoneyInput(e.target.value, allowNegative);
     setDisplayValue(cleanRaw);
-    onChange(cleanRaw ? (cleanRaw.endsWith('.') ? cleanRaw : cleanRaw) : '', cleanRaw);
+    onChange(cleanRaw, cleanRaw);
   };
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const num = parseFloat(displayValue.replace(/,/g, ''));
-    if (!isNaN(num)) {
-      setDisplayValue(num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }));
+    const cleanStr = displayValue.replace(/,/g, '');
+    const num = parseFloat(cleanStr);
+    if (!isNaN(num) && isFinite(num)) {
+      if (!allowNegative && num < 0) {
+        setDisplayValue('0.00');
+        onChange(0, '0.00');
+      } else {
+        const rounded = Math.round(num * 100) / 100;
+        setDisplayValue(
+          rounded.toLocaleString('en-LK', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+          })
+        );
+        onChange(rounded, String(rounded));
+      }
+    } else {
+      setDisplayValue('');
+      onChange('', '');
     }
     props.onBlur?.(e);
   };

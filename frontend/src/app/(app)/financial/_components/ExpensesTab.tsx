@@ -1,6 +1,14 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { useApp, formatRs, calcExpensesByCategory } from '@/store';
+import {
+  useApp,
+  formatRs,
+  calcExpensesByCategory,
+  calcMonthlyExpenses,
+  calcMonthlyIncome,
+  calcFinancePayments,
+  calcDailyExpenseBudget,
+} from '@/store';
 import { Card } from '@/components/ui/Card';
 import { StatCard } from '@/components/ui/StatCard';
 import { Button } from '@/components/ui/Button';
@@ -40,7 +48,7 @@ export function ExpensesTab({ month }: { month: string }) {
   const [catFilter, setCatFilter] = useState('All');
 
   const monthExp = state.expenses.filter(e => e.date.startsWith(month));
-  const monthTotal = monthExp.reduce((s, e) => s + e.amount, 0);
+  const monthTotal = calcMonthlyExpenses(state.expenses, month);
   const catMap = calcExpensesByCategory(state.expenses, month);
   const cats = ['All', ...Object.keys(catMap).sort()];
   const filtered = useMemo(() => {
@@ -49,24 +57,15 @@ export function ExpensesTab({ month }: { month: string }) {
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [monthExp, catFilter]);
 
-  // Real days-left & daily budget computation
-  const [yearStr, monthStr] = month.split('-');
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonthNum = today.getMonth() + 1;
-  const isCurrentMonth = Number(yearStr) === currentYear && Number(monthStr) === currentMonthNum;
-  const daysInMonth = new Date(Number(yearStr) || currentYear, Number(monthStr) || currentMonthNum, 0).getDate();
-  const daysLeft = isCurrentMonth ? Math.max(1, daysInMonth - today.getDate() + 1) : daysInMonth;
-
-  const totalMonthlyIncome = state.income.reduce((s, i) => {
-    if (i.frequency === 'monthly') return s + i.amount;
-    if (i.frequency === 'weekly') return s + i.amount * 4;
-    if (i.frequency === 'daily') return s + i.amount * 30;
-    return s;
-  }, 0);
-  const recurringObligations = state.financePayments.reduce((s, f) => s + f.amount, 0);
-  const remainingBudget = Math.max(0, totalMonthlyIncome - recurringObligations - monthTotal);
-  const dailyBudget = Math.round(remainingBudget / daysLeft);
+  // Real days-left & daily budget computation using shared module
+  const totalMonthlyIncome = calcMonthlyIncome(state.income, month, state.employmentProfiles);
+  const recurringObligations = calcFinancePayments(state.financePayments);
+  const { daysLeft, dailyBudget } = calcDailyExpenseBudget({
+    monthlyIncome: totalMonthlyIncome,
+    obligations: recurringObligations,
+    monthlyExpenses: monthTotal,
+    month,
+  });
 
   const submit = () => {
     if (!form.amount || Number(form.amount) <= 0) {

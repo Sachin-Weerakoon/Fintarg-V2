@@ -16,8 +16,8 @@ export interface PostTransactionParams {
   paymentMethod?: 'cash' | 'card' | 'debit_card' | 'credit_card' | 'bank_transfer' | 'cheque' | 'standing_order' | 'online' | 'other';
   bankAccountId?: string | mongoose.Types.ObjectId | null;
   cardId?: string | mongoose.Types.ObjectId | null;
-  referenceId?: string;
-  transferGroupId?: string;
+  referenceId?: string | null;
+  transferGroupId?: string | null;
 }
 
 /**
@@ -267,6 +267,215 @@ export async function replaceTransaction(
   return withLedgerSession(async (session) => {
     await reverseTransaction(userId, referenceId, session);
     return postTransaction({ ...newParams, referenceId }, session);
+  });
+}
+
+/**
+ * Reverses a single transaction by ID and removes it.
+ */
+export async function reverseTransactionById(
+  userId: string | mongoose.Types.ObjectId,
+  transactionId: string | mongoose.Types.ObjectId,
+  session?: mongoose.ClientSession,
+): Promise<boolean> {
+  const uId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+  const txId = typeof transactionId === 'string' ? new mongoose.Types.ObjectId(transactionId) : transactionId;
+
+  const findQuery = TransactionModel.findOne({ _id: txId, userId: uId });
+  if (session) findQuery.session(session);
+  const tx = await findQuery;
+  if (!tx) return false;
+
+  // Reverse bank account balance
+  if (tx.bankAccountId) {
+    let reverseDelta = 0;
+    if (tx.type === 'income') reverseDelta = -tx.amountCents;
+    else if (tx.type === 'expense') reverseDelta = tx.amountCents;
+    else if (tx.type === 'transfer') {
+      if (tx.transferDirection === 'incoming') reverseDelta = -tx.amountCents;
+      else if (tx.transferDirection === 'outgoing') reverseDelta = tx.amountCents;
+    }
+
+    if (reverseDelta !== 0) {
+      const updateQuery = BankAccountModel.updateOne(
+        { _id: tx.bankAccountId, userId: uId },
+        { $inc: { balanceCents: reverseDelta } },
+      );
+      if (session) updateQuery.session(session);
+      await updateQuery;
+    }
+  }
+
+  // Reverse card balance
+  if (tx.cardId) {
+    const card = await CardModel.findOne({ _id: tx.cardId, userId: uId });
+    if (card && (card.cardType === 'credit' || tx.paymentMethod === 'credit_card')) {
+      let cardReverseDelta = 0;
+      if (tx.type === 'expense') cardReverseDelta = -tx.amountCents;
+      else if (tx.type === 'income') cardReverseDelta = tx.amountCents;
+      else if (tx.type === 'transfer') {
+        if (tx.transferDirection === 'incoming') cardReverseDelta = tx.amountCents;
+        else if (tx.transferDirection === 'outgoing') cardReverseDelta = -tx.amountCents;
+      }
+
+      if (cardReverseDelta !== 0) {
+        const updateQuery = CardModel.updateOne(
+          { _id: tx.cardId, userId: uId },
+          { $inc: { balanceCents: cardReverseDelta } },
+        );
+        if (session) updateQuery.session(session);
+        await updateQuery;
+      }
+    }
+  }
+
+  const deleteQuery = TransactionModel.deleteOne({ _id: tx._id });
+  if (session) deleteQuery.session(session);
+  await deleteQuery;
+
+  return true;
+}
+
+/**
+ * Updates a generic transaction by reversing old balances, applying new balances, and updating the transaction document.
+ */
+export async function updateTransactionById(
+  userId: string | mongoose.Types.ObjectId,
+  transactionId: string | mongoose.Types.ObjectId,
+  newParams: PostTransactionParams,
+): Promise<ITransaction> {
+  return withLedgerSession(async (session) => {
+    const uId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+    const txId = typeof transactionId === 'string' ? new mongoose.Types.ObjectId(transactionId) : transactionId;
+
+    const findQuery = TransactionModel.findOne({ _id: txId, userId: uId });
+    if (session) findQuery.session(session);
+    const existing = await findQuery;
+    if (!existing) throw new HttpError(404, 'Transaction not found');
+
+    // 1. Reverse existing balance impact
+    if (existing.bankAccountId) {
+      let reverseDelta = 0;
+      if (existing.type === 'income') reverseDelta = -existing.amountCents;
+      else if (existing.type === 'expense') reverseDelta = existing.amountCents;
+      else if (existing.type === 'transfer') {
+        if (existing.transferDirection === 'incoming') reverseDelta = -existing.amountCents;
+        else if (existing.transferDirection === 'outgoing') reverseDelta = existing.amountCents;
+      }
+
+      if (reverseDelta !== 0) {
+        const updateQuery = BankAccountModel.updateOne(
+          { _id: existing.bankAccountId, userId: uId },
+          { $inc: { balanceCents: reverseDelta } },
+        );
+        if (session) updateQuery.session(session);
+        await updateQuery;
+      }
+    }
+
+    if (existing.cardId) {
+      const card = await CardModel.findOne({ _id: existing.cardId, userId: uId });
+      if (card && (card.cardType === 'credit' || existing.paymentMethod === 'credit_card')) {
+        let cardReverseDelta = 0;
+        if (existing.type === 'expense') cardReverseDelta = -existing.amountCents;
+        else if (existing.type === 'income') cardReverseDelta = existing.amountCents;
+        else if (existing.type === 'transfer') {
+          if (existing.transferDirection === 'incoming') cardReverseDelta = existing.amountCents;
+          else if (existing.transferDirection === 'outgoing') cardReverseDelta = -existing.amountCents;
+        }
+
+        if (cardReverseDelta !== 0) {
+          const updateQuery = CardModel.updateOne(
+            { _id: existing.cardId, userId: uId },
+            { $inc: { balanceCents: cardReverseDelta } },
+          );
+          if (session) updateQuery.session(session);
+          await updateQuery;
+        }
+      }
+    }
+
+    // 2. Post new balance impact
+    let newBankAccountId = newParams.bankAccountId
+      ? (typeof newParams.bankAccountId === 'string' ? new mongoose.Types.ObjectId(newParams.bankAccountId) : newParams.bankAccountId)
+      : null;
+    const newCardId = newParams.cardId
+      ? (typeof newParams.cardId === 'string' ? new mongoose.Types.ObjectId(newParams.cardId) : newParams.cardId)
+      : null;
+
+    if (newParams.paymentMethod === 'cash' && !newBankAccountId && !newCardId) {
+      const cashWallet = await ensureCashWallet(uId);
+      newBankAccountId = cashWallet._id as mongoose.Types.ObjectId;
+    }
+
+    const newAmountCents = Math.round(Number(newParams.amountCents));
+    if (!Number.isFinite(newAmountCents) || newAmountCents <= 0) {
+      throw new HttpError(400, 'Transaction amount must be a positive number');
+    }
+
+    if (newBankAccountId) {
+      let delta = 0;
+      if (newParams.type === 'income') delta = newAmountCents;
+      else if (newParams.type === 'expense') delta = -newAmountCents;
+      else if (newParams.type === 'transfer') {
+        if (newParams.transferDirection === 'incoming') delta = newAmountCents;
+        else if (newParams.transferDirection === 'outgoing') delta = -newAmountCents;
+      }
+
+      if (delta !== 0) {
+        const updateQuery = BankAccountModel.updateOne(
+          { _id: newBankAccountId, userId: uId },
+          { $inc: { balanceCents: delta } },
+        );
+        if (session) updateQuery.session(session);
+        await updateQuery;
+      }
+    }
+
+    if (newCardId) {
+      const card = await CardModel.findOne({ _id: newCardId, userId: uId });
+      if (card && (card.cardType === 'credit' || newParams.paymentMethod === 'credit_card')) {
+        let cardDelta = 0;
+        if (newParams.type === 'expense') cardDelta = newAmountCents;
+        else if (newParams.type === 'income') cardDelta = -newAmountCents;
+        else if (newParams.type === 'transfer') {
+          if (newParams.transferDirection === 'incoming') cardDelta = -newAmountCents;
+          else if (newParams.transferDirection === 'outgoing') cardDelta = newAmountCents;
+        }
+
+        if (cardDelta !== 0) {
+          const updateQuery = CardModel.updateOne(
+            { _id: newCardId, userId: uId },
+            { $inc: { balanceCents: cardDelta } },
+          );
+          if (session) updateQuery.session(session);
+          await updateQuery;
+        }
+      }
+    }
+
+    // 3. Update the transaction document
+    const updateData: Record<string, any> = {
+      type: newParams.type,
+      amountCents: newAmountCents,
+      date: newParams.date,
+      category: newParams.category || 'General',
+      description: newParams.description || '',
+      paymentMethod: newParams.paymentMethod || 'cash',
+      bankAccountId: newBankAccountId || null,
+      cardId: newCardId || null,
+      transferDirection: newParams.transferDirection || null,
+    };
+
+    const updateDocQuery = TransactionModel.findOneAndUpdate(
+      { _id: txId, userId: uId },
+      { $set: updateData },
+      { new: true, runValidators: true },
+    );
+    if (session) updateDocQuery.session(session);
+    const updated = await updateDocQuery.exec();
+    if (!updated) throw new HttpError(404, 'Transaction not found');
+    return updated;
   });
 }
 

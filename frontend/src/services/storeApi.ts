@@ -472,6 +472,17 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
     }
     case 'DELETE_LOAN':
       return void (await send(`/api/backend/records/loans/${id}`, 'DELETE'));
+    case 'ADD_LOAN_FROM_SHORTFALL':
+      return create('/api/backend/records/loans', {
+        lender: 'Self (shortfall ' + action.month + ')',
+        amount: action.amount,
+        rate: 0,
+        method: 'simple',
+        interestBasis: 'annual',
+        tenureMonths: 12,
+        startDate: action.month + '-01',
+        dueDate: '',
+      });
     case 'RECORD_LOAN_REPAYMENT':
       return void (await send(`/api/backend/records/loans/${id}/repay`, 'POST', {
         amount: action.amount,
@@ -535,7 +546,10 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
       ));
 
     case 'SET_PERSONAL_SPENDING_BUDGET':
-      return void (await send('/api/backend/profile/personal-budget', 'PUT', { budget: action.budget }));
+      return void (await send('/api/backend/profile/personal-budget', 'PUT', {
+        budget: action.budget,
+        month: action.month || new Date().toISOString().slice(0, 7),
+      }));
     case 'UPDATE_PROFILE':
       return void (await send('/api/backend/profile', 'PATCH', action.profile));
     case 'ADD_LETTER':
@@ -585,39 +599,59 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
   }
 }
 
-export async function fetchTransactionHistory(filters: Record<string, any> = {}): Promise<{
+export interface TransactionHistoryResult {
+  transactions: Transaction[];
   data: Transaction[];
-  summary: { totalIncome: number; totalExpense: number; netFlow: number; count: number };
-}> {
+  totalCount: number;
+  summary: {
+    totalIncome: number;
+    totalExpense: number;
+    netFlow: number;
+    closingBalance?: number;
+    count: number;
+  };
+}
+
+export async function fetchTransactionHistory(filters: Record<string, any> = {}): Promise<TransactionHistoryResult> {
   const query = new URLSearchParams();
   Object.entries(filters).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') query.set(k, String(v));
   });
   const qStr = query.toString();
   const path = `/api/backend/transactions/history${qStr ? `?${qStr}` : ''}`;
-  const res = await apiClient<{ data: any[]; summary: any }>(path);
+  const res = await apiClient<{ transactions?: any[]; data?: any[]; totalCount?: number; summary: any }>(path);
+  const rawList = res.transactions || res.data || [];
+  const mapped = rawList.map(row => ({
+    id: row._id,
+    type: row.type,
+    transferDirection: row.transferDirection,
+    transferGroupId: row.transferGroupId,
+    amount: (row.amountCents || 0) / 100,
+    date: row.date,
+    category: row.category,
+    description: row.description,
+    paymentMethod: row.paymentMethod,
+    bankAccountId: row.bankAccountId,
+    cardId: row.cardId,
+    sourceRecordId: row.sourceRecordId,
+    sourceRecordKind: row.sourceRecordKind,
+    balanceAfter: row.balanceAfterCents !== undefined
+      ? row.balanceAfterCents / 100
+      : (row.runningBalanceCents !== undefined ? row.runningBalanceCents / 100 : undefined),
+  }));
+
+  const totalCount = res.totalCount ?? res.summary?.count ?? mapped.length;
+
   return {
-    data: (res.data || []).map(row => ({
-      id: row._id,
-      type: row.type,
-      transferDirection: row.transferDirection,
-      transferGroupId: row.transferGroupId,
-      amount: (row.amountCents || 0) / 100,
-      date: row.date,
-      category: row.category,
-      description: row.description,
-      paymentMethod: row.paymentMethod,
-      bankAccountId: row.bankAccountId,
-      cardId: row.cardId,
-      sourceRecordId: row.sourceRecordId,
-      sourceRecordKind: row.sourceRecordKind,
-      balanceAfter: row.balanceAfterCents !== undefined ? row.balanceAfterCents / 100 : undefined,
-    })),
+    transactions: mapped,
+    data: mapped,
+    totalCount,
     summary: {
       totalIncome: (res.summary?.totalIncomeCents || 0) / 100,
       totalExpense: (res.summary?.totalExpenseCents || 0) / 100,
-      netFlow: (res.summary?.netFlowCents || 0) / 100,
-      count: res.summary?.count || 0,
+      netFlow: (res.summary?.netFlowCents ?? res.summary?.netCents ?? 0) / 100,
+      closingBalance: res.summary?.closingBalanceCents !== undefined ? res.summary.closingBalanceCents / 100 : undefined,
+      count: totalCount,
     },
   };
 }

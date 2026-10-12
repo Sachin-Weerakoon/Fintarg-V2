@@ -10,7 +10,7 @@ export interface IPasswordReset extends Document {
 
 const PasswordResetSchema = new Schema<IPasswordReset>({
   userId: { type: Schema.Types.ObjectId, required: true, index: true },
-  tokenHash: { type: String, required: true },
+  tokenHash: { type: String, required: true, unique: true, index: true },
   expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
   used: { type: Boolean, default: false },
 }, { timestamps: true });

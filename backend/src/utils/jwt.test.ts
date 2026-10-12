@@ -12,6 +12,15 @@ describe('JWT Utilities', () => {
 
     const decoded = readAccessToken(token);
     assert.strictEqual(decoded.userId, userId, 'Decoded user ID should match original');
+    assert.strictEqual(decoded.tokenVersion, 0, 'Default tokenVersion should be 0');
+  });
+
+  it('preserves custom tokenVersion in generated token', () => {
+    const userId = 'user_with_version';
+    const token = createAccessToken(userId, 3);
+    const decoded = readAccessToken(token);
+    assert.strictEqual(decoded.userId, userId);
+    assert.strictEqual(decoded.tokenVersion, 3);
   });
 
   it('throws an error when verifying an invalid or tampered token', () => {

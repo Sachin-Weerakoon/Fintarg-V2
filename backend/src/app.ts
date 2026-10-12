@@ -25,16 +25,36 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(helmet());
 
-const allowedOrigins = [env.FRONTEND_ORIGIN, env.APP_ORIGIN].filter(Boolean);
+const parseOrigins = (raw?: string): string[] => {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+};
+
+export const getAllowedOrigins = (): string[] => {
+  const origins = new Set<string>();
+  for (const o of parseOrigins(env.FRONTEND_ORIGIN)) origins.add(o);
+  for (const o of parseOrigins(env.APP_ORIGIN)) origins.add(o);
+  return Array.from(origins);
+};
+
+export const isOriginAllowed = (origin: string, isProduction = env.NODE_ENV === 'production'): boolean => {
+  if (!origin) return true;
+  const allowed = getAllowedOrigins();
+  if (allowed.includes(origin)) return true;
+  if (!isProduction) {
+    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+      return true;
+    }
+  }
+  return false;
+};
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    const isAllowed =
-      allowedOrigins.includes(origin) ||
-      origin.endsWith('.vercel.app') ||
-      (env.NODE_ENV !== 'production' && origin.startsWith('http://localhost:'));
-    if (isAllowed) {
+    if (!origin || isOriginAllowed(origin)) {
       return callback(null, true);
     }
     return callback(new Error('Origin not allowed by CORS'));
@@ -162,9 +182,10 @@ app.use('/api/health', healthRoutes);
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: env.NODE_ENV === 'test' ? 10000 : 20,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  validate: { trustProxy: false },
   message: { error: 'Too many requests, please try again later.' },
 });
 

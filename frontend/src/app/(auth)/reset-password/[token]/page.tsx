@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { PasswordField } from '@/components/ui/PasswordField';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 export default function ResetPassword({ params }: { params: Promise<{ token: string }> }) {
   const [password, setPassword] = useState('');
@@ -49,11 +50,8 @@ export default function ResetPassword({ params }: { params: Promise<{ token: str
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-[#070D19] via-[#0B1528] to-[#0F1D32] text-white selection:bg-primary-500/30">
       <div className="onboarding-card max-w-md w-full bg-[#0E1726]/95 border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
-        <div className="flex items-center gap-2.5 mb-6">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/10 p-2 shadow-lg border border-white/15 backdrop-blur-md">
-            <img src="/brand/fintarg-logo.svg" alt="Fintarg logo" className="w-5 h-5 object-contain" />
-          </div>
-          <span className="font-extrabold text-lg text-white tracking-tight">Fintarg</span>
+        <div className="mb-6">
+          <BrandLogo variant="full" height={32} />
         </div>
 
         <h2 className="text-2xl font-bold tracking-tight text-white mb-2">Set a new password</h2>

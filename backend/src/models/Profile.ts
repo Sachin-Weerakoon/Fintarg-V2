@@ -60,6 +60,5 @@ const ProfileSchema = new Schema<IProfile>({
 }, { timestamps: true });
 
 ProfileSchema.index({ userId: 1, email: 1 }, { unique: true });
-ProfileSchema.index({ deletionRequestedAt: 1 }, { sparse: true, expireAfterSeconds: 30 * 24 * 60 * 60 });
 
 export const ProfileModel = mongoose.models.Profile || mongoose.model<IProfile>('Profile', ProfileSchema);

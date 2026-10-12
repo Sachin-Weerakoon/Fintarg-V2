@@ -34,4 +34,8 @@ const TransactionSchema = new Schema<ITransaction>({
   runningBalanceCents: { type: Number },
 }, { timestamps: true });
 
+TransactionSchema.index({ userId: 1, bankAccountId: 1, date: -1 });
+TransactionSchema.index({ userId: 1, date: -1 });
+TransactionSchema.index({ userId: 1, referenceId: 1 });
+
 export const TransactionModel = mongoose.models.Transaction || mongoose.model<ITransaction>('Transaction', TransactionSchema);

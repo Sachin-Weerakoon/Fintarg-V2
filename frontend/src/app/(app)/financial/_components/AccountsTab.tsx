@@ -349,7 +349,7 @@ export function AccountsTab() {
         </Card>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <SegmentedTabs
           size="sm"
           options={[
@@ -359,6 +359,18 @@ export function AccountsTab() {
           value={activeSubTab}
           onChange={(v: string) => setActiveSubTab(v as any)}
         />
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            setIsTransferOpen(true);
+            setTransferError('');
+          }}
+          className="flex items-center gap-1.5 shrink-0"
+        >
+          <Icon name="refresh" size={14} />
+          <span>Transfer Funds</span>
+        </Button>
       </div>
 
       {activeSubTab === 'accounts' ? (
@@ -1317,6 +1329,124 @@ export function AccountsTab() {
         </Modal>
       )}
 
+      {/* Transfer Funds Modal */}
+      {isTransferOpen && (
+        <Modal
+          isOpen={isTransferOpen}
+          onClose={() => setIsTransferOpen(false)}
+          title="Transfer Funds"
+        >
+          <div className="space-y-4">
+            <p className="text-xs text-muted">
+              Move funds between your bank accounts, cash wallet, or credit cards. Both balances and transactions will be recorded automatically in your ledger.
+            </p>
+
+            {transferError && (
+              <Alert tone="danger" title="Transfer Error">
+                {transferError}
+              </Alert>
+            )}
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Field id="transfer-from-select" label="From (Source)" required>
+                <Select
+                  id="transfer-from-select"
+                  value={transferForm.fromEntity}
+                  onChange={e => setTransferForm(f => ({ ...f, fromEntity: e.target.value }))}
+                >
+                  <option value="">Select source...</option>
+                  <option value="cash">Cash Wallet</option>
+                  {state.bankAccounts.map(a => (
+                    <option key={a.id} value={`ba_${a.id}`}>
+                      {a.name} ({a.bankName}) · {formatRs(a.currentBalance || 0)}
+                    </option>
+                  ))}
+                  {state.cards.map(c => (
+                    <option key={c.id} value={`cd_${c.id}`}>
+                      {c.name} ({c.cardType.toUpperCase()} •••• {c.lastFourDigits})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              <Field id="transfer-to-select" label="To (Destination)" required>
+                <Select
+                  id="transfer-to-select"
+                  value={transferForm.toEntity}
+                  onChange={e => setTransferForm(f => ({ ...f, toEntity: e.target.value }))}
+                >
+                  <option value="">Select destination...</option>
+                  <option value="cash">Cash Wallet</option>
+                  {state.bankAccounts.map(a => (
+                    <option key={a.id} value={`ba_${a.id}`}>
+                      {a.name} ({a.bankName}) · {formatRs(a.currentBalance || 0)}
+                    </option>
+                  ))}
+                  {state.cards.map(c => (
+                    <option key={c.id} value={`cd_${c.id}`}>
+                      {c.name} ({c.cardType.toUpperCase()} •••• {c.lastFourDigits})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Field id="transfer-amount-input" label="Amount (LKR)" required>
+                <Input
+                  id="transfer-amount-input"
+                  type="number"
+                  min="1"
+                  step="any"
+                  placeholder="e.g. 5000"
+                  value={transferForm.amount}
+                  onChange={e => setTransferForm(f => ({ ...f, amount: e.target.value }))}
+                />
+              </Field>
+
+              <Field id="transfer-date-input" label="Transfer Date" required>
+                <Input
+                  id="transfer-date-input"
+                  type="date"
+                  value={transferForm.date}
+                  onChange={e => setTransferForm(f => ({ ...f, date: e.target.value }))}
+                />
+              </Field>
+            </div>
+
+            <Field id="transfer-note-input" label="Note / Reference (Optional)">
+              <Input
+                id="transfer-note-input"
+                type="text"
+                placeholder="e.g. Monthly savings allocation, ATM withdrawal"
+                value={transferForm.description}
+                onChange={e => setTransferForm(f => ({ ...f, description: e.target.value }))}
+              />
+            </Field>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/60">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsTransferOpen(false)}
+                disabled={isTransferring}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={submitTransfer}
+                disabled={isTransferring}
+                className="flex items-center gap-1.5"
+              >
+                <Icon name="check" size={14} />
+                <span>{isTransferring ? 'Transferring...' : 'Confirm Transfer'}</span>
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
     </div>
   );

@@ -215,11 +215,11 @@ export interface SavingsGoal {
   name: string;
   dailyAmount: number;
   monthlyTarget: number;
-  endDate: string;
+  targetDate?: string;
+  endDate?: string;
   savedAmount: number;
   targetAmount?: number;
-  targetDate?: string;
-  contributions: GoalContribution[];
+  contributions?: GoalContribution[];
 }
 
 export interface Letter {

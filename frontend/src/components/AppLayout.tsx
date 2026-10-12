@@ -8,6 +8,8 @@ import { deriveBrand, validateCustomOverrides, THEME_COLORS } from '@/lib/theme'
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
+import { BrandLogo } from '@/components/ui/BrandLogo';
+import { NotificationCenter } from '@/components/NotificationCenter';
 
 const navItems = [
   { href: '/', label: 'Home', page: 'dashboard' },
@@ -127,21 +129,14 @@ export default function AppLayout({
             className="w-60 min-h-screen sticky top-0 h-screen overflow-y-auto border-r border-white/[0.07] bg-gradient-to-b from-chrome-900 to-chrome-800 flex-shrink-0 flex flex-col"
           >
             <div className="px-5 py-6">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/10 p-1.5 shadow-md flex-shrink-0 border border-white/10">
-                  <img src="/brand/fintarg-logo.svg" alt="Fintarg Logo" className="w-6 h-6 object-contain" />
-                </div>
-                <div>
-                  <div className="text-white font-bold text-lg leading-tight tracking-tight flex items-center gap-2">
-                    <span>Fintarg</span>
-                    <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded text-primary-400 bg-primary-tint/20 border border-primary-400/30">
-                      v2
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-chrome-text">
-                    <span className="w-1.5 h-1.5 rounded-full bg-success-solid animate-pulse" />
-                    <span>{modeLabel}</span>
-                  </div>
+              <div className="flex flex-col gap-2.5">
+                <BrandLogo variant="full" height={34} className="self-start" />
+                <div className="flex items-center gap-1.5 text-xs font-medium text-chrome-text">
+                  <span className="w-1.5 h-1.5 rounded-full bg-success-solid animate-pulse" />
+                  <span>{modeLabel}</span>
+                  <span className="ml-1 text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded text-primary-400 bg-primary-tint/20 border border-primary-400/30">
+                    v2
+                  </span>
                 </div>
               </div>
             </div>
@@ -209,6 +204,7 @@ export default function AppLayout({
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <NotificationCenter variant="light" />
                 <Link
                   href="/settings"
                   className="rounded-xl transition-transform hover:scale-105 overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -246,10 +242,10 @@ export default function AppLayout({
             className="mobile-topbar flex items-center justify-between px-4 py-3 sticky top-0 z-10 no-print bg-chrome-900 border-b border-white/[0.08]"
           >
             <div className="flex items-center gap-2">
-              <img src="/brand/fintarg-logo.svg" alt="Fintarg logo" className="w-6 h-6 object-contain" />
-              <span className="font-bold text-white text-base tracking-tight">Fintarg</span>
+              <BrandLogo variant="full" height={26} />
             </div>
             <div className="flex items-center gap-2">
+              <NotificationCenter variant="dark" />
               <span className="text-xs font-semibold px-2 py-1 rounded-full bg-white/10 text-white">
                 {modeLabel}
               </span>

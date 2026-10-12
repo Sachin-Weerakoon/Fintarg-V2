@@ -202,6 +202,7 @@ export const transactionHistory: RequestHandler = asyncHandler(async (request, r
     category: request.query.category as string | undefined,
     type: request.query.type as 'income' | 'expense' | 'transfer' | undefined,
     paymentMethod: request.query.paymentMethod as string | undefined,
+    search: request.query.search as string | undefined,
     limit: request.query.limit ? Number(request.query.limit) : undefined,
     skip: request.query.skip ? Number(request.query.skip) : undefined,
   };

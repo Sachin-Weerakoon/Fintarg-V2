@@ -14,3 +14,12 @@ export const loginSchema = z.object({
 
 export const forgotPasswordSchema = z.object({ email: z.string().trim().email().max(254).transform(value => value.toLowerCase()) });
 export const resetPasswordSchema = z.object({ token: z.string().min(32).max(256), newPassword: z.string().min(8).max(128) });
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: z.string().min(8).max(128),
+});
+
+export const deleteAccountSchema = z.object({
+  password: z.string().min(1).max(128),
+  confirmation: z.literal('DELETE MY ACCOUNT'),
+});

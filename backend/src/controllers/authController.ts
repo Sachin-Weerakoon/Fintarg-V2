@@ -1,13 +1,13 @@
 import type { RequestHandler } from 'express';
 import { env } from '../config/env';
 import { HttpError } from '../middleware/errors';
-import { authenticateUser, getUserProfile, registerUser } from '../services/authService';
+import { authenticateUser, changePassword, deleteUserAccount, getUserProfile, logoutAll, registerUser } from '../services/authService';
 import { applyPasswordReset, requestPasswordReset } from '../services/passwordResetService';
 import { createAccessToken } from '../utils/jwt';
 import { asyncHandler } from '../utils/asyncHandler';
 
-function setSessionCookie(response: Parameters<RequestHandler>[1], userId: string) {
-  response.cookie(env.COOKIE_NAME, createAccessToken(userId), {
+function setSessionCookie(response: Parameters<RequestHandler>[1], userId: string, tokenVersion = 0) {
+  response.cookie(env.COOKIE_NAME, createAccessToken(userId, tokenVersion), {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
     sameSite: 'strict',
@@ -18,13 +18,13 @@ function setSessionCookie(response: Parameters<RequestHandler>[1], userId: strin
 
 export const register: RequestHandler = asyncHandler(async (request, response) => {
   const { user, profile } = await registerUser(request.body);
-  setSessionCookie(response, user.id);
+  setSessionCookie(response, user.id, user.tokenVersion ?? 0);
   response.status(201).json({ ok: true, user: { id: user.id, name: user.name, email: user.email, plan: user.plan, workMode: user.workMode, profile } });
 });
 
 export const login: RequestHandler = asyncHandler(async (request, response) => {
   const { user, profile } = await authenticateUser(request.body.email, request.body.password);
-  setSessionCookie(response, user.id);
+  setSessionCookie(response, user.id, user.tokenVersion ?? 0);
   response.json({ ok: true, user: { id: user.id, name: user.name, email: user.email, plan: user.plan, workMode: user.workMode, profile } });
 });
 
@@ -42,9 +42,35 @@ export const currentUser: RequestHandler = asyncHandler(async (request, response
 });
 
 export const logout: RequestHandler = (_request, response) => {
-  response.clearCookie(env.COOKIE_NAME, { httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'lax', path: '/' });
+  response.clearCookie(env.COOKIE_NAME, { httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'strict', path: '/' });
   response.json({ ok: true });
 };
+
+export const changePasswordController: RequestHandler = asyncHandler(async (request, response) => {
+  if (!request.auth) throw new HttpError(401, 'Authentication required');
+  const updatedUser = await changePassword(request.auth.userId, request.body.currentPassword, request.body.newPassword);
+  setSessionCookie(response, updatedUser.id, updatedUser.tokenVersion ?? 0);
+  response.json({ ok: true });
+});
+
+export const logoutAllController: RequestHandler = asyncHandler(async (request, response) => {
+  if (!request.auth) throw new HttpError(401, 'Authentication required');
+  await logoutAll(request.auth.userId);
+  response.clearCookie(env.COOKIE_NAME, { httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'strict', path: '/' });
+  response.json({ ok: true });
+});
+
+export const deleteAccountController: RequestHandler = asyncHandler(async (request, response) => {
+  if (!request.auth) throw new HttpError(401, 'Authentication required');
+  await deleteUserAccount(request.auth.userId, request.body.password, request.body.confirmation);
+  response.clearCookie(env.COOKIE_NAME, {
+    httpOnly: true,
+    secure: env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+  });
+  response.json({ ok: true, message: 'Account and all associated records permanently erased' });
+});
 
 export const forgotPassword: RequestHandler = asyncHandler(async (request, response) => {
   await requestPasswordReset(request.body.email);

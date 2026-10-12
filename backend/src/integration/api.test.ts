@@ -128,12 +128,17 @@ describe('Backend API Integration Tests', () => {
       assert.ok(response.headers.get('content-security-policy'));
     });
 
-    it('configures CORS for vercel.app domains', async () => {
-      const response = await fetch(`${baseUrl}/api`, {
-        headers: { Origin: 'https://preview-deploy.vercel.app' },
+    it('allows configured frontend origin and rejects arbitrary vercel.app domains', async () => {
+      const allowedRes = await fetch(`${baseUrl}/api/health`, {
+        headers: { Origin: 'http://localhost:3000' },
       });
-      assert.strictEqual(response.headers.get('access-control-allow-origin'), 'https://preview-deploy.vercel.app');
-      assert.strictEqual(response.headers.get('access-control-allow-credentials'), 'true');
+      assert.strictEqual(allowedRes.headers.get('access-control-allow-origin'), 'http://localhost:3000');
+      assert.strictEqual(allowedRes.headers.get('access-control-allow-credentials'), 'true');
+
+      const rejectedRes = await fetch(`${baseUrl}/api/health`, {
+        headers: { Origin: 'https://arbitrary-attacker.vercel.app' },
+      });
+      assert.notStrictEqual(rejectedRes.headers.get('access-control-allow-origin'), 'https://arbitrary-attacker.vercel.app');
     });
   });
 
@@ -746,6 +751,802 @@ describe('Backend API Integration Tests', () => {
       assert.strictEqual(bHistory.transactions.length, 0);
       assert.strictEqual(bHistory.summary.totalIncomeCents, 0);
       assert.strictEqual(bHistory.summary.totalExpenseCents, 0);
+    });
+  });
+
+  describe('Session Revocation & Password Lifecycle (tokenVersion)', () => {
+    const testEmail = 'session-revoke-user@example.com';
+    const initialPassword = 'InitialSecretPassword123!';
+    const updatedPassword = 'NewSecretPassword456!';
+
+    it('manages password change, tokenVersion bumping, and session revocation', async () => {
+      // 1. Register test user
+      const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Session Revoke Tester',
+          email: testEmail,
+          password: initialPassword,
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(regRes.status, 201);
+      const sessionCookie1 = regRes.headers.get('set-cookie')?.split(';')[0] || '';
+      assert.ok(sessionCookie1.includes('fintarg_token'));
+
+      // 2. Verify session 1 works
+      const meRes1 = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: sessionCookie1 },
+      });
+      assert.strictEqual(meRes1.status, 200);
+
+      // 3. Reject password change with incorrect current password
+      const badChangeRes = await fetch(`${baseUrl}/api/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: sessionCookie1 },
+        body: JSON.stringify({
+          currentPassword: 'WrongPassword123!',
+          newPassword: updatedPassword,
+        }),
+      });
+      assert.strictEqual(badChangeRes.status, 400);
+
+      // 4. Change password with correct credentials
+      const goodChangeRes = await fetch(`${baseUrl}/api/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: sessionCookie1 },
+        body: JSON.stringify({
+          currentPassword: initialPassword,
+          newPassword: updatedPassword,
+        }),
+      });
+      assert.strictEqual(goodChangeRes.status, 200);
+      const sessionCookie2 = goodChangeRes.headers.get('set-cookie')?.split(';')[0] || '';
+      assert.ok(sessionCookie2.includes('fintarg_token'));
+
+      // 5. Old session cookie 1 is now revoked
+      const meResOld = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: sessionCookie1 },
+      });
+      assert.strictEqual(meResOld.status, 401);
+      const oldErr = await meResOld.json();
+      assert.ok(oldErr.error?.includes('revoked'));
+
+      // 6. New session cookie 2 is valid
+      const meResNew = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: sessionCookie2 },
+      });
+      assert.strictEqual(meResNew.status, 200);
+
+      // 7. Logout-all invalidates session cookie 2
+      const logoutAllRes = await fetch(`${baseUrl}/api/auth/logout-all`, {
+        method: 'POST',
+        headers: { Cookie: sessionCookie2 },
+      });
+      assert.strictEqual(logoutAllRes.status, 200);
+
+      // 8. Session cookie 2 is now rejected
+      const meAfterLogoutAll = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: sessionCookie2 },
+      });
+      assert.strictEqual(meAfterLogoutAll.status, 401);
+
+      // 9. Login with new password succeeds
+      const newLoginRes = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: testEmail,
+          password: updatedPassword,
+        }),
+      });
+      assert.strictEqual(newLoginRes.status, 200);
+    });
+
+    it('locks account after 5 failed attempts and resets counter when lockout period expires', async () => {
+      const lockEmail = 'lockout-test@example.com';
+      const lockPass = 'ValidSecretPass123!';
+
+      // 1. Register user
+      const reg = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Lockout Tester',
+          email: lockEmail,
+          password: lockPass,
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(reg.status, 201);
+
+      // 2. Fail login 4 times -> 401 each time
+      for (let i = 0; i < 4; i++) {
+        const failRes = await fetch(`${baseUrl}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: lockEmail, password: 'WrongPassword!' }),
+        });
+        assert.strictEqual(failRes.status, 401);
+      }
+
+      // 3. 5th failure triggers lockout
+      const fifthFail = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: lockEmail, password: 'WrongPassword!' }),
+      });
+      assert.strictEqual(fifthFail.status, 401);
+
+      // 4. 6th attempt while locked -> 429 Too Many Requests
+      const lockedAttempt = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: lockEmail, password: lockPass }),
+      });
+      assert.strictEqual(lockedAttempt.status, 429);
+      const lockedData = await lockedAttempt.json();
+      assert.ok(lockedData.error.includes('temporarily locked'));
+
+      // 5. Simulate lockout expiration by updating lockedUntil in database
+      const { UserModel } = await import('../models/User');
+      await UserModel.updateOne(
+        { email: lockEmail },
+        { $set: { lockedUntil: new Date(Date.now() - 5000) } }
+      );
+
+      // 6. After expiry, failed attempt starts fresh at 1 failure and does NOT immediately relock
+      const postExpiryFail = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: lockEmail, password: 'WrongPasswordAgain!' }),
+      });
+      assert.strictEqual(postExpiryFail.status, 401);
+
+      const userDoc = await UserModel.findOne({ email: lockEmail }).lean();
+      assert.strictEqual((userDoc as any).failedLoginAttempts, 1);
+      assert.strictEqual((userDoc as any).lockedUntil, undefined);
+
+      // 7. Successful login with valid password succeeds
+      const postExpirySuccess = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: lockEmail, password: lockPass }),
+      });
+      assert.strictEqual(postExpirySuccess.status, 200);
+
+      const userDocAfterSuccess = await UserModel.findOne({ email: lockEmail }).lean();
+      assert.strictEqual((userDocAfterSuccess as any).failedLoginAttempts, 0);
+    });
+
+    it('returns uniform 401 for non-existent email and 200 for forgot password without leaking', async () => {
+      const nonExistentEmail = 'nobody-here@example.com';
+
+      // 1. Non-existent login returns 401
+      const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: nonExistentEmail, password: 'AnyPassword123!' }),
+      });
+      assert.strictEqual(loginRes.status, 401);
+      const loginData = await loginRes.json();
+      assert.strictEqual(loginData.error, 'Invalid email or password');
+
+      // 2. Forgot password returns ok: true without disclosing whether email exists
+      const forgotRes = await fetch(`${baseUrl}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: nonExistentEmail }),
+      });
+      assert.strictEqual(forgotRes.status, 200);
+      const forgotData = await forgotRes.json();
+      assert.strictEqual(forgotData.ok, true);
+    });
+
+    it('atomically consumes reset token, invalidates alternate pending tokens, and revokes active sessions', async () => {
+      const resetUserEmail = 'atomic-reset-user@example.com';
+      const initialPassword = 'BeforeResetPassword123!';
+      const brandNewPassword = 'AfterResetPassword999!';
+
+      // 1. Register and login
+      const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Atomic Reset Tester',
+          email: resetUserEmail,
+          password: initialPassword,
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(regRes.status, 201);
+      const activeCookie = regRes.headers.get('set-cookie')?.split(';')[0] || '';
+
+      // 2. Session cookie is valid
+      const meBeforeReset = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: activeCookie },
+      });
+      assert.strictEqual(meBeforeReset.status, 200);
+
+      // 3. Create two pending reset tokens in DB
+      const { UserModel } = await import('../models/User');
+      const { PasswordResetModel } = await import('../models/PasswordReset');
+      const { randomBytes, createHash } = await import('node:crypto');
+
+      const userDoc = await UserModel.findOne({ email: resetUserEmail });
+      assert.ok(userDoc);
+
+      const rawToken1 = randomBytes(32).toString('hex');
+      const rawToken2 = randomBytes(32).toString('hex');
+
+      await PasswordResetModel.create([
+        {
+          userId: userDoc._id,
+          tokenHash: createHash('sha256').update(rawToken1).digest('hex'),
+          expiresAt: new Date(Date.now() + 3600000),
+          used: false,
+        },
+        {
+          userId: userDoc._id,
+          tokenHash: createHash('sha256').update(rawToken2).digest('hex'),
+          expiresAt: new Date(Date.now() + 3600000),
+          used: false,
+        },
+      ]);
+
+      // 4. Apply password reset with token 1
+      const resetRes1 = await fetch(`${baseUrl}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: rawToken1,
+          newPassword: brandNewPassword,
+        }),
+      });
+      assert.strictEqual(resetRes1.status, 200);
+
+      // 5. Token 1 cannot be reused
+      const replayRes = await fetch(`${baseUrl}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: rawToken1,
+          newPassword: brandNewPassword,
+        }),
+      });
+      assert.strictEqual(replayRes.status, 400);
+
+      // 6. Token 2 has been invalidated as well
+      const token2Res = await fetch(`${baseUrl}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: rawToken2,
+          newPassword: brandNewPassword,
+        }),
+      });
+      assert.strictEqual(token2Res.status, 400);
+
+      // 7. Old active session has been revoked
+      const meAfterReset = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: activeCookie },
+      });
+      assert.strictEqual(meAfterReset.status, 401);
+
+      // 8. User can sign in with new password
+      const loginNewRes = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: resetUserEmail,
+          password: brandNewPassword,
+        }),
+      });
+      assert.strictEqual(loginNewRes.status, 200);
+    });
+  });
+
+  describe('File Upload Hardening, Magic Bytes & Limits (3.5)', () => {
+    let fileUserCookie: string;
+
+    before(async () => {
+      const reg = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Files Tester',
+          email: 'files-tester@example.com',
+          password: 'Password123!',
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(reg.status, 201);
+      fileUserCookie = reg.headers.get('set-cookie')?.split(';')[0] || '';
+    });
+
+    it('rejects spoofed files whose magic bytes do not match allowed formats with 415', async () => {
+      const fakePng = Buffer.from('not really a png file at all');
+      const res = await fetch(`${baseUrl}/api/files`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'image/png',
+          Cookie: fileUserCookie,
+        },
+        body: fakePng,
+      });
+      assert.strictEqual(res.status, 415);
+      const data = await res.json();
+      assert.ok(data.error.includes('signature mismatch'));
+    });
+
+    it('accepts real PNG image and sets inline disposition and nosniff headers on download', async () => {
+      const realPng = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D]);
+      const uploadRes = await fetch(`${baseUrl}/api/files?purpose=avatar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'image/png',
+          Cookie: fileUserCookie,
+        },
+        body: realPng,
+      });
+      assert.strictEqual(uploadRes.status, 201);
+      const { id } = await uploadRes.json();
+      assert.ok(id);
+
+      const downloadRes = await fetch(`${baseUrl}/api/files/${id}`, {
+        headers: { Cookie: fileUserCookie },
+      });
+      assert.strictEqual(downloadRes.status, 200);
+      assert.strictEqual(downloadRes.headers.get('x-content-type-options'), 'nosniff');
+      assert.strictEqual(downloadRes.headers.get('content-type'), 'image/png');
+      assert.ok(downloadRes.headers.get('content-disposition')?.includes('inline'));
+    });
+
+    it('accepts real WebP image and sets image/webp mimeType', async () => {
+      const realWebp = Buffer.from([
+        0x52, 0x49, 0x46, 0x46, // RIFF
+        0x20, 0x00, 0x00, 0x00, // file length
+        0x57, 0x45, 0x42, 0x50, // WEBP
+        0x56, 0x50, 0x38, 0x20, // VP8 chunk
+      ]);
+      const uploadRes = await fetch(`${baseUrl}/api/files?purpose=avatar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'image/webp',
+          Cookie: fileUserCookie,
+        },
+        body: realWebp,
+      });
+      assert.strictEqual(uploadRes.status, 201);
+      const { id, mimeType } = await uploadRes.json();
+      assert.strictEqual(mimeType, 'image/webp');
+
+      const downloadRes = await fetch(`${baseUrl}/api/files/${id}`, {
+        headers: { Cookie: fileUserCookie },
+      });
+      assert.strictEqual(downloadRes.status, 200);
+      assert.strictEqual(downloadRes.headers.get('content-type'), 'image/webp');
+      assert.ok(downloadRes.headers.get('content-disposition')?.includes('inline'));
+    });
+
+    it('rejects non-image when uploaded with ?purpose=avatar', async () => {
+      const realPdf = Buffer.from('%PDF-1.4 dummy pdf document content');
+      const res = await fetch(`${baseUrl}/api/files?purpose=avatar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/pdf',
+          Cookie: fileUserCookie,
+        },
+        body: realPdf,
+      });
+      assert.strictEqual(res.status, 400);
+      const data = await res.json();
+      assert.ok(data.error.includes('Avatar must be a valid image file'));
+    });
+
+    it('serves docx files with Content-Disposition: attachment for security', async () => {
+      const realDocx = Buffer.from([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x06, 0x00, 0x08, 0x00]);
+      const uploadRes = await fetch(`${baseUrl}/api/files`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          Cookie: fileUserCookie,
+        },
+        body: realDocx,
+      });
+      assert.strictEqual(uploadRes.status, 201);
+      const { id } = await uploadRes.json();
+
+      const downloadRes = await fetch(`${baseUrl}/api/files/${id}`, {
+        headers: { Cookie: fileUserCookie },
+      });
+      assert.strictEqual(downloadRes.status, 200);
+      assert.strictEqual(downloadRes.headers.get('x-content-type-options'), 'nosniff');
+      assert.ok(downloadRes.headers.get('content-disposition')?.includes('attachment'));
+    });
+
+    it('enforces avatar 2MB size limit and document 4MB size limit', async () => {
+      // 1. Avatar exceeding 2MB
+      const bigAvatar = Buffer.alloc(2 * 1024 * 1024 + 1024);
+      bigAvatar[0] = 0x89;
+      bigAvatar[1] = 0x50;
+      bigAvatar[2] = 0x4E;
+      bigAvatar[3] = 0x47;
+      bigAvatar[4] = 0x0D;
+      bigAvatar[5] = 0x0A;
+      bigAvatar[6] = 0x1A;
+      bigAvatar[7] = 0x0A;
+
+      const avatarRes = await fetch(`${baseUrl}/api/files?purpose=avatar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'image/png',
+          Cookie: fileUserCookie,
+        },
+        body: bigAvatar,
+      });
+      assert.strictEqual(avatarRes.status, 400);
+      const avatarData = await avatarRes.json();
+      assert.ok(avatarData.error.includes('exceeds the 2 MB limit'));
+
+      // 2. Document exceeding 4MB
+      const bigDoc = Buffer.alloc(4 * 1024 * 1024 + 1024);
+      bigDoc[0] = 0x25;
+      bigDoc[1] = 0x50;
+      bigDoc[2] = 0x44;
+      bigDoc[3] = 0x46; // %PDF
+
+      const docRes = await fetch(`${baseUrl}/api/files`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/pdf',
+          Cookie: fileUserCookie,
+        },
+        body: bigDoc,
+      });
+      assert.strictEqual(docRes.status, 400);
+      const docData = await docRes.json();
+      assert.ok(docData.error.includes('exceeds the 4 MB limit'));
+    });
+  });
+
+  describe('Cascade Account Deletion (3.6)', () => {
+    const purgeEmail = 'purge-user@example.com';
+    const purgePass = 'PurgeSecret123!';
+
+    it('requires password and confirmation, then cascade deletes all records across collections', async () => {
+      // 1. Register user
+      const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Purge Tester',
+          email: purgeEmail,
+          password: purgePass,
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(regRes.status, 201);
+      const purgeCookie = regRes.headers.get('set-cookie')?.split(';')[0] || '';
+      const regData = await regRes.json();
+      const userId = regData.user.id;
+
+      // 2. Create bank account
+      const bankRes = await fetch(`${baseUrl}/api/records/bankAccounts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          accountName: 'Purge Checking',
+          bankName: 'Commercial Bank',
+          accountNumber: '1234567890',
+          balance: 10000,
+        }),
+      });
+      assert.strictEqual(bankRes.status, 201);
+
+      // 3. Create card
+      const cardRes = await fetch(`${baseUrl}/api/records/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          cardName: 'Purge Platinum',
+          bankName: 'HSBC',
+          cardType: 'credit',
+          last4: '4321',
+          creditLimit: 250000,
+        }),
+      });
+      assert.strictEqual(cardRes.status, 201);
+
+      // 4. Create loan
+      const loanRes = await fetch(`${baseUrl}/api/records/loans`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          lender: 'Purge Lender',
+          amount: 50000,
+          rate: 10,
+          method: 'simple',
+          startDate: '2026-01-01',
+          dueDate: '2026-12-31',
+        }),
+      });
+      assert.strictEqual(loanRes.status, 201);
+
+      // 5. Create expense
+      const expRes = await fetch(`${baseUrl}/api/records/expenses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          category: 'Utilities',
+          amount: 3500,
+          date: '2026-03-01',
+          paymentMethod: 'cash',
+        }),
+      });
+      assert.strictEqual(expRes.status, 201);
+
+      // 6. Delete account with wrong password -> 400
+      const badPassRes = await fetch(`${baseUrl}/api/auth/account`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          password: 'WrongPassword!',
+          confirmation: 'DELETE MY ACCOUNT',
+        }),
+      });
+      assert.strictEqual(badPassRes.status, 400);
+
+      // 7. Delete account with wrong confirmation -> 400
+      const badConfRes = await fetch(`${baseUrl}/api/auth/account`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          password: purgePass,
+          confirmation: 'PLEASE DELETE',
+        }),
+      });
+      assert.strictEqual(badConfRes.status, 400);
+
+      // 8. Delete account with correct credentials
+      const deleteRes = await fetch(`${baseUrl}/api/auth/account`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          password: purgePass,
+          confirmation: 'DELETE MY ACCOUNT',
+        }),
+      });
+      assert.strictEqual(deleteRes.status, 200);
+
+      // 9. Verify cascade purge in database
+      const { UserModel } = await import('../models/User');
+      const { ProfileModel } = await import('../models/Profile');
+      const { BankAccountModel } = await import('../models/BankAccount');
+      const { CardModel } = await import('../models/Card');
+      const { LoanModel } = await import('../models/Loan');
+      const { ExpenseModel } = await import('../models/Expense');
+      const { TransactionModel } = await import('../models/Transaction');
+
+      const userExists = await UserModel.findById(userId);
+      assert.strictEqual(userExists, null);
+
+      const profileExists = await ProfileModel.findOne({ userId });
+      assert.strictEqual(profileExists, null);
+
+      const bankCount = await BankAccountModel.countDocuments({ userId });
+      assert.strictEqual(bankCount, 0);
+
+      const cardCount = await CardModel.countDocuments({ userId });
+      assert.strictEqual(cardCount, 0);
+
+      const loanCount = await LoanModel.countDocuments({ userId });
+      assert.strictEqual(loanCount, 0);
+
+      const expCount = await ExpenseModel.countDocuments({ userId });
+      assert.strictEqual(expCount, 0);
+
+      const txCount = await TransactionModel.countDocuments({ userId });
+      assert.strictEqual(txCount, 0);
+
+      // 10. Previous session cookie is now rejected
+      const meAfterDelete = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: purgeCookie },
+      });
+      assert.strictEqual(meAfterDelete.status, 401);
+    });
+
+    it('GET /api/profile/export provides complete data archive without sensitive credentials (3.7)', async () => {
+      const exportEmail = `export_${Date.now()}@test.com`;
+      const exportPass = 'Password123!';
+
+      // Register user
+      const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Export Tester',
+          email: exportEmail,
+          password: exportPass,
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(regRes.status, 201);
+      const exportCookie = regRes.headers.get('set-cookie')?.split(';')[0] || '';
+
+      // Unauthenticated export -> 401
+      const unauthRes = await fetch(`${baseUrl}/api/profile/export`);
+      assert.strictEqual(unauthRes.status, 401);
+
+      // Authenticated export -> 200
+      const exportRes = await fetch(`${baseUrl}/api/profile/export`, {
+        headers: { Cookie: exportCookie },
+      });
+      assert.strictEqual(exportRes.status, 200);
+      assert.strictEqual(exportRes.headers.get('content-type'), 'application/json; charset=utf-8');
+      const disposition = exportRes.headers.get('content-disposition');
+      assert.ok(disposition && disposition.includes('attachment; filename="fintarg-data-export-'));
+
+      const data = await exportRes.json();
+      assert.ok(data.exportDate);
+      assert.ok(data.account);
+      assert.strictEqual(data.account.email, exportEmail);
+      // Ensure password hash and salt are NEVER leaked in export
+      assert.strictEqual(data.account.passwordHash, undefined);
+      assert.strictEqual(data.account.salt, undefined);
+
+      assert.ok(data.financialRecords);
+      assert.ok(Array.isArray(data.financialRecords.bankAccounts));
+      assert.ok(Array.isArray(data.financialRecords.transactions));
+      assert.ok(Array.isArray(data.financialRecords.loans));
+
+      assert.ok(data.businessRecords);
+      assert.ok(Array.isArray(data.businessRecords.companies));
+      assert.ok(Array.isArray(data.businessRecords.agreements));
+    });
+
+    it('PATCH /api/profile strictly validates colors, URLs, NICs, and phone numbers (3.8)', async () => {
+      const profEmail = `prof_val_${Date.now()}@test.com`;
+      const profPass = 'Password123!';
+
+      const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Original Name',
+          email: profEmail,
+          password: profPass,
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(regRes.status, 201);
+      const cookie = regRes.headers.get('set-cookie')?.split(';')[0] || '';
+
+      // 1. Rejects invalid themeColor (e.g. invalid hex format)
+      const badColorRes = await fetch(`${baseUrl}/api/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ themeColor: 'not-a-color' }),
+      });
+      assert.strictEqual(badColorRes.status, 400);
+
+      // 2. Rejects invalid colorText override
+      const badTextColRes = await fetch(`${baseUrl}/api/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ colorText: '#XYZ123' }),
+      });
+      assert.strictEqual(badTextColRes.status, 400);
+
+      // 3. Rejects invalid portfolio link (javascript: or plain text without http(s))
+      const badUrlRes = await fetch(`${baseUrl}/api/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ portfolioLink: 'javascript:alert(1)' }),
+      });
+      assert.strictEqual(badUrlRes.status, 400);
+
+      // 4. Rejects invalid NIC format
+      const badNicRes = await fetch(`${baseUrl}/api/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ nicNumber: '12345ABC' }),
+      });
+      assert.strictEqual(badNicRes.status, 400);
+
+      // 5. Rejects invalid mobile number (too short or letters)
+      const badPhoneRes = await fetch(`${baseUrl}/api/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ mobile: '123' }),
+      });
+      assert.strictEqual(badPhoneRes.status, 400);
+
+      // 6. Accepts valid profile update and syncs UserModel.name
+      const goodRes = await fetch(`${baseUrl}/api/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          name: 'Updated Name',
+          themeColor: '#7C3AED',
+          colorText: '#1E293B',
+          colorMuted: '',
+          portfolioLink: 'https://example.com/portfolio',
+          nicNumber: '199512345678',
+          mobile: '+94 77 123 4567',
+          contacts: [
+            { id: 'c1', name: 'Emergency Contact', relationship: 'Spouse', number: '0771234567' },
+          ],
+        }),
+      });
+      assert.strictEqual(goodRes.status, 200);
+      const goodData = await goodRes.json();
+      assert.strictEqual(goodData.profile.name, 'Updated Name');
+      assert.strictEqual(goodData.profile.themeColor, '#7C3AED');
+      assert.strictEqual(goodData.profile.portfolioLink, 'https://example.com/portfolio');
+      assert.strictEqual(goodData.profile.nicNumber, '199512345678');
+
+      // Verify UserModel.name was also updated
+      const { UserModel } = await import('../models/User');
+      const user = await UserModel.findOne({ email: profEmail });
+      assert.strictEqual(user?.name, 'Updated Name');
+    });
+
+    it('GET /api/cron endpoints enforce timingSafe secret and process reminders safely (3.9)', async () => {
+      const { env } = await import('../config/env');
+      const { ReminderModel } = await import('../models/Reminder');
+      const { UserModel } = await import('../models/User');
+
+      // 1. Unauthenticated or wrong secret -> 401
+      const unauthCron = await fetch(`${baseUrl}/api/cron/maintenance`);
+      assert.strictEqual(unauthCron.status, 401);
+
+      const badSecretCron = await fetch(`${baseUrl}/api/cron/maintenance`, {
+        headers: { 'x-cron-secret': 'wrong-secret' },
+      });
+      assert.strictEqual(badSecretCron.status, 401);
+
+      // 2. Authenticated maintenance -> 200
+      const goodMaint = await fetch(`${baseUrl}/api/cron/maintenance`, {
+        headers: { 'x-cron-secret': env.CRON_SECRET },
+      });
+      assert.strictEqual(goodMaint.status, 200);
+      const maintData = await goodMaint.json();
+      assert.strictEqual(typeof maintData.cleanedSessions, 'number');
+      assert.strictEqual(typeof maintData.cleanedResets, 'number');
+
+      // 3. Reminder processing with HTML label
+      const cronUserEmail = `cron_tester_${Date.now()}@test.com`;
+      const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Cron User',
+          email: cronUserEmail,
+          password: 'Password123!',
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(regRes.status, 201);
+      const regData = await regRes.json();
+      const cronUserId = regData.user.id;
+
+      await ReminderModel.create({
+        userId: cronUserId,
+        type: 'custom',
+        label: '<script>alert("xss")</script> Pay Electric Bill',
+        dueDate: '2020-01-01',
+        channel: 'email',
+        status: 'pending',
+      });
+
+      const goodReminders = await fetch(`${baseUrl}/api/cron/reminders`, {
+        headers: { 'x-cron-secret': env.CRON_SECRET },
+      });
+      assert.strictEqual(goodReminders.status, 200);
+      const remindersData = await goodReminders.json();
+      assert.ok(remindersData.found >= 1);
     });
   });
 });

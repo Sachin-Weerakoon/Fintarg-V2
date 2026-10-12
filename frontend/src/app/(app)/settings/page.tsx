@@ -322,13 +322,13 @@ function ProfileTab() {
       showToast('Accepted photo formats: JPG, PNG, WEBP', 'error');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Profile image must be less than 5 MB', 'error');
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Profile image must be less than 2 MB', 'error');
       return;
     }
     setUploadingAvatar(true);
     try {
-      const res = await fetch('/api/backend/files', {
+      const res = await fetch('/api/backend/files?purpose=avatar', {
         method: 'POST',
         headers: { 'content-type': file.type },
         body: file,
@@ -375,7 +375,7 @@ function ProfileTab() {
         />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-bold text-text">Avatar Image</div>
-          <p className="text-xs text-muted mt-0.5">JPG, PNG, or WEBP up to 5 MB</p>
+          <p className="text-xs text-muted mt-0.5">JPG, PNG, or WEBP up to 2 MB</p>
           <div className="flex items-center gap-2 mt-2">
             <Input
               ref={avatarInputRef}
@@ -631,8 +631,8 @@ function DocumentsTab() {
       showToast('Accepted formats: PDF, JPG, PNG, DOCX', 'error');
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      showToast('Max file size is 10 MB', 'error');
+    if (file.size > 4 * 1024 * 1024) {
+      showToast('Max file size is 4 MB', 'error');
       return;
     }
     dispatch({
@@ -765,7 +765,7 @@ function DocumentsTab() {
           >
             Choose & Upload File
           </Button>
-          <span className="text-xs text-muted">Max 10 MB (PDF, JPG, PNG, DOCX)</span>
+          <span className="text-xs text-muted">Max 4 MB (PDF, JPG, PNG, DOCX)</span>
         </div>
       </div>
     </Card>
@@ -883,53 +883,319 @@ function RemindersTab() {
 }
 
 function AccountTab() {
+  const router = useRouter();
   const { showToast } = useApp();
   const confirm = useConfirm();
 
-  const handleDeleteAccount = async () => {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword) {
+      showToast('Please enter your current password.', 'error');
+      return;
+    }
+    if (newPassword.length < 8) {
+      showToast('New password must be at least 8 characters long.', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('New passwords do not match.', 'error');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to change password');
+      }
+      showToast('Password updated successfully.', 'success');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to change password', 'error');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleLogoutAll = async () => {
     const confirmed = await confirm({
-      title: 'Delete Account',
-      message:
-        'Are you sure you want to permanently delete your account? All financial records, bank links, savings goals, and uploaded documents will be wiped. This cannot be undone.',
-      confirmLabel: 'Yes, Delete Account',
-      cancelLabel: 'Keep Account',
+      title: 'Sign Out of All Devices',
+      message: 'This will invalidate all active sessions across all browsers and devices. You will be logged out immediately.',
+      confirmLabel: 'Sign Out Everywhere',
       tone: 'danger',
     });
 
     if (confirmed) {
-      showToast('Account deletion request registered. Your session data will be cleared.', 'info');
+      setIsLoggingOutAll(true);
+      try {
+        await fetch('/api/auth/logout-all', { method: 'POST' });
+        showToast('All sessions have been revoked.', 'info');
+        router.push('/login');
+      } catch {
+        showToast('Failed to sign out of all devices', 'error');
+      } finally {
+        setIsLoggingOutAll(false);
+      }
+    }
+  };
+
+  const [isExportingData, setIsExportingData] = useState(false);
+
+  const handleExportData = async () => {
+    setIsExportingData(true);
+    try {
+      const res = await fetch('/api/profile/export');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to export data archive');
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fintarg-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      showToast('Data archive downloaded successfully.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to export data archive', 'error');
+    } finally {
+      setIsExportingData(false);
+    }
+  };
+
+  const [showDeleteForm, setShowDeleteForm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  const executeDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deletePassword) {
+      showToast('Please enter your password to confirm deletion.', 'error');
+      return;
+    }
+    if (deleteConfirmation !== 'DELETE MY ACCOUNT') {
+      showToast('Please type "DELETE MY ACCOUNT" exactly to confirm.', 'error');
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      const res = await fetch('/api/auth/account', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: deletePassword, confirmation: deleteConfirmation }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete account');
+      }
+      showToast('Account permanently erased.', 'info');
+      router.push('/login');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete account', 'error');
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
   return (
-    <Card className="p-6 space-y-6">
-      <div>
-        <h3 className="text-base font-bold text-text">Account Deletion & Data Privacy</h3>
-        <p className="text-xs text-muted mt-0.5">
-          Permanent data removal and account decommissioning in accordance with international privacy guidelines.
-        </p>
-      </div>
-
-      <div className="p-4 rounded-xl border border-danger-solid/30 bg-danger-tint/30 space-y-2">
-        <div className="flex items-center gap-2 text-xs font-bold text-danger-text">
-          <Icon name="alert" size={16} />
-          <span>Permanent Data Erasure Notice</span>
-        </div>
-        <p className="text-xs text-danger-text leading-relaxed">
-          Deleting your account will permanently wipe your transaction records, connected bank balances, savings targets, and cloud documents. Once executed, this data cannot be recovered.
-        </p>
-      </div>
-
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 border-t border-border">
+    <div className="space-y-6">
+      {/* Change Password */}
+      <Card className="p-6 space-y-6">
         <div>
-          <div className="text-sm font-bold text-text">Permanently Delete Account</div>
-          <div className="text-xs text-muted">Irreversibly purge all stored database records for this user.</div>
+          <h3 className="text-base font-bold text-text">Security & Password</h3>
+          <p className="text-xs text-muted mt-0.5">Ensure your account uses a secure password of at least 8 characters.</p>
         </div>
-        <Button variant="danger" size="sm" onClick={handleDeleteAccount}>
-          Delete Account
-        </Button>
-      </div>
-    </Card>
+
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          <FormGrid columns={3}>
+            <FormField id="pwd-curr" label="Current Password" required>
+              <Input
+                id="pwd-curr"
+                type="password"
+                placeholder="••••••••"
+                value={currentPassword}
+                onChange={e => setCurrentPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+            </FormField>
+            <FormField id="pwd-new" label="New Password" required hint="Min 8 characters">
+              <Input
+                id="pwd-new"
+                type="password"
+                placeholder="••••••••"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </FormField>
+            <FormField id="pwd-confirm" label="Confirm New Password" required>
+              <Input
+                id="pwd-confirm"
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </FormField>
+          </FormGrid>
+
+          <div className="flex justify-end pt-2">
+            <Button type="submit" variant="primary" loading={isChangingPassword}>
+              Change Password
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {/* Session Management */}
+      <Card className="p-6 space-y-4">
+        <div>
+          <h3 className="text-base font-bold text-text">Session Management</h3>
+          <p className="text-xs text-muted mt-0.5">Control active logins across mobile devices and browsers.</p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
+          <div>
+            <div className="text-sm font-bold text-text">Sign Out of All Devices</div>
+            <div className="text-xs text-muted">Revoke all active sessions everywhere. You will need to sign back in.</div>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleLogoutAll}
+            loading={isLoggingOutAll}
+            iconLeft={<Icon name="shield" size={14} />}
+          >
+            Sign Out Everywhere
+          </Button>
+        </div>
+      </Card>
+
+      {/* Data Portability & Export */}
+      <Card className="p-6 space-y-4">
+        <div>
+          <h3 className="text-base font-bold text-text">Data Portability & Privacy</h3>
+          <p className="text-xs text-muted mt-0.5">
+            Download a complete machine-readable archive (JSON) of all your personal profile, transaction, and financial records.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
+          <div>
+            <div className="text-sm font-bold text-text">Download My Data Archive</div>
+            <div className="text-xs text-muted">Includes account info, bank accounts, cards, transactions, and agreements.</div>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleExportData}
+            loading={isExportingData}
+            iconLeft={<Icon name="download" size={14} />}
+          >
+            Download Data (.json)
+          </Button>
+        </div>
+      </Card>
+
+      {/* Account Deletion */}
+      <Card className="p-6 space-y-6">
+        <div>
+          <h3 className="text-base font-bold text-text">Account Deletion & Data Privacy</h3>
+          <p className="text-xs text-muted mt-0.5">
+            Permanent data removal and account decommissioning in accordance with international privacy guidelines.
+          </p>
+        </div>
+
+        <div className="p-4 rounded-xl border border-danger-solid/30 bg-danger-tint/30 space-y-2">
+          <div className="flex items-center gap-2 text-xs font-bold text-danger-text">
+            <Icon name="alert" size={16} />
+            <span>Permanent Data Erasure Notice</span>
+          </div>
+          <p className="text-xs text-danger-text leading-relaxed">
+            Deleting your account will permanently wipe your transaction records, connected bank balances, savings targets, and cloud documents. Once executed, this data cannot be recovered.
+          </p>
+        </div>
+
+        {!showDeleteForm ? (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 border-t border-border">
+            <div>
+              <div className="text-sm font-bold text-text">Permanently Delete Account</div>
+              <div className="text-xs text-muted">Irreversibly purge all stored database records for this user.</div>
+            </div>
+            <Button variant="danger" size="sm" onClick={() => setShowDeleteForm(true)}>
+              Delete Account
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={executeDeleteAccount} className="space-y-4 pt-4 border-t border-border">
+            <div className="text-sm font-bold text-danger-text">Confirm Permanent Deletion</div>
+            <FormGrid columns={2}>
+              <FormField id="del-pwd" label="Current Password" required>
+                <Input
+                  id="del-pwd"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={deletePassword}
+                  onChange={e => setDeletePassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </FormField>
+              <FormField id="del-conf" label='Type "DELETE MY ACCOUNT"' required>
+                <Input
+                  id="del-conf"
+                  placeholder="DELETE MY ACCOUNT"
+                  value={deleteConfirmation}
+                  onChange={e => setDeleteConfirmation(e.target.value)}
+                />
+              </FormField>
+            </FormGrid>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setShowDeleteForm(false);
+                  setDeletePassword('');
+                  setDeleteConfirmation('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="danger"
+                size="sm"
+                loading={isDeletingAccount}
+                disabled={deleteConfirmation !== 'DELETE MY ACCOUNT' || !deletePassword}
+              >
+                Confirm Permanent Erasure
+              </Button>
+            </div>
+          </form>
+        )}
+      </Card>
+    </div>
   );
 }
 

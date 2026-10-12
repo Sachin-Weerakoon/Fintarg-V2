@@ -178,7 +178,7 @@ type Action =
   | { type: 'DELETE_GOAL'; id: string }
   | { type: 'ADD_SAVING_CONTRIBUTION'; goalId: string; amount: number; date: string; note?: string; debitAccount?: boolean; paymentMethod?: string; bankAccountId?: string | null }
   | { type: 'DELETE_SAVING_CONTRIBUTION'; goalId: string; contributionId: string }
-  | { type: 'SET_PERSONAL_SPENDING_BUDGET'; budget: number }
+  | { type: 'SET_PERSONAL_SPENDING_BUDGET'; budget: number; month?: string }
   | { type: 'ADD_LETTER'; entry: Letter }
   | { type: 'DELETE_LETTER'; id: string }
   | { type: 'ADD_AGREEMENT'; entry: Agreement }
@@ -201,7 +201,7 @@ type Action =
   | { type: 'ADD_REMINDER'; entry: Reminder }
   | { type: 'UPDATE_REMINDER'; id: string; status: Reminder['status'] }
   | { type: 'DELETE_REMINDER'; id: string }
-  | { type: 'ADD_LOAN_FROM_SHORTFALL'; amount: number; month: string }
+  | { type: 'ADD_LOAN_FROM_SHORTFALL'; amount: number; month: string; id?: string }
   | { type: 'SET_MONTH'; month: string }
   | { type: 'ROLLBACK'; previousState: AppState };
 
@@ -545,8 +545,10 @@ function reducer(state: AppState, action: Action): AppState {
     case 'UPDATE_REMINDER': return { ...state, reminders: state.reminders.map(r => r.id === action.id ? { ...r, status: action.status } : r) };
     case 'DELETE_REMINDER': return { ...state, reminders: state.reminders.filter(r => r.id !== action.id) };
     case 'ADD_LOAN_FROM_SHORTFALL': {
+      const localId = action.id || ('loan_' + Date.now());
+      action.id = localId;
       const loan: Loan = {
-        id: 'loan_' + Date.now(),
+        id: localId,
         lender: 'Self (shortfall ' + action.month + ')',
         principal: action.amount,
         rate: 0,
@@ -608,9 +610,12 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
         ADD_PAWNED: 'pawnedItems', ADD_GOAL: 'savingsGoals', ADD_LETTER: 'letters', ADD_AGREEMENT: 'agreements',
         ADD_COMPANY: 'companies', ADD_BRANCH: 'businessBranches', ADD_EMPLOYMENT: 'employmentProfiles',
         ADD_OWNER_DRAW: 'ownerDraws', ADD_MEDICAL_EXPENSE: 'medicalExpenses', ADD_DOCUMENT: 'documents', ADD_REMINDER: 'reminders',
+        ADD_LOAN_FROM_SHORTFALL: 'loans',
       };
       const collection = collectionByAction[action.type];
-      const localId = 'entry' in action && action.entry && 'id' in action.entry ? String(action.entry.id) : undefined;
+      const localId = action.type === 'ADD_LOAN_FROM_SHORTFALL'
+        ? String(action.id)
+        : ('entry' in action && action.entry && 'id' in action.entry ? String(action.entry.id) : undefined);
       if (serverId && collection && localId) reduce({ type: 'REPLACE_RECORD_ID', collection, localId, serverId });
       return serverId;
     } catch (error: any) {
@@ -625,20 +630,29 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
     <AppContext.Provider value={{ state, dispatch, showToast }}>
       {children}
       {toasts.length > 0 && (
-        <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none" aria-live="polite">
+        <div className="fixed bottom-5 right-5 z-[60] flex flex-col gap-2.5 w-[min(92vw,380px)] pointer-events-none no-print" aria-live="polite">
           {toasts.map((t: Toast) => (
             <div
               key={t.id}
-              className={`pointer-events-auto px-4 py-3 rounded-xl shadow-lg border text-xs font-medium flex items-center gap-2 transition-all ${
-                t.tone === 'error'
-                  ? 'bg-danger-tint border-danger-solid/40 text-danger-text'
-                  : t.tone === 'success'
-                  ? 'bg-success-tint border-success-solid/40 text-success-text'
-                  : 'bg-surface border-border text-text'
-              }`}
+              className="glass-toast pointer-events-auto relative overflow-hidden rounded-2xl pl-5 pr-4 py-3 flex items-center gap-3 text-xs font-medium animate-fade-in"
             >
-              <span>{t.tone === 'error' ? '⚠' : t.tone === 'success' ? '✓' : 'ℹ'}</span>
-              <span>{t.message}</span>
+              <span
+                className={`absolute left-0 top-0 bottom-0 w-1 ${t.tone === 'error' ? 'bg-rose-400' : t.tone === 'success' ? 'bg-emerald-400' : 'bg-primary-400'}`}
+                aria-hidden="true"
+              />
+              <span
+                className={`w-6 h-6 rounded-full border flex items-center justify-center text-[11px] font-black flex-shrink-0 ${
+                  t.tone === 'error'
+                    ? 'bg-rose-400/15 text-rose-300 border-rose-400/30'
+                    : t.tone === 'success'
+                    ? 'bg-emerald-400/15 text-emerald-300 border-emerald-400/30'
+                    : 'bg-primary-400/15 text-primary-300 border-primary-400/30'
+                }`}
+                aria-hidden="true"
+              >
+                {t.tone === 'error' ? '!' : t.tone === 'success' ? '✓' : 'i'}
+              </span>
+              <span className="text-slate-100 leading-relaxed">{t.message}</span>
             </div>
           ))}
         </div>
@@ -655,75 +669,7 @@ export function useApp() {
 
 export { formatRs } from '@/utils/formatCurrency';
 
-export function calcMonthlyIncome(income: AppState['income'], month: string): number {
-  return income.reduce((sum, i) => {
-    if (i.frequency === 'monthly') return sum + i.amount;
-    if (i.frequency === 'weekly') return sum + i.amount * 4;
-    if (i.frequency === 'daily') return sum + i.amount * 30;
-    // one-time: only count if in this month
-    if (i.frequency === 'one-time') return i.date.startsWith(month) ? sum + i.amount : sum;
-    return sum;
-  }, 0);
-}
-
-export function calcMonthlyExpenses(expenses: AppState['expenses'], month: string): number {
-  return expenses.filter(e => e.date.startsWith(month)).reduce((s, e) => s + e.amount, 0);
-}
-
-export function calcPersonalSpent(expenses: AppState['expenses'], month: string): number {
-  return expenses.filter(e => e.date.startsWith(month) && e.category === 'Personal').reduce((s, e) => s + e.amount, 0);
-}
-
-export function calcFinancePayments(fps: AppState['financePayments']): number {
-  return fps.reduce((s, f) => s + f.amount, 0);
-}
-
-export function calcLoanInterest(loans: AppState['loans']): number {
-  return loans.reduce((s, l) => {
-    if (l.method === 'compound') {
-      return s + l.balance * (Math.pow(1 + l.rate / 100, 1) - 1);
-    }
-    return s + (l.balance * l.rate) / 100;
-  }, 0);
-}
-
-export function calcExpensesByCategory(expenses: AppState['expenses'], month: string): Record<string, number> {
-  const map: Record<string, number> = {};
-  expenses.filter(e => e.date.startsWith(month)).forEach(e => {
-    map[e.category] = (map[e.category] || 0) + e.amount;
-  });
-  return map;
-}
-
-export function calcExpensesByDay(expenses: AppState['expenses'], month: string): Record<string, number> {
-  const map: Record<string, number> = {};
-  expenses.filter(e => e.date.startsWith(month)).forEach(e => {
-    map[e.date] = (map[e.date] || 0) + e.amount;
-  });
-  return map;
-}
-
-export function calcAnalysis(state: AppState, month: string) {
-  const totalIncome = calcMonthlyIncome(state.income, month);
-  // Living expenses includes ALL expense categories (including Personal)
-  const livingExpenses = calcMonthlyExpenses(state.expenses, month);
-  const financePayments = calcFinancePayments(state.financePayments);
-  const loanInterest = calcLoanInterest(state.loans);
-  const savingsTarget = state.savingsGoals.reduce((s, g) => s + g.monthlyTarget, 0);
-  // BR-1: Total outflow = living expenses + finance payments + loan interest + savings
-  // Note: personal spending is already within living expenses (Personal category)
-  // personalSpendingBudget is a planning tool, not added separately to avoid double-count
-  const totalOutflow = livingExpenses + financePayments + loanInterest + savingsTarget;
-  const netPosition = totalIncome - totalOutflow;
-  const shortfall = netPosition < 0 ? Math.abs(netPosition) : 0;
-  // Free cash: what's available after essential obligations (before savings allocation)
-  const freeCash = totalIncome - livingExpenses - financePayments - loanInterest;
-  const personalSpent = calcPersonalSpent(state.expenses, month);
-  return {
-    totalIncome, livingExpenses, financePayments, loanInterest, savingsTarget,
-    totalOutflow, netPosition, shortfall, freeCash, personalSpent,
-  };
-}
+export * from '@/lib/money';
 
 // Compute CSS tint from a hex color (lighten toward white at 88%)
 export function computeTint(hex: string): string {
