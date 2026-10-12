@@ -952,18 +952,39 @@ function AccountTab() {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    const confirmed = await confirm({
-      title: 'Delete Account',
-      message:
-        'Are you sure you want to permanently delete your account? All financial records, bank links, savings goals, and uploaded documents will be wiped. This cannot be undone.',
-      confirmLabel: 'Yes, Delete Account',
-      cancelLabel: 'Keep Account',
-      tone: 'danger',
-    });
+  const [showDeleteForm, setShowDeleteForm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
-    if (confirmed) {
-      showToast('Account deletion request registered. Your session data will be cleared.', 'info');
+  const executeDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deletePassword) {
+      showToast('Please enter your password to confirm deletion.', 'error');
+      return;
+    }
+    if (deleteConfirmation !== 'DELETE MY ACCOUNT') {
+      showToast('Please type "DELETE MY ACCOUNT" exactly to confirm.', 'error');
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      const res = await fetch('/api/auth/account', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: deletePassword, confirmation: deleteConfirmation }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete account');
+      }
+      showToast('Account permanently erased.', 'info');
+      router.push('/login');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete account', 'error');
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -1061,15 +1082,65 @@ function AccountTab() {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 border-t border-border">
-          <div>
-            <div className="text-sm font-bold text-text">Permanently Delete Account</div>
-            <div className="text-xs text-muted">Irreversibly purge all stored database records for this user.</div>
+        {!showDeleteForm ? (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 border-t border-border">
+            <div>
+              <div className="text-sm font-bold text-text">Permanently Delete Account</div>
+              <div className="text-xs text-muted">Irreversibly purge all stored database records for this user.</div>
+            </div>
+            <Button variant="danger" size="sm" onClick={() => setShowDeleteForm(true)}>
+              Delete Account
+            </Button>
           </div>
-          <Button variant="danger" size="sm" onClick={handleDeleteAccount}>
-            Delete Account
-          </Button>
-        </div>
+        ) : (
+          <form onSubmit={executeDeleteAccount} className="space-y-4 pt-4 border-t border-border">
+            <div className="text-sm font-bold text-danger-text">Confirm Permanent Deletion</div>
+            <FormGrid columns={2}>
+              <FormField id="del-pwd" label="Current Password" required>
+                <Input
+                  id="del-pwd"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={deletePassword}
+                  onChange={e => setDeletePassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </FormField>
+              <FormField id="del-conf" label='Type "DELETE MY ACCOUNT"' required>
+                <Input
+                  id="del-conf"
+                  placeholder="DELETE MY ACCOUNT"
+                  value={deleteConfirmation}
+                  onChange={e => setDeleteConfirmation(e.target.value)}
+                />
+              </FormField>
+            </FormGrid>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setShowDeleteForm(false);
+                  setDeletePassword('');
+                  setDeleteConfirmation('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="danger"
+                size="sm"
+                loading={isDeletingAccount}
+                disabled={deleteConfirmation !== 'DELETE MY ACCOUNT' || !deletePassword}
+              >
+                Confirm Permanent Erasure
+              </Button>
+            </div>
+          </form>
+        )}
       </Card>
     </div>
   );

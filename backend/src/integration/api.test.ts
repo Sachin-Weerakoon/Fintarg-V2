@@ -1210,5 +1210,152 @@ describe('Backend API Integration Tests', () => {
       assert.ok(docData.error.includes('exceeds the 4 MB limit'));
     });
   });
+
+  describe('Cascade Account Deletion (3.6)', () => {
+    const purgeEmail = 'purge-user@example.com';
+    const purgePass = 'PurgeSecret123!';
+
+    it('requires password and confirmation, then cascade deletes all records across collections', async () => {
+      // 1. Register user
+      const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Purge Tester',
+          email: purgeEmail,
+          password: purgePass,
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(regRes.status, 201);
+      const purgeCookie = regRes.headers.get('set-cookie')?.split(';')[0] || '';
+      const regData = await regRes.json();
+      const userId = regData.user.id;
+
+      // 2. Create bank account
+      const bankRes = await fetch(`${baseUrl}/api/records/bankAccounts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          accountName: 'Purge Checking',
+          bankName: 'Commercial Bank',
+          accountNumber: '1234567890',
+          balance: 10000,
+        }),
+      });
+      assert.strictEqual(bankRes.status, 201);
+
+      // 3. Create card
+      const cardRes = await fetch(`${baseUrl}/api/records/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          cardName: 'Purge Platinum',
+          bankName: 'HSBC',
+          cardType: 'credit',
+          last4: '4321',
+          creditLimit: 250000,
+        }),
+      });
+      assert.strictEqual(cardRes.status, 201);
+
+      // 4. Create loan
+      const loanRes = await fetch(`${baseUrl}/api/records/loans`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          lender: 'Purge Lender',
+          amount: 50000,
+          rate: 10,
+          method: 'simple',
+          startDate: '2026-01-01',
+          dueDate: '2026-12-31',
+        }),
+      });
+      assert.strictEqual(loanRes.status, 201);
+
+      // 5. Create expense
+      const expRes = await fetch(`${baseUrl}/api/records/expenses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          category: 'Utilities',
+          amount: 3500,
+          date: '2026-03-01',
+          paymentMethod: 'cash',
+        }),
+      });
+      assert.strictEqual(expRes.status, 201);
+
+      // 6. Delete account with wrong password -> 400
+      const badPassRes = await fetch(`${baseUrl}/api/auth/account`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          password: 'WrongPassword!',
+          confirmation: 'DELETE MY ACCOUNT',
+        }),
+      });
+      assert.strictEqual(badPassRes.status, 400);
+
+      // 7. Delete account with wrong confirmation -> 400
+      const badConfRes = await fetch(`${baseUrl}/api/auth/account`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          password: purgePass,
+          confirmation: 'PLEASE DELETE',
+        }),
+      });
+      assert.strictEqual(badConfRes.status, 400);
+
+      // 8. Delete account with correct credentials
+      const deleteRes = await fetch(`${baseUrl}/api/auth/account`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Cookie: purgeCookie },
+        body: JSON.stringify({
+          password: purgePass,
+          confirmation: 'DELETE MY ACCOUNT',
+        }),
+      });
+      assert.strictEqual(deleteRes.status, 200);
+
+      // 9. Verify cascade purge in database
+      const { UserModel } = await import('../models/User');
+      const { ProfileModel } = await import('../models/Profile');
+      const { BankAccountModel } = await import('../models/BankAccount');
+      const { CardModel } = await import('../models/Card');
+      const { LoanModel } = await import('../models/Loan');
+      const { ExpenseModel } = await import('../models/Expense');
+      const { TransactionModel } = await import('../models/Transaction');
+
+      const userExists = await UserModel.findById(userId);
+      assert.strictEqual(userExists, null);
+
+      const profileExists = await ProfileModel.findOne({ userId });
+      assert.strictEqual(profileExists, null);
+
+      const bankCount = await BankAccountModel.countDocuments({ userId });
+      assert.strictEqual(bankCount, 0);
+
+      const cardCount = await CardModel.countDocuments({ userId });
+      assert.strictEqual(cardCount, 0);
+
+      const loanCount = await LoanModel.countDocuments({ userId });
+      assert.strictEqual(loanCount, 0);
+
+      const expCount = await ExpenseModel.countDocuments({ userId });
+      assert.strictEqual(expCount, 0);
+
+      const txCount = await TransactionModel.countDocuments({ userId });
+      assert.strictEqual(txCount, 0);
+
+      // 10. Previous session cookie is now rejected
+      const meAfterDelete = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: purgeCookie },
+      });
+      assert.strictEqual(meAfterDelete.status, 401);
+    });
+  });
 });
 

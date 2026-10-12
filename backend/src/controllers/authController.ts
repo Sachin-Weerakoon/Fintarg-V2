@@ -1,7 +1,7 @@
 import type { RequestHandler } from 'express';
 import { env } from '../config/env';
 import { HttpError } from '../middleware/errors';
-import { authenticateUser, changePassword, getUserProfile, logoutAll, registerUser } from '../services/authService';
+import { authenticateUser, changePassword, deleteUserAccount, getUserProfile, logoutAll, registerUser } from '../services/authService';
 import { applyPasswordReset, requestPasswordReset } from '../services/passwordResetService';
 import { createAccessToken } from '../utils/jwt';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -58,6 +58,18 @@ export const logoutAllController: RequestHandler = asyncHandler(async (request, 
   await logoutAll(request.auth.userId);
   response.clearCookie(env.COOKIE_NAME, { httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'strict', path: '/' });
   response.json({ ok: true });
+});
+
+export const deleteAccountController: RequestHandler = asyncHandler(async (request, response) => {
+  if (!request.auth) throw new HttpError(401, 'Authentication required');
+  await deleteUserAccount(request.auth.userId, request.body.password, request.body.confirmation);
+  response.clearCookie(env.COOKIE_NAME, {
+    httpOnly: true,
+    secure: env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+  });
+  response.json({ ok: true, message: 'Account and all associated records permanently erased' });
 });
 
 export const forgotPassword: RequestHandler = asyncHandler(async (request, response) => {

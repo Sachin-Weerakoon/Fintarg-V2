@@ -1,6 +1,31 @@
+import mongoose from 'mongoose';
 import { randomBytes } from 'node:crypto';
 import { ProfileModel } from '../models/Profile';
 import { UserModel } from '../models/User';
+import { BankAccountModel } from '../models/BankAccount';
+import { CardModel } from '../models/Card';
+import { TransactionModel } from '../models/Transaction';
+import { ExpenseModel } from '../models/Expense';
+import { IncomeModel } from '../models/Income';
+import { LoanModel } from '../models/Loan';
+import { PawnedItemModel } from '../models/PawnedItem';
+import { FinancePaymentModel } from '../models/FinancePayment';
+import { SavingsGoalModel } from '../models/SavingsGoal';
+import { ReminderModel } from '../models/Reminder';
+import { DocumentModel } from '../models/Document';
+import { FileModel } from '../models/File';
+import { CompanyModel } from '../models/Company';
+import { BusinessBranchModel } from '../models/BusinessBranch';
+import { BranchEntryModel } from '../models/BranchEntry';
+import { OwnerDrawModel } from '../models/OwnerDraw';
+import { AgreementModel } from '../models/Agreement';
+import { LetterModel } from '../models/Letter';
+import { MedicalExpenseModel } from '../models/MedicalExpense';
+import { PersonalBudgetModel } from '../models/PersonalBudget';
+import { EmploymentProfileModel } from '../models/EmploymentProfile';
+import { PasswordResetModel } from '../models/PasswordReset';
+import { AuditLogModel } from '../models/AuditLog';
+import { SessionModel } from '../models/Session';
 import { HttpError } from '../middleware/errors';
 import { hashPassword, verifyPassword } from '../utils/password';
 
@@ -107,4 +132,49 @@ export async function logoutAll(userId: string) {
   );
   if (!user) throw new HttpError(404, 'Account not found');
   return user;
+}
+
+export async function deleteUserAccount(userId: string, password: string, confirmation: string) {
+  if (confirmation !== 'DELETE MY ACCOUNT') {
+    throw new HttpError(400, 'Confirmation string must exactly match "DELETE MY ACCOUNT"');
+  }
+
+  const user = await UserModel.findById(userId);
+  if (!user) throw new HttpError(404, 'Account not found');
+
+  const valid = await verifyPassword(password, user.salt, user.passwordHash);
+  if (!valid) throw new HttpError(400, 'Incorrect password');
+
+  const uid = new mongoose.Types.ObjectId(userId);
+
+  await Promise.all([
+    ProfileModel.deleteMany({ userId: uid }),
+    BankAccountModel.deleteMany({ userId: uid }),
+    CardModel.deleteMany({ userId: uid }),
+    TransactionModel.deleteMany({ userId: uid }),
+    ExpenseModel.deleteMany({ userId: uid }),
+    IncomeModel.deleteMany({ userId: uid }),
+    LoanModel.deleteMany({ userId: uid }),
+    PawnedItemModel.deleteMany({ userId: uid }),
+    FinancePaymentModel.deleteMany({ userId: uid }),
+    SavingsGoalModel.deleteMany({ userId: uid }),
+    ReminderModel.deleteMany({ userId: uid }),
+    DocumentModel.deleteMany({ userId: uid }),
+    FileModel.deleteMany({ userId: uid }),
+    CompanyModel.deleteMany({ userId: uid }),
+    BusinessBranchModel.deleteMany({ userId: uid }),
+    BranchEntryModel.deleteMany({ userId: uid }),
+    OwnerDrawModel.deleteMany({ userId: uid }),
+    AgreementModel.deleteMany({ userId: uid }),
+    LetterModel.deleteMany({ userId: uid }),
+    MedicalExpenseModel.deleteMany({ userId: uid }),
+    PersonalBudgetModel.deleteMany({ userId: uid }),
+    EmploymentProfileModel.deleteMany({ userId: uid }),
+    PasswordResetModel.deleteMany({ userId: uid }),
+    AuditLogModel.deleteMany({ userId: uid }),
+    SessionModel.deleteMany({ userId: uid }),
+    UserModel.deleteOne({ _id: uid }),
+  ]);
+
+  return { success: true };
 }
