@@ -943,6 +943,108 @@ describe('Backend API Integration Tests', () => {
       const forgotData = await forgotRes.json();
       assert.strictEqual(forgotData.ok, true);
     });
+
+    it('atomically consumes reset token, invalidates alternate pending tokens, and revokes active sessions', async () => {
+      const resetUserEmail = 'atomic-reset-user@example.com';
+      const initialPassword = 'BeforeResetPassword123!';
+      const brandNewPassword = 'AfterResetPassword999!';
+
+      // 1. Register and login
+      const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Atomic Reset Tester',
+          email: resetUserEmail,
+          password: initialPassword,
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(regRes.status, 201);
+      const activeCookie = regRes.headers.get('set-cookie')?.split(';')[0] || '';
+
+      // 2. Session cookie is valid
+      const meBeforeReset = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: activeCookie },
+      });
+      assert.strictEqual(meBeforeReset.status, 200);
+
+      // 3. Create two pending reset tokens in DB
+      const { UserModel } = await import('../models/User');
+      const { PasswordResetModel } = await import('../models/PasswordReset');
+      const { randomBytes, createHash } = await import('node:crypto');
+
+      const userDoc = await UserModel.findOne({ email: resetUserEmail });
+      assert.ok(userDoc);
+
+      const rawToken1 = randomBytes(32).toString('hex');
+      const rawToken2 = randomBytes(32).toString('hex');
+
+      await PasswordResetModel.create([
+        {
+          userId: userDoc._id,
+          tokenHash: createHash('sha256').update(rawToken1).digest('hex'),
+          expiresAt: new Date(Date.now() + 3600000),
+          used: false,
+        },
+        {
+          userId: userDoc._id,
+          tokenHash: createHash('sha256').update(rawToken2).digest('hex'),
+          expiresAt: new Date(Date.now() + 3600000),
+          used: false,
+        },
+      ]);
+
+      // 4. Apply password reset with token 1
+      const resetRes1 = await fetch(`${baseUrl}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: rawToken1,
+          newPassword: brandNewPassword,
+        }),
+      });
+      assert.strictEqual(resetRes1.status, 200);
+
+      // 5. Token 1 cannot be reused
+      const replayRes = await fetch(`${baseUrl}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: rawToken1,
+          newPassword: brandNewPassword,
+        }),
+      });
+      assert.strictEqual(replayRes.status, 400);
+
+      // 6. Token 2 has been invalidated as well
+      const token2Res = await fetch(`${baseUrl}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: rawToken2,
+          newPassword: brandNewPassword,
+        }),
+      });
+      assert.strictEqual(token2Res.status, 400);
+
+      // 7. Old active session has been revoked
+      const meAfterReset = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: activeCookie },
+      });
+      assert.strictEqual(meAfterReset.status, 401);
+
+      // 8. User can sign in with new password
+      const loginNewRes = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: resetUserEmail,
+          password: brandNewPassword,
+        }),
+      });
+      assert.strictEqual(loginNewRes.status, 200);
+    });
   });
 });
 

@@ -27,8 +27,19 @@ export async function requestPasswordReset(email: string) {
 }
 
 export async function applyPasswordReset(token: string, password: string) {
-  const reset = await PasswordResetModel.findOne({ tokenHash: hashToken(token), used: false, expiresAt: { $gt: new Date() } });
+  const reset = await PasswordResetModel.findOneAndUpdate(
+    { tokenHash: hashToken(token), used: false, expiresAt: { $gt: new Date() } },
+    { $set: { used: true } },
+    { new: true }
+  );
   if (!reset) throw new HttpError(400, 'Invalid or expired reset link');
+
+  // Invalidate any other pending reset tokens for this user
+  await PasswordResetModel.updateMany(
+    { userId: reset.userId, used: false },
+    { $set: { used: true } }
+  );
+
   const user = await UserModel.findById(reset.userId);
   if (!user) throw new HttpError(404, 'Account not found');
   const credentials = await hashPassword(password);
@@ -38,6 +49,4 @@ export async function applyPasswordReset(token: string, password: string) {
   user.lockedUntil = undefined;
   user.tokenVersion = (user.tokenVersion || 0) + 1;
   await user.save();
-  reset.used = true;
-  await reset.save();
 }
