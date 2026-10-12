@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
@@ -20,8 +20,18 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
   const searchParams = useSearchParams();
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [remoteTransactions, setRemoteTransactions] = useState<Transaction[]>([]);
-  const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, netFlow: 0, count: 0 });
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
+  const [summary, setSummary] = useState<{
+    totalIncome: number;
+    totalExpense: number;
+    netFlow: number;
+    closingBalance?: number;
+    count: number;
+  }>({ totalIncome: 0, totalExpense: 0, netFlow: 0, count: 0 });
 
   // Read initial filters from URL
   const initialSearch = searchParams.get('search') || '';
@@ -49,21 +59,25 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
+    setPage(1);
     updateUrlFilters(val, typeFilter, methodFilter, accountFilter);
   };
 
   const handleTypeChange = (val: 'all' | 'income' | 'expense' | 'transfer') => {
     setTypeFilter(val);
+    setPage(1);
     updateUrlFilters(search, val, methodFilter, accountFilter);
   };
 
   const handleMethodChange = (val: string) => {
     setMethodFilter(val);
+    setPage(1);
     updateUrlFilters(search, typeFilter, val, accountFilter);
   };
 
   const handleAccountChange = (val: string) => {
     setAccountFilter(val);
+    setPage(1);
     updateUrlFilters(search, typeFilter, methodFilter, val);
   };
 
@@ -72,50 +86,45 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
     setTypeFilter('all');
     setMethodFilter('all');
     setAccountFilter('all');
+    setPage(1);
     updateUrlFilters('', 'all', 'all', 'all');
   };
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async (targetPage: number) => {
     setLoading(true);
+    setError(null);
     try {
-      const filters: Record<string, any> = {};
+      const filters: Record<string, any> = {
+        limit: pageSize,
+        skip: (targetPage - 1) * pageSize,
+      };
       if (typeFilter !== 'all') filters.type = typeFilter;
       if (methodFilter !== 'all') filters.paymentMethod = methodFilter;
       if (accountFilter !== 'all') filters.bankAccountId = accountFilter;
       if (search.trim()) filters.search = search.trim();
 
       const res = await fetchTransactionHistory(filters);
-      setRemoteTransactions(res.data);
+      setRemoteTransactions(res.transactions || res.data || []);
+      setTotalCount(res.totalCount ?? res.summary?.count ?? 0);
       setSummary(res.summary);
-    } catch {
-      // Fallback to local store if offline
-      setRemoteTransactions(state.transactions || []);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load transaction history. Please retry.');
+      setRemoteTransactions([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
-  };
+  }, [pageSize, typeFilter, methodFilter, accountFilter, search]);
 
   useEffect(() => {
-    loadHistory();
-  }, [typeFilter, methodFilter, accountFilter]);
+    const timer = setTimeout(() => {
+      loadHistory(page);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [loadHistory, page]);
 
-  // Combine local and remote fallback
-  const items = remoteTransactions.length > 0 ? remoteTransactions : state.transactions;
-  const filteredItems = useMemo(() => {
-    return items.filter(t => {
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        const match = (t.category || '').toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q);
-        if (!match) return false;
-      }
-      if (typeFilter !== 'all' && t.type !== typeFilter) return false;
-      if (methodFilter !== 'all' && t.paymentMethod !== methodFilter) return false;
-      if (accountFilter !== 'all' && t.bankAccountId !== accountFilter) return false;
-      return true;
-    });
-  }, [items, search, typeFilter, methodFilter, accountFilter]);
-
-  const hasActiveFilters = search || typeFilter !== 'all' || methodFilter !== 'all' || accountFilter !== 'all';
+  const items = remoteTransactions;
+  const hasActiveFilters = Boolean(search || typeFilter !== 'all' || methodFilter !== 'all' || accountFilter !== 'all');
 
   const columns: Column<Transaction>[] = [
     {
@@ -226,10 +235,28 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
         />
         <StatCard
           label="Total Records"
-          value={filteredItems.length}
+          value={totalCount}
           icon={<Icon name="documents" size={18} />}
         />
       </div>
+
+      {/* Error state with retry */}
+      {error && (
+        <Card className="p-3.5 border-danger/40 bg-danger/5 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-danger">
+            <Icon name="alert" size={16} />
+            <span>{error}</span>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => loadHistory(page)}
+            className="!py-1 !px-2.5 text-xs shrink-0"
+          >
+            Retry
+          </Button>
+        </Card>
+      )}
 
       {/* Filter Toolbar */}
       <Card className="p-3.5">
@@ -293,7 +320,7 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
       {/* DataTable with responsive card view */}
       <DataTable
         columns={columns}
-        data={filteredItems}
+        data={items}
         keyExtractor={t => t.id}
         loading={loading}
         emptyState={
@@ -315,6 +342,40 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
           />
         }
       />
+
+      {/* Pagination Controls */}
+      {totalCount > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-muted">
+          <div>
+            Showing <span className="font-semibold text-text">{(page - 1) * pageSize + 1}</span> to{' '}
+            <span className="font-semibold text-text">{Math.min(page * pageSize, totalCount)}</span> of{' '}
+            <span className="font-semibold text-text">{totalCount}</span> transactions
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="!py-1 !px-2.5 text-xs"
+            >
+              Previous
+            </Button>
+            <span className="text-xs px-2 font-medium text-text">
+              Page {page} of {Math.max(1, Math.ceil(totalCount / pageSize))}
+            </span>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page >= Math.ceil(totalCount / pageSize) || loading}
+              onClick={() => setPage(p => Math.min(Math.ceil(totalCount / pageSize), p + 1))}
+              className="!py-1 !px-2.5 text-xs"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

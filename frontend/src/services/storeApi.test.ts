@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { persistStoreAction } from './storeApi';
+import { fetchTransactionHistory, persistStoreAction } from './storeApi';
 
 describe('storeApi loan mapping and readonly field stripping (1.2)', () => {
   beforeEach(() => {
@@ -226,3 +226,56 @@ describe('storeApi loan mapping and readonly field stripping (1.2)', () => {
     expect(capturedMethod).toBe('DELETE');
   });
 });
+
+describe('fetchTransactionHistory contract alignment (2.10)', () => {
+  it('maps transactions, totalCount, and summary accurately from backend response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
+      return new Response(
+        JSON.stringify({
+          transactions: [
+            {
+              _id: 'tx_1',
+              type: 'income',
+              amountCents: 150000,
+              date: '2026-10-12',
+              category: 'Salary',
+              description: 'October Pay',
+              paymentMethod: 'bank_transfer',
+              bankAccountId: 'ba_1',
+              runningBalanceCents: 250000,
+            },
+          ],
+          totalCount: 1,
+          summary: {
+            totalIncomeCents: 150000,
+            totalExpenseCents: 0,
+            netFlowCents: 150000,
+            closingBalanceCents: 250000,
+            count: 1,
+          },
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
+    });
+
+    const res = await fetchTransactionHistory({
+      bankAccountId: 'ba_1',
+      limit: 25,
+      skip: 0,
+    });
+
+    expect(res.transactions).toHaveLength(1);
+    expect(res.data).toHaveLength(1);
+    expect(res.totalCount).toBe(1);
+    expect(res.transactions[0].amount).toBe(1500);
+    expect(res.transactions[0].balanceAfter).toBe(2500);
+    expect(res.summary.totalIncome).toBe(1500);
+    expect(res.summary.totalExpense).toBe(0);
+    expect(res.summary.netFlow).toBe(1500);
+    expect(res.summary.closingBalance).toBe(2500);
+  });
+});
+
