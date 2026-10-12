@@ -753,5 +753,96 @@ describe('Backend API Integration Tests', () => {
       assert.strictEqual(bHistory.summary.totalExpenseCents, 0);
     });
   });
+
+  describe('Session Revocation & Password Lifecycle (tokenVersion)', () => {
+    const testEmail = 'session-revoke-user@example.com';
+    const initialPassword = 'InitialSecretPassword123!';
+    const updatedPassword = 'NewSecretPassword456!';
+
+    it('manages password change, tokenVersion bumping, and session revocation', async () => {
+      // 1. Register test user
+      const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Session Revoke Tester',
+          email: testEmail,
+          password: initialPassword,
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(regRes.status, 201);
+      const sessionCookie1 = regRes.headers.get('set-cookie')?.split(';')[0] || '';
+      assert.ok(sessionCookie1.includes('fintarg_token'));
+
+      // 2. Verify session 1 works
+      const meRes1 = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: sessionCookie1 },
+      });
+      assert.strictEqual(meRes1.status, 200);
+
+      // 3. Reject password change with incorrect current password
+      const badChangeRes = await fetch(`${baseUrl}/api/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: sessionCookie1 },
+        body: JSON.stringify({
+          currentPassword: 'WrongPassword123!',
+          newPassword: updatedPassword,
+        }),
+      });
+      assert.strictEqual(badChangeRes.status, 400);
+
+      // 4. Change password with correct credentials
+      const goodChangeRes = await fetch(`${baseUrl}/api/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: sessionCookie1 },
+        body: JSON.stringify({
+          currentPassword: initialPassword,
+          newPassword: updatedPassword,
+        }),
+      });
+      assert.strictEqual(goodChangeRes.status, 200);
+      const sessionCookie2 = goodChangeRes.headers.get('set-cookie')?.split(';')[0] || '';
+      assert.ok(sessionCookie2.includes('fintarg_token'));
+
+      // 5. Old session cookie 1 is now revoked
+      const meResOld = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: sessionCookie1 },
+      });
+      assert.strictEqual(meResOld.status, 401);
+      const oldErr = await meResOld.json();
+      assert.ok(oldErr.error?.includes('revoked'));
+
+      // 6. New session cookie 2 is valid
+      const meResNew = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: sessionCookie2 },
+      });
+      assert.strictEqual(meResNew.status, 200);
+
+      // 7. Logout-all invalidates session cookie 2
+      const logoutAllRes = await fetch(`${baseUrl}/api/auth/logout-all`, {
+        method: 'POST',
+        headers: { Cookie: sessionCookie2 },
+      });
+      assert.strictEqual(logoutAllRes.status, 200);
+
+      // 8. Session cookie 2 is now rejected
+      const meAfterLogoutAll = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Cookie: sessionCookie2 },
+      });
+      assert.strictEqual(meAfterLogoutAll.status, 401);
+
+      // 9. Login with new password succeeds
+      const newLoginRes = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: testEmail,
+          password: updatedPassword,
+        }),
+      });
+      assert.strictEqual(newLoginRes.status, 200);
+    });
+  });
 });
 

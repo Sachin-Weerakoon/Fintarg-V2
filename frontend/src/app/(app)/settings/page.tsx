@@ -883,8 +883,74 @@ function RemindersTab() {
 }
 
 function AccountTab() {
+  const router = useRouter();
   const { showToast } = useApp();
   const confirm = useConfirm();
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword) {
+      showToast('Please enter your current password.', 'error');
+      return;
+    }
+    if (newPassword.length < 8) {
+      showToast('New password must be at least 8 characters long.', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('New passwords do not match.', 'error');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to change password');
+      }
+      showToast('Password updated successfully.', 'success');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to change password', 'error');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleLogoutAll = async () => {
+    const confirmed = await confirm({
+      title: 'Sign Out of All Devices',
+      message: 'This will invalidate all active sessions across all browsers and devices. You will be logged out immediately.',
+      confirmLabel: 'Sign Out Everywhere',
+      tone: 'danger',
+    });
+
+    if (confirmed) {
+      setIsLoggingOutAll(true);
+      try {
+        await fetch('/api/auth/logout-all', { method: 'POST' });
+        showToast('All sessions have been revoked.', 'info');
+        router.push('/login');
+      } catch {
+        showToast('Failed to sign out of all devices', 'error');
+      } finally {
+        setIsLoggingOutAll(false);
+      }
+    }
+  };
 
   const handleDeleteAccount = async () => {
     const confirmed = await confirm({
@@ -902,34 +968,110 @@ function AccountTab() {
   };
 
   return (
-    <Card className="p-6 space-y-6">
-      <div>
-        <h3 className="text-base font-bold text-text">Account Deletion & Data Privacy</h3>
-        <p className="text-xs text-muted mt-0.5">
-          Permanent data removal and account decommissioning in accordance with international privacy guidelines.
-        </p>
-      </div>
-
-      <div className="p-4 rounded-xl border border-danger-solid/30 bg-danger-tint/30 space-y-2">
-        <div className="flex items-center gap-2 text-xs font-bold text-danger-text">
-          <Icon name="alert" size={16} />
-          <span>Permanent Data Erasure Notice</span>
-        </div>
-        <p className="text-xs text-danger-text leading-relaxed">
-          Deleting your account will permanently wipe your transaction records, connected bank balances, savings targets, and cloud documents. Once executed, this data cannot be recovered.
-        </p>
-      </div>
-
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 border-t border-border">
+    <div className="space-y-6">
+      {/* Change Password */}
+      <Card className="p-6 space-y-6">
         <div>
-          <div className="text-sm font-bold text-text">Permanently Delete Account</div>
-          <div className="text-xs text-muted">Irreversibly purge all stored database records for this user.</div>
+          <h3 className="text-base font-bold text-text">Security & Password</h3>
+          <p className="text-xs text-muted mt-0.5">Ensure your account uses a secure password of at least 8 characters.</p>
         </div>
-        <Button variant="danger" size="sm" onClick={handleDeleteAccount}>
-          Delete Account
-        </Button>
-      </div>
-    </Card>
+
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          <FormGrid columns={3}>
+            <FormField id="pwd-curr" label="Current Password" required>
+              <Input
+                id="pwd-curr"
+                type="password"
+                placeholder="••••••••"
+                value={currentPassword}
+                onChange={e => setCurrentPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+            </FormField>
+            <FormField id="pwd-new" label="New Password" required hint="Min 8 characters">
+              <Input
+                id="pwd-new"
+                type="password"
+                placeholder="••••••••"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </FormField>
+            <FormField id="pwd-confirm" label="Confirm New Password" required>
+              <Input
+                id="pwd-confirm"
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </FormField>
+          </FormGrid>
+
+          <div className="flex justify-end pt-2">
+            <Button type="submit" variant="primary" loading={isChangingPassword}>
+              Change Password
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {/* Session Management */}
+      <Card className="p-6 space-y-4">
+        <div>
+          <h3 className="text-base font-bold text-text">Session Management</h3>
+          <p className="text-xs text-muted mt-0.5">Control active logins across mobile devices and browsers.</p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
+          <div>
+            <div className="text-sm font-bold text-text">Sign Out of All Devices</div>
+            <div className="text-xs text-muted">Revoke all active sessions everywhere. You will need to sign back in.</div>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleLogoutAll}
+            loading={isLoggingOutAll}
+            iconLeft={<Icon name="shield" size={14} />}
+          >
+            Sign Out Everywhere
+          </Button>
+        </div>
+      </Card>
+
+      {/* Account Deletion */}
+      <Card className="p-6 space-y-6">
+        <div>
+          <h3 className="text-base font-bold text-text">Account Deletion & Data Privacy</h3>
+          <p className="text-xs text-muted mt-0.5">
+            Permanent data removal and account decommissioning in accordance with international privacy guidelines.
+          </p>
+        </div>
+
+        <div className="p-4 rounded-xl border border-danger-solid/30 bg-danger-tint/30 space-y-2">
+          <div className="flex items-center gap-2 text-xs font-bold text-danger-text">
+            <Icon name="alert" size={16} />
+            <span>Permanent Data Erasure Notice</span>
+          </div>
+          <p className="text-xs text-danger-text leading-relaxed">
+            Deleting your account will permanently wipe your transaction records, connected bank balances, savings targets, and cloud documents. Once executed, this data cannot be recovered.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 border-t border-border">
+          <div>
+            <div className="text-sm font-bold text-text">Permanently Delete Account</div>
+            <div className="text-xs text-muted">Irreversibly purge all stored database records for this user.</div>
+          </div>
+          <Button variant="danger" size="sm" onClick={handleDeleteAccount}>
+            Delete Account
+          </Button>
+        </div>
+      </Card>
+    </div>
   );
 }
 

@@ -8,6 +8,7 @@ export interface IUser extends Document {
   plan: 'basic' | 'business';
   workMode: 'salary' | 'business' | 'both';
   emailVerified: boolean;
+  tokenVersion: number;
   lastLoginAt?: Date;
   lockedUntil?: Date;
   failedLoginAttempts: number;
@@ -23,6 +24,7 @@ const UserSchema = new Schema<IUser>({
   plan: { type: String, enum: ['basic', 'business'], required: true },
   workMode: { type: String, enum: ['salary', 'business', 'both'], required: true },
   emailVerified: { type: Boolean, default: false },
+  tokenVersion: { type: Number, default: 0 },
   lastLoginAt: { type: Date },
   lockedUntil: { type: Date },
   failedLoginAttempts: { type: Number, default: 0 },

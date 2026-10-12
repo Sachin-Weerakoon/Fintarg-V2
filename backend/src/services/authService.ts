@@ -22,6 +22,7 @@ export async function registerUser(input: RegisterInput) {
       salt: credentials.salt,
       plan,
       workMode: input.workMode,
+      tokenVersion: 0,
     });
   } catch (err: unknown) {
     if (err && typeof err === 'object' && ('code' in err) && (err as { code: unknown }).code === 11000) {
@@ -66,4 +67,27 @@ export async function getUserProfile(userId: string) {
   if (!user) throw new HttpError(401, 'Account no longer exists');
   const profile = await ProfileModel.findOne({ userId: user._id }).lean();
   return { user, profile };
+}
+
+export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
+  const user = await UserModel.findById(userId);
+  if (!user) throw new HttpError(404, 'Account not found');
+  const valid = await verifyPassword(currentPassword, user.salt, user.passwordHash);
+  if (!valid) throw new HttpError(400, 'Current password is incorrect');
+  const credentials = await hashPassword(newPassword);
+  user.passwordHash = credentials.hash;
+  user.salt = credentials.salt;
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
+  await user.save();
+  return user;
+}
+
+export async function logoutAll(userId: string) {
+  const user = await UserModel.findByIdAndUpdate(
+    userId,
+    { $inc: { tokenVersion: 1 } },
+    { new: true }
+  );
+  if (!user) throw new HttpError(404, 'Account not found');
+  return user;
 }

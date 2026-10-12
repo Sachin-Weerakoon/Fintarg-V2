@@ -30,6 +30,7 @@ export async function applyPasswordReset(token: string, password: string) {
   user.salt = credentials.salt;
   user.failedLoginAttempts = 0;
   user.lockedUntil = undefined;
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
   await user.save();
   reset.used = true;
   await reset.save();
