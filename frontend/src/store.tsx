@@ -1,7 +1,10 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useReducer, useRef, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useRef, useState, useCallback, ReactNode } from 'react';
 import { loadPersistedData, persistStoreAction } from '@/services/storeApi';
+import { useToast } from '@/components/ui/ToastProvider';
+import { Icon } from '@/components/ui/Icon';
+import { Button } from '@/components/ui/Button';
 import type {
   AppState, Page, IncomeEntry, ExpenseEntry, FinancePayment, Loan, PawnedItem,
   SavingsGoal, Letter, Agreement, Company, MedicalExpense, Document, Reminder,
@@ -570,6 +573,9 @@ const AppContext = createContext<{
   state: AppState;
   dispatch: (action: Action) => Promise<string | undefined>;
   showToast: (message: string, tone?: 'success' | 'error' | 'info') => void;
+  loadError?: string | null;
+  isLoading?: boolean;
+  retryLoad?: () => Promise<void>;
 } | null>(null);
 
 export function AppProvider({ children, initialProfile = {} }: { children: ReactNode; initialProfile?: Partial<AppState['profile']> }) {
@@ -580,23 +586,31 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toast = useToast();
+  const showToast = useCallback((message: string, tone: 'success' | 'error' | 'info' = 'info') => {
+    toast(message, tone);
+  }, [toast]);
 
-  const showToast = (message: string, tone: 'success' | 'error' | 'info' = 'info') => {
-    const id = 't_' + Date.now();
-    setToasts((prev: Toast[]) => [...prev, { id, message, tone }]);
-    setTimeout(() => setToasts((prev: Toast[]) => prev.filter((t: Toast) => t.id !== id)), 4000);
-  };
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const data = await loadPersistedData();
+      reduce({ type: 'HYDRATE', data });
+      setIsLoading(false);
+    } catch (error: any) {
+      console.error('Unable to load account records', error);
+      setLoadError(error?.message || 'Unable to connect to the backend server. Please verify your connection and retry.');
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    void loadPersistedData().then(data => {
-      if (!cancelled) reduce({ type: 'HYDRATE', data });
-    }).catch(error => {
-      if (!cancelled) console.error('Unable to load account records', error);
-    });
-    return () => { cancelled = true; };
-  }, []);
+    void loadData();
+  }, [loadData]);
 
   const dispatch = async (action: Action): Promise<string | undefined> => {
     const prevState = stateRef.current;
@@ -620,43 +634,48 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
       return serverId;
     } catch (error: any) {
       console.error('Unable to save account change', error);
-      reduce({ type: 'ROLLBACK', previousState: prevState });
-      showToast(error?.message || 'Failed to save changes. Reverting...', 'error');
+      try {
+        const freshData = await loadPersistedData();
+        reduce({ type: 'HYDRATE', data: freshData });
+      } catch {
+        reduce({ type: 'ROLLBACK', previousState: prevState });
+      }
+      toast.error(error?.message || 'Failed to save changes. Reverting...');
       return undefined;
     }
   };
 
-  return (
-    <AppContext.Provider value={{ state, dispatch, showToast }}>
-      {children}
-      {toasts.length > 0 && (
-        <div className="fixed bottom-5 right-5 z-[60] flex flex-col gap-2.5 w-[min(92vw,380px)] pointer-events-none no-print" aria-live="polite">
-          {toasts.map((t: Toast) => (
-            <div
-              key={t.id}
-              className="glass-toast pointer-events-auto relative overflow-hidden rounded-2xl pl-5 pr-4 py-3 flex items-center gap-3 text-xs font-medium animate-fade-in"
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-bg text-text flex items-center justify-center p-6">
+        <div className="w-full max-w-md p-6 rounded-3xl border border-danger-solid/30 bg-surface shadow-2xl text-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-danger-tint text-danger-text mx-auto flex items-center justify-center">
+            <Icon name="alert" size={24} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-text">Failed to load account records</h2>
+            <p className="text-xs text-muted mt-1 leading-relaxed">
+              {loadError}
+            </p>
+          </div>
+          <div className="pt-2 flex justify-center gap-3">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => void loadData()}
+              iconLeft={<Icon name="refresh" size={14} />}
             >
-              <span
-                className={`absolute left-0 top-0 bottom-0 w-1 ${t.tone === 'error' ? 'bg-rose-400' : t.tone === 'success' ? 'bg-emerald-400' : 'bg-primary-400'}`}
-                aria-hidden="true"
-              />
-              <span
-                className={`w-6 h-6 rounded-full border flex items-center justify-center text-[11px] font-black flex-shrink-0 ${
-                  t.tone === 'error'
-                    ? 'bg-rose-400/15 text-rose-300 border-rose-400/30'
-                    : t.tone === 'success'
-                    ? 'bg-emerald-400/15 text-emerald-300 border-emerald-400/30'
-                    : 'bg-primary-400/15 text-primary-300 border-primary-400/30'
-                }`}
-                aria-hidden="true"
-              >
-                {t.tone === 'error' ? '!' : t.tone === 'success' ? '✓' : 'i'}
-              </span>
-              <span className="text-slate-100 leading-relaxed">{t.message}</span>
-            </div>
-          ))}
+              Retry Connection
+            </Button>
+          </div>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <AppContext.Provider value={{ state, dispatch, showToast, loadError, isLoading, retryLoad: loadData }}>
+      {children}
     </AppContext.Provider>
   );
 }

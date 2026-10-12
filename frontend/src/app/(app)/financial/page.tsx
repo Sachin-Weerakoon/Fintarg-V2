@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useApp } from '@/store';
 import { PageContainer } from '@/components/ui/PageContainer';
@@ -31,14 +31,38 @@ function FinancialContent() {
   const rawTab = searchParams.get('tab') as Tab | null;
   const initialTab: Tab = (rawTab && TAB_OPTIONS.some(t => t.id === rawTab)) ? rawTab : 'accounts';
 
+  const { state, dispatch } = useApp();
+  const urlMonth = searchParams.get('month');
+  const initialMonth = urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) ? urlMonth : state.selectedMonth;
+
   const [tab, setTab] = useState<Tab>(initialTab);
-  const { state } = useApp();
-  const [month, setMonth] = useState(state.selectedMonth);
+  const [month, setMonth] = useState(initialMonth);
+
+  useEffect(() => {
+    if (rawTab && TAB_OPTIONS.some(t => t.id === rawTab) && rawTab !== tab) {
+      setTab(rawTab);
+    }
+  }, [rawTab, tab]);
+
+  useEffect(() => {
+    if (urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) && urlMonth !== month) {
+      setMonth(urlMonth);
+      dispatch({ type: 'SET_MONTH', month: urlMonth });
+    }
+  }, [urlMonth, month, dispatch]);
 
   const handleTabChange = (newTab: Tab) => {
     setTab(newTab);
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', newTab);
+    router.replace(`/financial?${params.toString()}`, { scroll: false });
+  };
+
+  const handleMonthChange = (newMonth: string) => {
+    setMonth(newMonth);
+    dispatch({ type: 'SET_MONTH', month: newMonth });
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('month', newMonth);
     router.replace(`/financial?${params.toString()}`, { scroll: false });
   };
 
@@ -62,7 +86,7 @@ function FinancialContent() {
                 size="sm"
                 options={months.map(m => ({ id: m, label: m }))}
                 value={month}
-                onChange={setMonth}
+                onChange={handleMonthChange}
               />
             </div>
           )

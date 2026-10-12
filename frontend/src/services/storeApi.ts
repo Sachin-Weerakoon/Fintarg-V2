@@ -4,14 +4,31 @@ import type { AppState, Transaction } from '@/types';
 type RawRecord = Record<string, any> & { _id: string };
 type ListResult = { data: RawRecord[] };
 
-async function list(kind: string): Promise<RawRecord[]> {
-  try {
-    const result = await apiClient<ListResult>(`/api/backend/records/${kind}`);
-    return result.data || [];
-  } catch (error) {
-    console.warn(`Failed to list ${kind}:`, error);
-    return [];
+export const pendingCreations = new Map<string, Promise<string>>();
+export const resolvedServerIds = new Map<string, string>();
+
+export async function resolveRecordId(rawId: string | undefined): Promise<string> {
+  if (!rawId) return '';
+  if (resolvedServerIds.has(rawId)) {
+    return resolvedServerIds.get(rawId)!;
   }
+  if (pendingCreations.has(rawId)) {
+    try {
+      const serverId = await pendingCreations.get(rawId);
+      if (serverId) {
+        resolvedServerIds.set(rawId, serverId);
+        return serverId;
+      }
+    } catch {
+      // If create failed, return rawId so subsequent call fails cleanly
+    }
+  }
+  return rawId;
+}
+
+async function list(kind: string): Promise<RawRecord[]> {
+  const result = await apiClient<ListResult>(`/api/backend/records/${kind}`);
+  return result?.data || [];
 }
 
 export async function loadPersistedData(): Promise<Partial<AppState>> {
@@ -313,12 +330,53 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
   const send = <T = unknown>(path: string, method: string, body?: unknown) =>
     apiClient<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
 
+  const rawTargetId = String(
+    action.id ||
+    (action.entry && typeof action.entry === 'object' && 'id' in action.entry ? action.entry.id : '') ||
+    action.goalId ||
+    ''
+  );
+
+  const isAdd = action.type.startsWith('ADD_');
+  const localAddId = isAdd ? rawTargetId : '';
+
+  let resolvePending!: (id: string) => void;
+  let rejectPending!: (err: any) => void;
+  if (localAddId) {
+    const pendingPromise = new Promise<string>((res, rej) => {
+      resolvePending = res;
+      rejectPending = rej;
+    });
+    pendingCreations.set(localAddId, pendingPromise);
+  }
+
   const create = async (path: string, body: unknown) => {
-    const result = await send<{ data: { _id: string } }>(path, 'POST', body);
-    return result.data._id;
+    try {
+      const result = await send<{ data: { _id: string } }>(path, 'POST', body);
+      const serverId = result.data._id;
+      if (localAddId) {
+        resolvedServerIds.set(localAddId, serverId);
+        resolvePending(serverId);
+      }
+      return serverId;
+    } catch (err) {
+      if (localAddId) {
+        rejectPending(err);
+      }
+      throw err;
+    } finally {
+      if (localAddId) {
+        pendingCreations.delete(localAddId);
+      }
+    }
   };
 
-  const id = encodeURIComponent(String(action.id || action.entry?.id || ''));
+  const resolvedId = isAdd ? rawTargetId : await resolveRecordId(rawTargetId);
+  const id = encodeURIComponent(resolvedId);
+
+  if (action.entry && typeof action.entry === 'object' && 'id' in action.entry && action.entry.id === rawTargetId) {
+    action.entry.id = resolvedId;
+  }
 
   switch (action.type) {
     case 'ADD_INCOME':

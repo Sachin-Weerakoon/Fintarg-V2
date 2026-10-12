@@ -9,11 +9,19 @@ export async function backendApi(path: string, init: RequestInit = {}) {
   if (!headers.has('content-type') && init.body) headers.set('content-type', 'application/json');
   if (cookieHeader) headers.set('cookie', cookieHeader);
 
-  const response = await fetch(new URL(path, backendUrl), {
-    ...init,
-    headers,
-    cache: 'no-store',
-  });
-  const data = await response.json().catch(() => ({ error: 'Backend returned an invalid response' }));
-  return { ok: response.ok, status: response.status, data };
+  try {
+    const response = await fetch(new URL(path, backendUrl), {
+      ...init,
+      headers,
+      cache: 'no-store',
+    });
+    const data = await response.json().catch(() => ({ error: 'Backend returned an invalid response' }));
+    return { ok: response.ok, status: response.status, data };
+  } catch (error: any) {
+    return {
+      ok: false,
+      status: 503,
+      data: { error: error?.message || 'Backend service unreachable' },
+    };
+  }
 }

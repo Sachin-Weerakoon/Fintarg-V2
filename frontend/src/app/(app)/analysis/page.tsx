@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useApp, formatRs } from '@/store';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -141,13 +142,45 @@ function Kpi({
 
 /* ─────────────────────────────────── page ─────────────────────────────────── */
 
-export default function Analysis() {
+function AnalysisContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawTab = (searchParams.get('tab') as Tab) || 'overview';
+  const initialTab: Tab = (['overview', 'spending', 'forecast', 'goals'] as Tab[]).includes(rawTab) ? rawTab : 'overview';
+  const urlMonth = searchParams.get('month');
+
   const { state, dispatch } = useApp();
-  const month = state.selectedMonth;
+  const month = urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) ? urlMonth : state.selectedMonth;
   const today = todayISO();
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [trim, setTrim] = useState(10);
   const [extraSave, setExtraSave] = useState(5000);
+
+  useEffect(() => {
+    if (rawTab && (['overview', 'spending', 'forecast', 'goals'] as Tab[]).includes(rawTab) && rawTab !== tab) {
+      setTab(rawTab);
+    }
+  }, [rawTab, tab]);
+
+  useEffect(() => {
+    if (urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) && urlMonth !== state.selectedMonth) {
+      dispatch({ type: 'SET_MONTH', month: urlMonth });
+    }
+  }, [urlMonth, state.selectedMonth, dispatch]);
+
+  const handleTabChange = (newTab: Tab) => {
+    setTab(newTab);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', newTab);
+    router.replace(`/analysis?${params.toString()}`, { scroll: false });
+  };
+
+  const handleMonthChange = (newMonth: string) => {
+    dispatch({ type: 'SET_MONTH', month: newMonth });
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('month', newMonth);
+    router.replace(`/analysis?${params.toString()}`, { scroll: false });
+  };
 
   const hasData = state.income.length + state.expenses.length > 0;
 
@@ -237,11 +270,11 @@ export default function Analysis() {
         actions={
           <>
             <div className="flex items-center gap-1.5 p-1 rounded-xl bg-surface-hover border border-border no-print">
-              <Button variant="ghost" size="sm" onClick={() => prevM && dispatch({ type: 'SET_MONTH', month: prevM })} disabled={!prevM} className="!p-1.5" title="Previous month" aria-label="Previous month">
+              <Button variant="ghost" size="sm" onClick={() => prevM && handleMonthChange(prevM)} disabled={!prevM} className="!p-1.5" title="Previous month" aria-label="Previous month">
                 <Icon name="chevron-left" size={16} />
               </Button>
               <span className="px-2 text-xs font-bold text-text min-w-[104px] text-center">{monthLabel(month)}</span>
-              <Button variant="ghost" size="sm" onClick={() => nextM && dispatch({ type: 'SET_MONTH', month: nextM })} disabled={!nextM} className="!p-1.5" title="Next month" aria-label="Next month">
+              <Button variant="ghost" size="sm" onClick={() => nextM && handleMonthChange(nextM)} disabled={!nextM} className="!p-1.5" title="Next month" aria-label="Next month">
                 <Icon name="chevron-right" size={16} />
               </Button>
             </div>
@@ -329,7 +362,7 @@ export default function Analysis() {
           </section>
 
           <div className="no-print">
-            <SegmentedTabs options={tabs} value={tab} onChange={setTab} aria-label="Analysis sections" />
+            <SegmentedTabs options={tabs} value={tab} onChange={handleTabChange} aria-label="Analysis sections" />
           </div>
 
           {/* ═════════════════════════ OVERVIEW ═════════════════════════ */}
@@ -782,5 +815,17 @@ export default function Analysis() {
         </>
       )}
     </PageContainer>
+  );
+}
+
+export default function Analysis() {
+  return (
+    <Suspense fallback={
+      <PageContainer>
+        <PageHeader eyebrow="Intelligence" title="Financial Analysis" description="Loading analysis..." />
+      </PageContainer>
+    }>
+      <AnalysisContent />
+    </Suspense>
   );
 }

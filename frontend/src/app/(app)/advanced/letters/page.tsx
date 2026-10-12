@@ -28,12 +28,16 @@ function generateBody(
   addressedTo: string,
   purpose: string,
   accountNumber: string,
+  defaultAccount?: ReturnType<typeof useApp>['state']['bankAccounts'][0] | null,
 ): string {
   const name = mode === 'business' && company ? company.name : profile.name || 'Your Name';
   const address = mode === 'business' && company ? company.address : profile.address || 'Address, City';
   const contact = mode === 'business' && company ? company.contact : profile.mobile || '';
   const date = new Date().toLocaleDateString('en-LK', { day: 'numeric', month: 'long', year: 'numeric' });
-  const accNum = accountNumber || profile.accountNumber || '— — — —';
+  const accNum = accountNumber || profile.accountNumber || defaultAccount?.accountNumber || '— — — —';
+  const bankName = mode === 'personal'
+    ? (profile.bankName || defaultAccount?.bankName || 'Bank')
+    : 'Bank';
 
   if (template === 'bank') {
     return `${name}
@@ -42,7 +46,7 @@ ${address}${contact ? '\n' + contact : ''}
 ${date}
 
 ${addressedTo || 'The Manager'}
-${mode === 'personal' ? (profile.bankName || 'Bank') : 'Bank'}
+${bankName}
 
 Dear Sir/Madam,
 
@@ -103,10 +107,18 @@ export default function LettersClient() {
   const { profile } = state;
   const isBusiness = profile.plan === 'business';
 
+  const nonCashAccounts = state.bankAccounts.filter(b => b.accountType !== 'cash');
+  const defaultAccount = nonCashAccounts[0] || state.bankAccounts[0] || null;
+  const [selectedAccountId, setSelectedAccountId] = useState(defaultAccount?.id || '');
+
   const [mode, setMode] = useState<'personal' | 'business'>('personal');
   const [template, setTemplate] = useState<Template>('bank');
   const [selectedCompanyId, setSelectedCompanyId] = useState(state.companies[0]?.id || '');
-  const [form, setForm] = useState({ addressedTo: '', accountNumber: '', purpose: '' });
+  const [form, setForm] = useState({
+    addressedTo: defaultAccount ? `The Manager, ${defaultAccount.bankName}` : '',
+    accountNumber: defaultAccount?.accountNumber || profile.accountNumber || '',
+    purpose: '',
+  });
   const [generated, setGenerated] = useState('');
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState('');
@@ -130,10 +142,13 @@ export default function LettersClient() {
   const missingFields: string[] = [];
   if (!profile.name) missingFields.push('name');
   if (!profile.address) missingFields.push('address');
-  if (template === 'bank' && !profile.accountNumber && !form.accountNumber) missingFields.push('account number');
+  if (template === 'bank' && !profile.accountNumber && !form.accountNumber && !defaultAccount?.accountNumber) {
+    missingFields.push('account number');
+  }
 
   const generate = () => {
-    const body = generateBody(template, mode, profile, selectedCompany, form.addressedTo, form.purpose, form.accountNumber);
+    const activeAccount = state.bankAccounts.find(b => b.id === selectedAccountId) || defaultAccount;
+    const body = generateBody(template, mode, profile, selectedCompany, form.addressedTo, form.purpose, form.accountNumber, activeAccount);
     setGenerated(body);
     setEditBody(body);
     setEditing(false);
@@ -226,12 +241,38 @@ export default function LettersClient() {
               />
             </Field>
 
+            {template === 'bank' && nonCashAccounts.length > 0 && (
+              <Field id="letter-account-select" label="Select bank account">
+                <Select
+                  value={selectedAccountId}
+                  onChange={e => {
+                    const accId = e.target.value;
+                    setSelectedAccountId(accId);
+                    const acc = state.bankAccounts.find(b => b.id === accId);
+                    if (acc) {
+                      setForm(f => ({
+                        ...f,
+                        accountNumber: acc.accountNumber,
+                        addressedTo: `The Manager, ${acc.bankName}`,
+                      }));
+                    }
+                  }}
+                >
+                  {nonCashAccounts.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.bankName} - {b.accountNumber || 'No acc#'})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+
             {template === 'bank' && (
               <Field id="letter-account" label="Account number">
                 <Input
-                  value={form.accountNumber || profile.accountNumber}
+                  value={form.accountNumber}
                   onChange={e => setForm(f => ({ ...f, accountNumber: e.target.value }))}
-                  placeholder="0012 3456 789"
+                  placeholder={defaultAccount?.accountNumber || profile.accountNumber || '0012 3456 789'}
                 />
               </Field>
             )}
