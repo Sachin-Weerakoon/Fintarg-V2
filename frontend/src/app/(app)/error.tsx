@@ -15,6 +15,13 @@ export default function AppErrorBoundary({
     console.error('App layout boundary caught error:', error);
   }, [error]);
 
+  const handleClearSession = () => {
+    try {
+      document.cookie = 'fintarg_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0;';
+    } catch {}
+    window.location.href = '/welcome';
+  };
+
   return (
     <div className="min-h-[70vh] flex items-center justify-center p-6">
       <div className="w-full max-w-lg p-6 sm:p-8 rounded-3xl border border-danger-solid/30 bg-surface shadow-2xl text-center space-y-5 animate-rise-in">
@@ -45,7 +52,16 @@ export default function AppErrorBoundary({
           >
             Try Again
           </Button>
-          <Link href="/dashboard" className="w-full sm:w-auto">
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={handleClearSession}
+            iconLeft={<Icon name="logout" size={15} />}
+            className="w-full sm:w-auto"
+          >
+            Sign In Again
+          </Button>
+          <Link href="/" className="w-full sm:w-auto">
             <Button
               variant="secondary"
               size="md"

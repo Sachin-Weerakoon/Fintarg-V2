@@ -6,7 +6,14 @@ export async function getSessionUser() {
   const cookieName = process.env.AUTH_COOKIE_NAME || 'fintarg_token';
   if (!cookieStore.has(cookieName)) return null;
 
-  const result = await backendApi('/api/auth/me');
+  let result = await backendApi('/api/auth/me');
+
+  // Retry once on temporary 503/502/network hiccups (e.g. MongoDB Atlas cold-start)
+  if (!result.ok && result.status !== 401) {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    result = await backendApi('/api/auth/me');
+  }
+
   if (result.ok) {
     return result.data;
   }
@@ -21,7 +28,7 @@ export async function getSessionUser() {
     return null;
   }
 
-  // On 5xx or connection error: KEEP COOKIE intact so session is not lost!
+  // On persistent 5xx or connection error: KEEP COOKIE intact so session is not lost!
   throw new Error('Backend service is temporarily unavailable. Please retry.');
 }
 
