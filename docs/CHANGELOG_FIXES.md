@@ -121,4 +121,56 @@
 - **What changed:** Created `backend/src/scripts/verifyLedger.ts` property-based testing script executing randomized sequences of financial actions (expenses, incomes, transfers, loan repayments, pawn payments, finance payments, goal contributions, generic transactions, and undos) and asserting `driftCents === 0` across all accounts after every single operation. Added `verifyLedger.test.ts` into backend test runner.
 - **How verified:** Ran property verification test with 30+ randomized operations in `npm test`. All 119 backend tests passed with zero balance drift.
 
+## Phase 3 — Security & Account Lifecycle
+
+### 3.1 Strict CORS Origin Validation
+- **What was wrong:** CORS configuration permitted arbitrary origins matching `/\.vercel\.app$/`, allowing malicious domains like `attacker-preview.vercel.app` to make authenticated cross-origin requests.
+- **What changed:** Replaced regex-based origin matching with strict exact-match validation against configured `FRONTEND_ORIGIN` and `APP_ORIGIN`. In non-production, only `http://localhost:*` and `http://127.0.0.1:*` are permitted.
+- **How verified:** Added unit tests in `cors.test.ts` asserting rejection of unauthorized `.vercel.app` subdomains and acceptance of configured origins.
+
+### 3.2 Session Revocation via `tokenVersion`, Change Password, and Sign Out Everywhere
+- **What was wrong:** JWT tokens could not be revoked before expiry. Password changes did not invalidate existing sessions across devices.
+- **What changed:** Added `tokenVersion` integer field to `User` model, included `tokenVersion` in JWT payloads, and checked it on every authenticated request in `requireAuth`. Implemented `POST /api/auth/change-password` and `POST /api/auth/logout-all` incrementing `tokenVersion`. Added change password form and "Sign Out Everywhere" action in Settings UI.
+- **How verified:** Added unit tests in `jwt.test.ts` and integration tests in `api.test.ts` verifying immediate session revocation on `logout-all` and password change.
+
+### 3.3 Login Rate Limiting, Failed Attempt Lockout Expiry, and Timing Defense
+- **What was wrong:** Account lockout counters never reset automatically on expiry. Timing discrepancies during login and forgot password endpoints allowed user enumeration.
+- **What changed:** Added automated lockout counter reset when `lockoutUntil` expires. Added constant-time dummy password hashing for non-existent users during login, and uniform simulated response delays for `POST /api/auth/forgot-password`.
+- **How verified:** Integration tests in `api.test.ts` verified that lockout resets on expiry and non-existent accounts receive consistent response timing and generic error messages.
+
+### 3.4 Atomic Password Reset Token Consumption & Session Invalidation
+- **What was wrong:** Password reset token verification and consumption were non-atomic, risking race conditions and replay attacks. Resetting a password left other active sessions alive.
+- **What changed:** Wrapped token consumption in an atomic `findOneAndUpdate({ tokenHash, used: false, expiresAt: { $gt: now } }, { $set: { used: true } })`. Invalidated all previous reset tokens for the user upon successful reset and incremented `tokenVersion` to revoke all active sessions.
+- **How verified:** Integration tests in `api.test.ts` verified token single-use enforcement and multi-device session revocation upon password reset.
+
+### 3.5 Magic Byte File Type Verification, Size Limits, and Download Security Headers
+- **What was wrong:** File upload validation trusted user-supplied MIME types and file extensions without verifying actual file contents. Files lacked strict size boundaries and security headers.
+- **What changed:** Implemented magic byte detection for PDF, PNG, JPEG, WEBP, DOCX, and legacy DOC files via `fileValidation.ts`. Enforced strict size limits (2MB for avatars, 4MB for documents). Added WebP support. Configured `X-Content-Type-Options: nosniff` and `Content-Disposition: attachment` headers on file downloads to prevent browser execution attacks.
+- **How verified:** Tested valid and spoofed magic bytes, size limits, and download headers in integration test suite.
+
+### 3.6 Cascade Account Deletion & Profile TTL Index Drop
+- **What was wrong:** A TTL index on `Profile.deletionRequestedAt` risked automatically dropping user profiles while leaving transactions, accounts, and credentials orphaned. Account deletion was a soft flag without real cascade cleanup.
+- **What changed:** Implemented `DELETE /api/auth/account` requiring password confirmation and explicit `"DELETE MY ACCOUNT"` string, permanently and atomically purging user records across all 20+ collections in MongoDB. Created `dropProfileTtlIndex.ts` migration script to drop the hazardous TTL index. Added confirmation dialog and form in Settings UI.
+- **How verified:** Added unit tests in `dropProfileTtlIndex.test.ts` and integration tests in `api.test.ts` confirming complete cascade deletion across all collections.
+
+### 3.7 Data Portability & Archive Export
+- **What was wrong:** Application lacked a compliant data portability mechanism for users to export their complete financial and personal records.
+- **What changed:** Created `GET /api/profile/export` compiling all user profile, financial (accounts, cards, transactions, loans, goals, pawns, finances, medical expenses, budgets), and business records into a structured JSON archive while strictly omitting `passwordHash` and `salt`. Added frontend proxy route `/api/profile/export` and "Download Data (.json)" button in Settings UI.
+- **How verified:** Integration tests in `api.test.ts` verified complete export schema, `content-disposition` header, and absence of sensitive credential fields.
+
+### 3.8 Strict Profile Input Validation
+- **What was wrong:** Profile theme colors, URLs, NIC numbers, and phone numbers were loosely validated, permitting arbitrary strings and potential XSS vectors.
+- **What changed:** Enforced strict 6-digit hex regex (`/^#([0-9a-fA-F]{6})$/`) for theme colors and custom color overrides. Validated HTTP/HTTPS protocols for portfolio links. Validated Sri Lankan NIC format (9 digits + V/X or 12 digits). Enforced 9-20 character phone number validation across profile and contact entries. Updated `UserModel.name` when profile name changes.
+- **How verified:** Added comprehensive validation tests in `api.test.ts` rejecting invalid colors, URLs, NICs, and phone numbers.
+
+### 3.9 Cron Hardening, Reminder HTML Sanitization & Rate Limit Configuration
+- **What was wrong:** Reminder emails interpolated user-provided labels into HTML without escaping. Cron maintenance and reminder endpoints performed unbounded queries and N+1 lookups.
+- **What changed:** Implemented `escapeHtml` for reminder email subject and HTML body. Batched user lookups and added atomic `updateOne` for marking reminders sent. Configured `express-rate-limit` with explicit `validate: { trustProxy: false }` for safe reverse proxy operation behind Cloudflare and Vercel.
+- **How verified:** Integration tests in `api.test.ts` verified cron authorization, reminder processing with HTML escaping, and maintenance execution.
+
+### 3.10 Global Error Mapping for Mongoose & Secret Log Redaction
+- **What was wrong:** Mongoose `ValidationError` and `CastError` leaked internal error details or fell through to unhandled 500 server errors. Sensitive fields could appear in structured application logs.
+- **What changed:** Mapped Mongoose `ValidationError` and `CastError`, as well as body-parser `SyntaxError`, to HTTP 400 Bad Request with clean, user-friendly error messages. Configured Pino logger with comprehensive redaction for `password`, `currentPassword`, `newPassword`, `confirmPassword`, `passwordHash`, `salt`, `token`, `tokenHash`, `resetToken`, and sensitive headers.
+- **How verified:** Added unit tests in `errors.test.ts` asserting 400 status codes for Mongoose validation/cast errors and malformed JSON payloads without stack trace leaks.
+
 
