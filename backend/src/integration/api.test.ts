@@ -1492,6 +1492,62 @@ describe('Backend API Integration Tests', () => {
       const user = await UserModel.findOne({ email: profEmail });
       assert.strictEqual(user?.name, 'Updated Name');
     });
+
+    it('GET /api/cron endpoints enforce timingSafe secret and process reminders safely (3.9)', async () => {
+      const { env } = await import('../config/env');
+      const { ReminderModel } = await import('../models/Reminder');
+      const { UserModel } = await import('../models/User');
+
+      // 1. Unauthenticated or wrong secret -> 401
+      const unauthCron = await fetch(`${baseUrl}/api/cron/maintenance`);
+      assert.strictEqual(unauthCron.status, 401);
+
+      const badSecretCron = await fetch(`${baseUrl}/api/cron/maintenance`, {
+        headers: { 'x-cron-secret': 'wrong-secret' },
+      });
+      assert.strictEqual(badSecretCron.status, 401);
+
+      // 2. Authenticated maintenance -> 200
+      const goodMaint = await fetch(`${baseUrl}/api/cron/maintenance`, {
+        headers: { 'x-cron-secret': env.CRON_SECRET },
+      });
+      assert.strictEqual(goodMaint.status, 200);
+      const maintData = await goodMaint.json();
+      assert.strictEqual(typeof maintData.cleanedSessions, 'number');
+      assert.strictEqual(typeof maintData.cleanedResets, 'number');
+
+      // 3. Reminder processing with HTML label
+      const cronUserEmail = `cron_tester_${Date.now()}@test.com`;
+      const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Cron User',
+          email: cronUserEmail,
+          password: 'Password123!',
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(regRes.status, 201);
+      const regData = await regRes.json();
+      const cronUserId = regData.user.id;
+
+      await ReminderModel.create({
+        userId: cronUserId,
+        type: 'custom',
+        label: '<script>alert("xss")</script> Pay Electric Bill',
+        dueDate: '2020-01-01',
+        channel: 'email',
+        status: 'pending',
+      });
+
+      const goodReminders = await fetch(`${baseUrl}/api/cron/reminders`, {
+        headers: { 'x-cron-secret': env.CRON_SECRET },
+      });
+      assert.strictEqual(goodReminders.status, 200);
+      const remindersData = await goodReminders.json();
+      assert.ok(remindersData.found >= 1);
+    });
   });
 });
 

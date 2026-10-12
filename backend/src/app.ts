@@ -185,6 +185,7 @@ const authRateLimiter = rateLimit({
   max: env.NODE_ENV === 'test' ? 10000 : 20,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  validate: { trustProxy: false },
   message: { error: 'Too many requests, please try again later.' },
 });
 

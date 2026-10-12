@@ -27,22 +27,48 @@ export const maintenance: RequestHandler = asyncHandler(async (request, response
   response.json({ cleanedSessions: sessions.deletedCount, cleanedResets: resets.deletedCount });
 });
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export const reminders: RequestHandler = asyncHandler(async (request, response) => {
   if (!authorized(request.header('x-cron-secret') ?? request.header('authorization')?.replace(/^Bearer\s+/i, ''))) {
     response.status(401).json({ error: 'Unauthorized' });
     return;
   }
   const today = new Date().toISOString().slice(0, 10);
-  const pending = await ReminderModel.find({ status: 'pending', dueDate: { $lte: today }, channel: 'email' });
+  const pending = await ReminderModel.find({ status: 'pending', dueDate: { $lte: today }, channel: 'email' })
+    .limit(100)
+    .lean();
+
+  if (!pending.length) {
+    response.json({ found: 0, sent: 0 });
+    return;
+  }
+
+  const userIds = [...new Set(pending.map(r => r.userId))];
+  const users = await UserModel.find({ _id: { $in: userIds } }).select('email').lean();
+  const userMap = new Map(users.map(u => [u._id.toString(), u.email]));
+
   let sent = 0;
   for (const reminder of pending) {
-    const user = await UserModel.findById(reminder.userId).select('email');
-    if (!user) continue;
-    const delivered = await sendMail(user.email, `Reminder: ${reminder.label}`, `<p>${reminder.label}</p>`);
+    const email = userMap.get(reminder.userId.toString());
+    if (!email) continue;
+    const safeLabel = escapeHtml(reminder.label);
+    const delivered = await sendMail(email, `Reminder: ${safeLabel}`, `<p>${safeLabel}</p>`);
     if (delivered) {
-      reminder.status = 'sent';
-      await reminder.save();
-      sent++;
+      const updateResult = await ReminderModel.updateOne(
+        { _id: reminder._id, status: 'pending' },
+        { $set: { status: 'sent', sentAt: new Date() } }
+      );
+      if (updateResult.modifiedCount > 0) {
+        sent++;
+      }
     }
   }
   if (pending.length && !sent) logger.warn({ count: pending.length }, 'No reminders delivered; configure email first');
