@@ -21,4 +21,99 @@ describe('Error Middleware & HttpError', () => {
     assert.strictEqual(err503.statusCode, 503);
     assert.strictEqual(err503.status, 503);
   });
+
+  it('errorHandler maps SyntaxError (malformed body) to 400', async () => {
+    const { errorHandler } = await import('./errors');
+    let capturedStatus = 0;
+    let capturedJson: any = null;
+    const mockRes: any = {
+      status(code: number) {
+        capturedStatus = code;
+        return this;
+      },
+      json(payload: any) {
+        capturedJson = payload;
+      },
+    };
+
+    const syntaxErr: any = new SyntaxError('Unexpected token in JSON');
+    syntaxErr.status = 400;
+    syntaxErr.body = '{"bad":';
+
+    errorHandler(syntaxErr, {} as any, mockRes, () => {});
+    assert.strictEqual(capturedStatus, 400);
+    assert.strictEqual(capturedJson.error, 'Malformed JSON payload');
+  });
+
+  it('errorHandler maps Mongoose ValidationError to 400 with details', async () => {
+    const { errorHandler } = await import('./errors');
+    let capturedStatus = 0;
+    let capturedJson: any = null;
+    const mockRes: any = {
+      status(code: number) {
+        capturedStatus = code;
+        return this;
+      },
+      json(payload: any) {
+        capturedJson = payload;
+      },
+    };
+
+    const valErr = {
+      name: 'ValidationError',
+      errors: {
+        field1: { path: 'field1', message: 'field1 is required' },
+      },
+    };
+
+    errorHandler(valErr as any, {} as any, mockRes, () => {});
+    assert.strictEqual(capturedStatus, 400);
+    assert.strictEqual(capturedJson.error, 'Database validation failed');
+    assert.strictEqual(capturedJson.details[0].path, 'field1');
+  });
+
+  it('errorHandler maps Mongoose CastError to 400', async () => {
+    const { errorHandler } = await import('./errors');
+    let capturedStatus = 0;
+    let capturedJson: any = null;
+    const mockRes: any = {
+      status(code: number) {
+        capturedStatus = code;
+        return this;
+      },
+      json(payload: any) {
+        capturedJson = payload;
+      },
+    };
+
+    const castErr = {
+      name: 'CastError',
+      path: '_id',
+      value: 'invalid-id-123',
+    };
+
+    errorHandler(castErr as any, {} as any, mockRes, () => {});
+    assert.strictEqual(capturedStatus, 400);
+    assert.ok(capturedJson.error.includes('invalid-id-123'));
+  });
+
+  it('errorHandler maps unhandled error to 500 without leaking stack traces', async () => {
+    const { errorHandler } = await import('./errors');
+    let capturedStatus = 0;
+    let capturedJson: any = null;
+    const mockRes: any = {
+      status(code: number) {
+        capturedStatus = code;
+        return this;
+      },
+      json(payload: any) {
+        capturedJson = payload;
+      },
+    };
+
+    errorHandler(new Error('Secret internal db explosion'), {} as any, mockRes, () => {});
+    assert.strictEqual(capturedStatus, 500);
+    assert.strictEqual(capturedJson.error, 'Internal server error');
+    assert.strictEqual(capturedJson.stack, undefined);
+  });
 });
