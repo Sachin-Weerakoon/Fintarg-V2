@@ -128,12 +128,17 @@ describe('Backend API Integration Tests', () => {
       assert.ok(response.headers.get('content-security-policy'));
     });
 
-    it('configures CORS for vercel.app domains', async () => {
-      const response = await fetch(`${baseUrl}/api`, {
-        headers: { Origin: 'https://preview-deploy.vercel.app' },
+    it('allows configured frontend origin and rejects arbitrary vercel.app domains', async () => {
+      const allowedRes = await fetch(`${baseUrl}/api/health`, {
+        headers: { Origin: 'http://localhost:3000' },
       });
-      assert.strictEqual(response.headers.get('access-control-allow-origin'), 'https://preview-deploy.vercel.app');
-      assert.strictEqual(response.headers.get('access-control-allow-credentials'), 'true');
+      assert.strictEqual(allowedRes.headers.get('access-control-allow-origin'), 'http://localhost:3000');
+      assert.strictEqual(allowedRes.headers.get('access-control-allow-credentials'), 'true');
+
+      const rejectedRes = await fetch(`${baseUrl}/api/health`, {
+        headers: { Origin: 'https://arbitrary-attacker.vercel.app' },
+      });
+      assert.notStrictEqual(rejectedRes.headers.get('access-control-allow-origin'), 'https://arbitrary-attacker.vercel.app');
     });
   });
 
