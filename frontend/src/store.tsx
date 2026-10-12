@@ -664,75 +664,7 @@ export function useApp() {
 
 export { formatRs } from '@/utils/formatCurrency';
 
-export function calcMonthlyIncome(income: AppState['income'], month: string): number {
-  return income.reduce((sum, i) => {
-    if (i.frequency === 'monthly') return sum + i.amount;
-    if (i.frequency === 'weekly') return sum + i.amount * 4;
-    if (i.frequency === 'daily') return sum + i.amount * 30;
-    // one-time: only count if in this month
-    if (i.frequency === 'one-time') return i.date.startsWith(month) ? sum + i.amount : sum;
-    return sum;
-  }, 0);
-}
-
-export function calcMonthlyExpenses(expenses: AppState['expenses'], month: string): number {
-  return expenses.filter(e => e.date.startsWith(month)).reduce((s, e) => s + e.amount, 0);
-}
-
-export function calcPersonalSpent(expenses: AppState['expenses'], month: string): number {
-  return expenses.filter(e => e.date.startsWith(month) && e.category === 'Personal').reduce((s, e) => s + e.amount, 0);
-}
-
-export function calcFinancePayments(fps: AppState['financePayments']): number {
-  return fps.reduce((s, f) => s + f.amount, 0);
-}
-
-export function calcLoanInterest(loans: AppState['loans']): number {
-  return loans.reduce((s, l) => {
-    if (l.method === 'compound') {
-      return s + l.balance * (Math.pow(1 + l.rate / 100, 1) - 1);
-    }
-    return s + (l.balance * l.rate) / 100;
-  }, 0);
-}
-
-export function calcExpensesByCategory(expenses: AppState['expenses'], month: string): Record<string, number> {
-  const map: Record<string, number> = {};
-  expenses.filter(e => e.date.startsWith(month)).forEach(e => {
-    map[e.category] = (map[e.category] || 0) + e.amount;
-  });
-  return map;
-}
-
-export function calcExpensesByDay(expenses: AppState['expenses'], month: string): Record<string, number> {
-  const map: Record<string, number> = {};
-  expenses.filter(e => e.date.startsWith(month)).forEach(e => {
-    map[e.date] = (map[e.date] || 0) + e.amount;
-  });
-  return map;
-}
-
-export function calcAnalysis(state: AppState, month: string) {
-  const totalIncome = calcMonthlyIncome(state.income, month);
-  // Living expenses includes ALL expense categories (including Personal)
-  const livingExpenses = calcMonthlyExpenses(state.expenses, month);
-  const financePayments = calcFinancePayments(state.financePayments);
-  const loanInterest = calcLoanInterest(state.loans);
-  const savingsTarget = state.savingsGoals.reduce((s, g) => s + g.monthlyTarget, 0);
-  // BR-1: Total outflow = living expenses + finance payments + loan interest + savings
-  // Note: personal spending is already within living expenses (Personal category)
-  // personalSpendingBudget is a planning tool, not added separately to avoid double-count
-  const totalOutflow = livingExpenses + financePayments + loanInterest + savingsTarget;
-  const netPosition = totalIncome - totalOutflow;
-  const shortfall = netPosition < 0 ? Math.abs(netPosition) : 0;
-  // Free cash: what's available after essential obligations (before savings allocation)
-  const freeCash = totalIncome - livingExpenses - financePayments - loanInterest;
-  const personalSpent = calcPersonalSpent(state.expenses, month);
-  return {
-    totalIncome, livingExpenses, financePayments, loanInterest, savingsTarget,
-    totalOutflow, netPosition, shortfall, freeCash, personalSpent,
-  };
-}
+export * from '@/lib/money';
 
 // Compute CSS tint from a hex color (lighten toward white at 88%)
 export function computeTint(hex: string): string {

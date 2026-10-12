@@ -10,6 +10,15 @@
  * so that numbers shown in analysis always agree with the rest of the app.
  */
 import type { AppState, SavingsGoal, FinancePayment } from '@/types';
+import {
+  calcMonthlyExpenses,
+  calcFinancePayments,
+  calcLoanInterest,
+  calcRecurringIncome,
+  calcOneTimeIncome,
+  calcGoalMonthlyTarget,
+  calcTotalSavingsTarget,
+} from './money';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /* Date helpers                                                               */
@@ -171,42 +180,18 @@ export interface MonthPoint {
   isForecast?: boolean;
 }
 
-function recurringIncome(state: AppState): number {
-  return state.income.reduce((s, i) => {
-    if (i.frequency === 'monthly') return s + i.amount;
-    if (i.frequency === 'weekly') return s + i.amount * 4;
-    if (i.frequency === 'daily') return s + i.amount * 30;
-    return s;
-  }, 0);
-}
-
-function oneTimeIncome(state: AppState, month: string): number {
-  return state.income.filter(i => i.frequency === 'one-time' && i.date.startsWith(month)).reduce((s, i) => s + i.amount, 0);
-}
-
-function loanInterestTotal(state: AppState): number {
-  return state.loans.reduce((s, l) => {
-    if (l.method === 'compound') return s + l.balance * (Math.pow(1 + l.rate / 100, 1) - 1);
-    return s + (l.balance * l.rate) / 100;
-  }, 0);
-}
-
-function activeFinancePayments(state: AppState): FinancePayment[] {
-  return state.financePayments.filter(f => f.status !== 'completed' && f.status !== 'cancelled' && f.status !== 'cleared');
-}
-
 export function livingExpenses(state: AppState, month: string): number {
-  return state.expenses.filter(e => e.date.startsWith(month)).reduce((s, e) => s + e.amount, 0);
+  return calcMonthlyExpenses(state.expenses, month);
 }
 
 export function monthPoint(state: AppState, month: string): MonthPoint {
-  const rec = recurringIncome(state);
-  const one = oneTimeIncome(state, month);
+  const rec = calcRecurringIncome(state.income, month, state.employmentProfiles);
+  const one = calcOneTimeIncome(state.income, month);
   const income = rec + one;
-  const living = livingExpenses(state, month);
-  const financePayments = state.financePayments.reduce((s, f) => s + f.amount, 0);
-  const loanInterest = loanInterestTotal(state);
-  const savings = state.savingsGoals.reduce((s, g) => s + g.monthlyTarget, 0);
+  const living = calcMonthlyExpenses(state.expenses, month);
+  const financePayments = calcFinancePayments(state.financePayments);
+  const loanInterest = calcLoanInterest(state.loans, state.financePayments);
+  const savings = calcTotalSavingsTarget(state.savingsGoals, month);
   const outflow = living + financePayments + loanInterest + savings;
   const net = income - outflow;
   const shortfall = net < 0 ? -net : 0;
@@ -266,18 +251,18 @@ export function forecastMonths(state: AppState, series: MonthPoint[], horizon = 
   const oneTimeHistory = series.map(p => p.oneTimeIncome);
   const oneTimeAvg = mean(oneTimeHistory);
   const oneTimeSd = stdDev(oneTimeHistory);
-  const rec = recurringIncome(state);
-  const loanInterest = loanInterestTotal(state);
-  const active = activeFinancePayments(state);
+  const loanInterest = calcLoanInterest(state.loans, state.financePayments);
+  const active = state.financePayments.filter(f => f.status !== 'completed' && f.status !== 'cancelled' && f.status !== 'cleared');
 
   return livingFc.map((lf, idx) => {
     const k = idx + 1;
     const month = addMonths(last, k);
+    const rec = calcRecurringIncome(state.income, month, state.employmentProfiles);
     const fp = active.reduce((s, f) => s + ((f.monthsRemaining || 0) >= k ? f.amount : 0), 0);
     const savings = state.savingsGoals.reduce((s, g) => {
       const end = g.targetDate || g.endDate;
       const reached = (g.targetAmount ?? 0) > 0 && g.savedAmount >= (g.targetAmount as number);
-      return s + (reached || (end && monthOf(end) < month) ? 0 : g.monthlyTarget);
+      return s + (reached || (end && monthOf(end) < month) ? 0 : calcGoalMonthlyTarget(g, month));
     }, 0);
     const income = rec + oneTimeAvg;
     const fixed = fp + loanInterest + savings;

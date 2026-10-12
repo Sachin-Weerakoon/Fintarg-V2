@@ -199,6 +199,40 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
     assert.strictEqual((updated as any).contributions?.length, 1, 'contributions must be preserved');
   });
 
+  it('goals: derives monthlyTargetCents from dailyAmount * daysInMonth of the target date (4.3)', async () => {
+    // 28-day month (Feb 2026)
+    const goalFeb26 = await createRecord('goals', userId, {
+      name: 'Feb 2026 Goal',
+      dailyAmount: 100,
+      targetDate: '2026-02-15',
+    });
+    assert.strictEqual(goalFeb26.monthlyTargetCents, 10000 * 28);
+
+    // 29-day leap month (Feb 2024)
+    const goalFeb24 = await createRecord('goals', userId, {
+      name: 'Feb 2024 Leap Goal',
+      dailyAmount: 100,
+      targetDate: '2024-02-20',
+    });
+    assert.strictEqual(goalFeb24.monthlyTargetCents, 10000 * 29);
+
+    // 30-day month (April 2026)
+    const goalApr = await createRecord('goals', userId, {
+      name: 'April Goal',
+      dailyAmount: 100,
+      targetDate: '2026-04-10',
+    });
+    assert.strictEqual(goalApr.monthlyTargetCents, 10000 * 30);
+
+    // 31-day month (March 2026)
+    const goalMar = await createRecord('goals', userId, {
+      name: 'March Goal',
+      dailyAmount: 100,
+      targetDate: '2026-03-31',
+    });
+    assert.strictEqual(goalMar.monthlyTargetCents, 10000 * 31);
+  });
+
   it('foreign keys: rejects invalid ObjectIds with 400 and unowned cards/accounts with 404 (1.7)', async () => {
     // Invalid ObjectId format should throw 400
     await assert.rejects(

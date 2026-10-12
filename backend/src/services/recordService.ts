@@ -21,6 +21,7 @@ import { BankAccountModel } from '../models/BankAccount';
 import { CardModel } from '../models/Card';
 import { TransactionModel } from '../models/Transaction';
 import { calculateAmortizationSchedule, calculateLoan } from '../utils/loanMath';
+import { getDaysInMonth } from '../utils/dateMath';
 import { HttpError } from '../middleware/errors';
 import { isValidIsoDate, transferSchema, type RecordKind } from '../validations/records';
 import { deleteTransfer, ensureCashWallet, postTransaction, replaceTransaction, reverseTransaction, reverseTransactionById, transferFunds, updateTransactionById } from './ledgerService';
@@ -105,7 +106,8 @@ function toStoredForCreate(kind: RecordKind, input: Record<string, unknown>) {
     if ('dailyAmount' in stored && stored.dailyAmount !== undefined && stored.dailyAmount !== null && stored.dailyAmount !== '') {
       const dailyCents = Math.round(Number(stored.dailyAmount) * 100);
       stored.dailyAmountCents = dailyCents;
-      stored.monthlyTargetCents = dailyCents * 30;
+      const targetMonth = String(stored.targetDate || stored.endDate || '').slice(0, 7) || new Date().toISOString().slice(0, 7);
+      stored.monthlyTargetCents = dailyCents * getDaysInMonth(targetMonth);
       delete stored.dailyAmount;
     }
     if (!('savedAmountCents' in stored)) stored.savedAmountCents = 0;
@@ -246,7 +248,8 @@ function toStoredForUpdate(kind: RecordKind, input: Record<string, unknown>, exi
     if ('dailyAmount' in stored && stored.dailyAmount !== undefined && stored.dailyAmount !== null && stored.dailyAmount !== '') {
       const dailyCents = Math.round(Number(stored.dailyAmount) * 100);
       stored.dailyAmountCents = dailyCents;
-      stored.monthlyTargetCents = dailyCents * 30;
+      const targetMonth = String(stored.targetDate || stored.endDate || existingDoc?.targetDate || existingDoc?.endDate || '').slice(0, 7) || new Date().toISOString().slice(0, 7);
+      stored.monthlyTargetCents = dailyCents * getDaysInMonth(targetMonth);
       delete stored.dailyAmount;
     }
   }
