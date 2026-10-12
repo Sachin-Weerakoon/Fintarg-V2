@@ -475,14 +475,14 @@ export default function DashboardClient() {
               </Link>
 
               <Link
-                href="/documents"
+                href="/analysis"
                 className="flex items-center justify-between p-3 rounded-xl border border-border bg-surface hover:bg-surface-hover hover:border-primary-500/50 text-xs font-semibold text-text transition-all duration-200 group"
               >
                 <div className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-lg bg-surface-hover text-text flex items-center justify-center">
-                    <Icon name="documents" size={16} />
+                    <Icon name="analysis" size={16} />
                   </div>
-                  <span>Manage Document Vault</span>
+                  <span>View Financial Analysis</span>
                 </div>
                 <Icon name="arrow-right" size={14} className="text-muted group-hover:text-primary-text transition-colors" />
               </Link>

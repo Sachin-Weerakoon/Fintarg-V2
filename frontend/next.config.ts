@@ -29,6 +29,11 @@ const nextConfig: NextConfig = {
         destination: '/',
         permanent: true,
       },
+      {
+        source: '/documents',
+        destination: '/',
+        permanent: true,
+      },
     ];
   },
   experimental: {

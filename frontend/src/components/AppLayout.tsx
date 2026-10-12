@@ -16,7 +16,6 @@ const navItems = [
   { href: '/financial', label: 'Financial', page: 'financial' },
   { href: '/analysis', label: 'Analysis', page: 'analysis' },
   { href: '/goals', label: 'Goals', page: 'goals' },
-  { href: '/documents', label: 'Documents', page: 'documents' },
   { href: '/advanced', label: 'Advanced Features', page: 'advanced' },
   { href: '/settings', label: 'Settings', page: 'settings' },
 ];
@@ -45,8 +44,6 @@ function getPageIconName(page: string): IconName {
       return 'analysis';
     case 'goals':
       return 'goals';
-    case 'documents':
-      return 'documents';
     case 'advanced':
       return 'advanced';
     case 'settings':
@@ -61,7 +58,6 @@ function pageTitleOf(pathname: string, tab?: string): string {
   if (pathname === '/financial') return 'Financial';
   if (pathname === '/analysis') return 'Analysis';
   if (pathname === '/goals') return 'Goals';
-  if (pathname === '/documents') return 'Documents';
   if (pathname === '/advanced') {
     if (tab === 'letters') return 'Letters';
     if (tab === 'medical') return 'Medical';
