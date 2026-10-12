@@ -5,6 +5,25 @@ import { HttpError } from '../middleware/errors';
 import { ProfileModel } from '../models/Profile';
 import { PersonalBudgetModel } from '../models/PersonalBudget';
 import { UserModel } from '../models/User';
+import { BankAccountModel } from '../models/BankAccount';
+import { CardModel } from '../models/Card';
+import { TransactionModel } from '../models/Transaction';
+import { ExpenseModel } from '../models/Expense';
+import { IncomeModel } from '../models/Income';
+import { LoanModel } from '../models/Loan';
+import { PawnedItemModel } from '../models/PawnedItem';
+import { FinancePaymentModel } from '../models/FinancePayment';
+import { SavingsGoalModel } from '../models/SavingsGoal';
+import { ReminderModel } from '../models/Reminder';
+import { DocumentModel } from '../models/Document';
+import { CompanyModel } from '../models/Company';
+import { BusinessBranchModel } from '../models/BusinessBranch';
+import { BranchEntryModel } from '../models/BranchEntry';
+import { OwnerDrawModel } from '../models/OwnerDraw';
+import { AgreementModel } from '../models/Agreement';
+import { LetterModel } from '../models/Letter';
+import { MedicalExpenseModel } from '../models/MedicalExpense';
+import { EmploymentProfileModel } from '../models/EmploymentProfile';
 import { asyncHandler } from '../utils/asyncHandler';
 import { isoMonthSchema, optionalIsoDateSchema } from '../validations/records';
 
@@ -67,4 +86,93 @@ export const setPersonalBudget: RequestHandler = asyncHandler(async (request, re
     { upsert: true, new: true, runValidators: true },
   );
   response.json({ ok: true, budget, data: record });
+});
+
+export const exportUserData: RequestHandler = asyncHandler(async (request, response) => {
+  const userId = request.auth?.userId;
+  if (!userId) throw new HttpError(401, 'Authentication required');
+
+  const uid = new mongoose.Types.ObjectId(userId);
+
+  const [
+    user,
+    profile,
+    bankAccounts,
+    cards,
+    transactions,
+    expenses,
+    incomes,
+    loans,
+    pawnedItems,
+    financePayments,
+    savingsGoals,
+    reminders,
+    documents,
+    companies,
+    businessBranches,
+    branchEntries,
+    ownerDraws,
+    agreements,
+    letters,
+    medicalExpenses,
+    personalBudgets,
+    employmentProfiles,
+  ] = await Promise.all([
+    UserModel.findById(uid).select('-passwordHash -salt').lean(),
+    ProfileModel.findOne({ userId: uid }).lean(),
+    BankAccountModel.find({ userId: uid }).lean(),
+    CardModel.find({ userId: uid }).lean(),
+    TransactionModel.find({ userId: uid }).lean(),
+    ExpenseModel.find({ userId: uid }).lean(),
+    IncomeModel.find({ userId: uid }).lean(),
+    LoanModel.find({ userId: uid }).lean(),
+    PawnedItemModel.find({ userId: uid }).lean(),
+    FinancePaymentModel.find({ userId: uid }).lean(),
+    SavingsGoalModel.find({ userId: uid }).lean(),
+    ReminderModel.find({ userId: uid }).lean(),
+    DocumentModel.find({ userId: uid }).select('-fileId').lean(),
+    CompanyModel.find({ userId: uid }).lean(),
+    BusinessBranchModel.find({ userId: uid }).lean(),
+    BranchEntryModel.find({ userId: uid }).lean(),
+    OwnerDrawModel.find({ userId: uid }).lean(),
+    AgreementModel.find({ userId: uid }).lean(),
+    LetterModel.find({ userId: uid }).lean(),
+    MedicalExpenseModel.find({ userId: uid }).lean(),
+    PersonalBudgetModel.find({ userId: uid }).lean(),
+    EmploymentProfileModel.find({ userId: uid }).lean(),
+  ]);
+
+  const exportPayload = {
+    exportDate: new Date().toISOString(),
+    account: user,
+    profile,
+    financialRecords: {
+      bankAccounts,
+      cards,
+      transactions,
+      expenses,
+      incomes,
+      loans,
+      pawnedItems,
+      financePayments,
+      savingsGoals,
+      reminders,
+      documents,
+      personalBudgets,
+      medicalExpenses,
+    },
+    businessRecords: {
+      companies,
+      businessBranches,
+      branchEntries,
+      ownerDraws,
+      agreements,
+      letters,
+      employmentProfiles,
+    },
+  };
+
+  response.setHeader('content-type', 'application/json');
+  response.setHeader('content-disposition', `attachment; filename="fintarg-data-export-${new Date().toISOString().slice(0, 10)}.json"`);
+  response.json(exportPayload);
 });

@@ -261,7 +261,7 @@ export async function runPropertyLedgerVerification(options: VerifyLedgerOptions
         }
       } else if (opType === 7) {
         // Goal contribution with ledger debit
-        const goal = await createRecord('savingsGoals', userId, {
+        const goal = await createRecord('goals', userId, {
           name: `Property Goal ${i}`,
           targetAmount: 50000,
           targetDate: '2026-12-31',

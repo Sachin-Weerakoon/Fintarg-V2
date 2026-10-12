@@ -27,7 +27,11 @@ export const requireAuth: RequestHandler = asyncHandler(async (request, _respons
     return next(new HttpError(401, 'Invalid or expired session'));
   }
 
-  const user = await UserModel.findById(payload.userId).select('tokenVersion plan').lean();
+  const user = (await UserModel.findById(payload.userId).select('tokenVersion plan').lean()) as {
+    _id: any;
+    tokenVersion?: number;
+    plan?: 'basic' | 'business';
+  } | null;
   if (!user) return next(new HttpError(401, 'Account no longer exists'));
 
   const userTokenVersion = typeof user.tokenVersion === 'number' ? user.tokenVersion : 0;
@@ -44,7 +48,7 @@ const businessRecordKinds = new Set(['companies', 'businessBranches', 'ownerDraw
 
 export const requireBusinessPlan: RequestHandler = asyncHandler(async (request, _response, next) => {
   if (!businessRecordKinds.has(request.params.kind)) return next();
-  const user = request.userRecord || (await UserModel.findById(request.auth?.userId).select('plan').lean());
+  const user = (request.userRecord as any) || ((await UserModel.findById(request.auth?.userId).select('plan').lean()) as any);
   if (!user || user.plan !== 'business') return next(new HttpError(403, 'This feature requires the Business edition'));
   next();
 });

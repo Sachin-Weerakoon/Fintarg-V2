@@ -952,6 +952,33 @@ function AccountTab() {
     }
   };
 
+  const [isExportingData, setIsExportingData] = useState(false);
+
+  const handleExportData = async () => {
+    setIsExportingData(true);
+    try {
+      const res = await fetch('/api/profile/export');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to export data archive');
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fintarg-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      showToast('Data archive downloaded successfully.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to export data archive', 'error');
+    } finally {
+      setIsExportingData(false);
+    }
+  };
+
   const [showDeleteForm, setShowDeleteForm] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
@@ -1059,6 +1086,32 @@ function AccountTab() {
             iconLeft={<Icon name="shield" size={14} />}
           >
             Sign Out Everywhere
+          </Button>
+        </div>
+      </Card>
+
+      {/* Data Portability & Export */}
+      <Card className="p-6 space-y-4">
+        <div>
+          <h3 className="text-base font-bold text-text">Data Portability & Privacy</h3>
+          <p className="text-xs text-muted mt-0.5">
+            Download a complete machine-readable archive (JSON) of all your personal profile, transaction, and financial records.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
+          <div>
+            <div className="text-sm font-bold text-text">Download My Data Archive</div>
+            <div className="text-xs text-muted">Includes account info, bank accounts, cards, transactions, and agreements.</div>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleExportData}
+            loading={isExportingData}
+            iconLeft={<Icon name="download" size={14} />}
+          >
+            Download Data (.json)
           </Button>
         </div>
       </Card>

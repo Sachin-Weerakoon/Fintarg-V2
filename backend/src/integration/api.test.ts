@@ -1356,6 +1356,55 @@ describe('Backend API Integration Tests', () => {
       });
       assert.strictEqual(meAfterDelete.status, 401);
     });
+
+    it('GET /api/profile/export provides complete data archive without sensitive credentials (3.7)', async () => {
+      const exportEmail = `export_${Date.now()}@test.com`;
+      const exportPass = 'Password123!';
+
+      // Register user
+      const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Export Tester',
+          email: exportEmail,
+          password: exportPass,
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(regRes.status, 201);
+      const exportCookie = regRes.headers.get('set-cookie')?.split(';')[0] || '';
+
+      // Unauthenticated export -> 401
+      const unauthRes = await fetch(`${baseUrl}/api/profile/export`);
+      assert.strictEqual(unauthRes.status, 401);
+
+      // Authenticated export -> 200
+      const exportRes = await fetch(`${baseUrl}/api/profile/export`, {
+        headers: { Cookie: exportCookie },
+      });
+      assert.strictEqual(exportRes.status, 200);
+      assert.strictEqual(exportRes.headers.get('content-type'), 'application/json; charset=utf-8');
+      const disposition = exportRes.headers.get('content-disposition');
+      assert.ok(disposition && disposition.includes('attachment; filename="fintarg-data-export-'));
+
+      const data = await exportRes.json();
+      assert.ok(data.exportDate);
+      assert.ok(data.account);
+      assert.strictEqual(data.account.email, exportEmail);
+      // Ensure password hash and salt are NEVER leaked in export
+      assert.strictEqual(data.account.passwordHash, undefined);
+      assert.strictEqual(data.account.salt, undefined);
+
+      assert.ok(data.financialRecords);
+      assert.ok(Array.isArray(data.financialRecords.bankAccounts));
+      assert.ok(Array.isArray(data.financialRecords.transactions));
+      assert.ok(Array.isArray(data.financialRecords.loans));
+
+      assert.ok(data.businessRecords);
+      assert.ok(Array.isArray(data.businessRecords.companies));
+      assert.ok(Array.isArray(data.businessRecords.agreements));
+    });
   });
 });
 
