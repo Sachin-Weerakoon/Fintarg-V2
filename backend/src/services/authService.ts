@@ -40,16 +40,33 @@ export async function registerUser(input: RegisterInput) {
   }
 }
 
+const DUMMY_SALT = '0123456789abcdef0123456789abcdef';
+const DUMMY_HASH = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
 export async function authenticateUser(email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
   const user = await UserModel.findOne({ email: normalizedEmail });
-  if (!user) throw new HttpError(401, 'Invalid email or password');
-  if (user.lockedUntil && user.lockedUntil > new Date()) throw new HttpError(429, 'Account temporarily locked. Try again later.');
+  if (!user) {
+    // Perform dummy scrypt derivation so timing does not leak user existence
+    await verifyPassword(password, DUMMY_SALT, DUMMY_HASH);
+    throw new HttpError(401, 'Invalid email or password');
+  }
+
+  if (user.lockedUntil) {
+    if (user.lockedUntil > new Date()) {
+      throw new HttpError(429, 'Account temporarily locked. Try again later.');
+    }
+    // Lockout duration has expired: reset failure counter and clear lockout timestamp
+    user.lockedUntil = undefined;
+    user.failedLoginAttempts = 0;
+  }
 
   const valid = await verifyPassword(password, user.salt, user.passwordHash);
   if (!valid) {
     user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
-    if (user.failedLoginAttempts >= 5) user.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+    if (user.failedLoginAttempts >= 5) {
+      user.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+    }
     await user.save();
     throw new HttpError(401, 'Invalid email or password');
   }

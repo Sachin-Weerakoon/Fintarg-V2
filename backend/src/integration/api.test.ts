@@ -843,6 +843,106 @@ describe('Backend API Integration Tests', () => {
       });
       assert.strictEqual(newLoginRes.status, 200);
     });
+
+    it('locks account after 5 failed attempts and resets counter when lockout period expires', async () => {
+      const lockEmail = 'lockout-test@example.com';
+      const lockPass = 'ValidSecretPass123!';
+
+      // 1. Register user
+      const reg = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Lockout Tester',
+          email: lockEmail,
+          password: lockPass,
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(reg.status, 201);
+
+      // 2. Fail login 4 times -> 401 each time
+      for (let i = 0; i < 4; i++) {
+        const failRes = await fetch(`${baseUrl}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: lockEmail, password: 'WrongPassword!' }),
+        });
+        assert.strictEqual(failRes.status, 401);
+      }
+
+      // 3. 5th failure triggers lockout
+      const fifthFail = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: lockEmail, password: 'WrongPassword!' }),
+      });
+      assert.strictEqual(fifthFail.status, 401);
+
+      // 4. 6th attempt while locked -> 429 Too Many Requests
+      const lockedAttempt = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: lockEmail, password: lockPass }),
+      });
+      assert.strictEqual(lockedAttempt.status, 429);
+      const lockedData = await lockedAttempt.json();
+      assert.ok(lockedData.error.includes('temporarily locked'));
+
+      // 5. Simulate lockout expiration by updating lockedUntil in database
+      const { UserModel } = await import('../models/User');
+      await UserModel.updateOne(
+        { email: lockEmail },
+        { $set: { lockedUntil: new Date(Date.now() - 5000) } }
+      );
+
+      // 6. After expiry, failed attempt starts fresh at 1 failure and does NOT immediately relock
+      const postExpiryFail = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: lockEmail, password: 'WrongPasswordAgain!' }),
+      });
+      assert.strictEqual(postExpiryFail.status, 401);
+
+      const userDoc = await UserModel.findOne({ email: lockEmail }).lean();
+      assert.strictEqual((userDoc as any).failedLoginAttempts, 1);
+      assert.strictEqual((userDoc as any).lockedUntil, undefined);
+
+      // 7. Successful login with valid password succeeds
+      const postExpirySuccess = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: lockEmail, password: lockPass }),
+      });
+      assert.strictEqual(postExpirySuccess.status, 200);
+
+      const userDocAfterSuccess = await UserModel.findOne({ email: lockEmail }).lean();
+      assert.strictEqual((userDocAfterSuccess as any).failedLoginAttempts, 0);
+    });
+
+    it('returns uniform 401 for non-existent email and 200 for forgot password without leaking', async () => {
+      const nonExistentEmail = 'nobody-here@example.com';
+
+      // 1. Non-existent login returns 401
+      const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: nonExistentEmail, password: 'AnyPassword123!' }),
+      });
+      assert.strictEqual(loginRes.status, 401);
+      const loginData = await loginRes.json();
+      assert.strictEqual(loginData.error, 'Invalid email or password');
+
+      // 2. Forgot password returns ok: true without disclosing whether email exists
+      const forgotRes = await fetch(`${baseUrl}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: nonExistentEmail }),
+      });
+      assert.strictEqual(forgotRes.status, 200);
+      const forgotData = await forgotRes.json();
+      assert.strictEqual(forgotData.ok, true);
+    });
   });
 });
 

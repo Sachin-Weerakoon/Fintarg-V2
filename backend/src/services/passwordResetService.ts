@@ -11,13 +11,19 @@ function hashToken(token: string) {
 }
 
 export async function requestPasswordReset(email: string) {
-  const user = await UserModel.findOne({ email });
-  if (!user) return;
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await UserModel.findOne({ email: normalizedEmail });
+  if (!user) {
+    const dummyToken = randomBytes(32).toString('hex');
+    hashToken(dummyToken);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    return;
+  }
 
   const token = randomBytes(32).toString('hex');
   await PasswordResetModel.create({ userId: user._id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + 60 * 60 * 1000), used: false });
   const url = `${env.APP_ORIGIN}/reset-password/${token}`;
-  await sendMail(email, 'Reset your Fintarg password', `<p><a href="${url}">Reset your password</a>. This link expires in one hour.</p>`);
+  await sendMail(normalizedEmail, 'Reset your Fintarg password', `<p><a href="${url}">Reset your password</a>. This link expires in one hour.</p>`);
 }
 
 export async function applyPasswordReset(token: string, password: string) {
