@@ -1046,5 +1046,169 @@ describe('Backend API Integration Tests', () => {
       assert.strictEqual(loginNewRes.status, 200);
     });
   });
+
+  describe('File Upload Hardening, Magic Bytes & Limits (3.5)', () => {
+    let fileUserCookie: string;
+
+    before(async () => {
+      const reg = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Files Tester',
+          email: 'files-tester@example.com',
+          password: 'Password123!',
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(reg.status, 201);
+      fileUserCookie = reg.headers.get('set-cookie')?.split(';')[0] || '';
+    });
+
+    it('rejects spoofed files whose magic bytes do not match allowed formats with 415', async () => {
+      const fakePng = Buffer.from('not really a png file at all');
+      const res = await fetch(`${baseUrl}/api/files`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'image/png',
+          Cookie: fileUserCookie,
+        },
+        body: fakePng,
+      });
+      assert.strictEqual(res.status, 415);
+      const data = await res.json();
+      assert.ok(data.error.includes('signature mismatch'));
+    });
+
+    it('accepts real PNG image and sets inline disposition and nosniff headers on download', async () => {
+      const realPng = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D]);
+      const uploadRes = await fetch(`${baseUrl}/api/files?purpose=avatar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'image/png',
+          Cookie: fileUserCookie,
+        },
+        body: realPng,
+      });
+      assert.strictEqual(uploadRes.status, 201);
+      const { id } = await uploadRes.json();
+      assert.ok(id);
+
+      const downloadRes = await fetch(`${baseUrl}/api/files/${id}`, {
+        headers: { Cookie: fileUserCookie },
+      });
+      assert.strictEqual(downloadRes.status, 200);
+      assert.strictEqual(downloadRes.headers.get('x-content-type-options'), 'nosniff');
+      assert.strictEqual(downloadRes.headers.get('content-type'), 'image/png');
+      assert.ok(downloadRes.headers.get('content-disposition')?.includes('inline'));
+    });
+
+    it('accepts real WebP image and sets image/webp mimeType', async () => {
+      const realWebp = Buffer.from([
+        0x52, 0x49, 0x46, 0x46, // RIFF
+        0x20, 0x00, 0x00, 0x00, // file length
+        0x57, 0x45, 0x42, 0x50, // WEBP
+        0x56, 0x50, 0x38, 0x20, // VP8 chunk
+      ]);
+      const uploadRes = await fetch(`${baseUrl}/api/files?purpose=avatar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'image/webp',
+          Cookie: fileUserCookie,
+        },
+        body: realWebp,
+      });
+      assert.strictEqual(uploadRes.status, 201);
+      const { id, mimeType } = await uploadRes.json();
+      assert.strictEqual(mimeType, 'image/webp');
+
+      const downloadRes = await fetch(`${baseUrl}/api/files/${id}`, {
+        headers: { Cookie: fileUserCookie },
+      });
+      assert.strictEqual(downloadRes.status, 200);
+      assert.strictEqual(downloadRes.headers.get('content-type'), 'image/webp');
+      assert.ok(downloadRes.headers.get('content-disposition')?.includes('inline'));
+    });
+
+    it('rejects non-image when uploaded with ?purpose=avatar', async () => {
+      const realPdf = Buffer.from('%PDF-1.4 dummy pdf document content');
+      const res = await fetch(`${baseUrl}/api/files?purpose=avatar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/pdf',
+          Cookie: fileUserCookie,
+        },
+        body: realPdf,
+      });
+      assert.strictEqual(res.status, 400);
+      const data = await res.json();
+      assert.ok(data.error.includes('Avatar must be a valid image file'));
+    });
+
+    it('serves docx files with Content-Disposition: attachment for security', async () => {
+      const realDocx = Buffer.from([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x06, 0x00, 0x08, 0x00]);
+      const uploadRes = await fetch(`${baseUrl}/api/files`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          Cookie: fileUserCookie,
+        },
+        body: realDocx,
+      });
+      assert.strictEqual(uploadRes.status, 201);
+      const { id } = await uploadRes.json();
+
+      const downloadRes = await fetch(`${baseUrl}/api/files/${id}`, {
+        headers: { Cookie: fileUserCookie },
+      });
+      assert.strictEqual(downloadRes.status, 200);
+      assert.strictEqual(downloadRes.headers.get('x-content-type-options'), 'nosniff');
+      assert.ok(downloadRes.headers.get('content-disposition')?.includes('attachment'));
+    });
+
+    it('enforces avatar 2MB size limit and document 4MB size limit', async () => {
+      // 1. Avatar exceeding 2MB
+      const bigAvatar = Buffer.alloc(2 * 1024 * 1024 + 1024);
+      bigAvatar[0] = 0x89;
+      bigAvatar[1] = 0x50;
+      bigAvatar[2] = 0x4E;
+      bigAvatar[3] = 0x47;
+      bigAvatar[4] = 0x0D;
+      bigAvatar[5] = 0x0A;
+      bigAvatar[6] = 0x1A;
+      bigAvatar[7] = 0x0A;
+
+      const avatarRes = await fetch(`${baseUrl}/api/files?purpose=avatar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'image/png',
+          Cookie: fileUserCookie,
+        },
+        body: bigAvatar,
+      });
+      assert.strictEqual(avatarRes.status, 400);
+      const avatarData = await avatarRes.json();
+      assert.ok(avatarData.error.includes('exceeds the 2 MB limit'));
+
+      // 2. Document exceeding 4MB
+      const bigDoc = Buffer.alloc(4 * 1024 * 1024 + 1024);
+      bigDoc[0] = 0x25;
+      bigDoc[1] = 0x50;
+      bigDoc[2] = 0x44;
+      bigDoc[3] = 0x46; // %PDF
+
+      const docRes = await fetch(`${baseUrl}/api/files`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/pdf',
+          Cookie: fileUserCookie,
+        },
+        body: bigDoc,
+      });
+      assert.strictEqual(docRes.status, 400);
+      const docData = await docRes.json();
+      assert.ok(docData.error.includes('exceeds the 4 MB limit'));
+    });
+  });
 });
 

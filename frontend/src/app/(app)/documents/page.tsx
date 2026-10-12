@@ -40,7 +40,7 @@ export default function DocumentsClient() {
     if (!file) return;
     setErrorMessage('');
     try {
-      if (file.size > 10 * 1024 * 1024) throw new Error('Maximum file size is 10 MB.');
+      if (file.size > 4 * 1024 * 1024) throw new Error('Maximum file size is 4 MB.');
       setUploading(true);
       const mimeType = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream');
       const uploaded = await apiClient<{ id: string }>('/api/backend/files', {
@@ -126,7 +126,7 @@ export default function DocumentsClient() {
               onClick={() => fileRef.current?.click()}
               loading={uploading}
             >
-              Select Files to Upload (Max 10MB)
+              Select Files to Upload (Max 4MB)
             </Button>
           }
         />

@@ -322,13 +322,13 @@ function ProfileTab() {
       showToast('Accepted photo formats: JPG, PNG, WEBP', 'error');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Profile image must be less than 5 MB', 'error');
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Profile image must be less than 2 MB', 'error');
       return;
     }
     setUploadingAvatar(true);
     try {
-      const res = await fetch('/api/backend/files', {
+      const res = await fetch('/api/backend/files?purpose=avatar', {
         method: 'POST',
         headers: { 'content-type': file.type },
         body: file,
@@ -375,7 +375,7 @@ function ProfileTab() {
         />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-bold text-text">Avatar Image</div>
-          <p className="text-xs text-muted mt-0.5">JPG, PNG, or WEBP up to 5 MB</p>
+          <p className="text-xs text-muted mt-0.5">JPG, PNG, or WEBP up to 2 MB</p>
           <div className="flex items-center gap-2 mt-2">
             <Input
               ref={avatarInputRef}
@@ -631,8 +631,8 @@ function DocumentsTab() {
       showToast('Accepted formats: PDF, JPG, PNG, DOCX', 'error');
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      showToast('Max file size is 10 MB', 'error');
+    if (file.size > 4 * 1024 * 1024) {
+      showToast('Max file size is 4 MB', 'error');
       return;
     }
     dispatch({
@@ -765,7 +765,7 @@ function DocumentsTab() {
           >
             Choose & Upload File
           </Button>
-          <span className="text-xs text-muted">Max 10 MB (PDF, JPG, PNG, DOCX)</span>
+          <span className="text-xs text-muted">Max 4 MB (PDF, JPG, PNG, DOCX)</span>
         </div>
       </div>
     </Card>

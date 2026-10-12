@@ -17,8 +17,8 @@ function getEncryptionKey(): Buffer {
   return createHash('sha256').update(raw).digest();
 }
 
-export async function storeFile(userId: string, mimeType: string, input: Buffer) {
-  if (input.length < 1 || input.length > 10 * 1024 * 1024) throw new HttpError(400, 'File must be between 1 byte and 10 MB');
+export async function storeFile(userId: string, mimeType: string, input: Buffer, maxAllowedBytes = 4 * 1024 * 1024) {
+  if (input.length < 1 || input.length > maxAllowedBytes) throw new HttpError(400, `File must be between 1 byte and ${maxAllowedBytes / (1024 * 1024)} MB`);
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', getEncryptionKey(), iv);
   const data = Buffer.concat([cipher.update(input), cipher.final()]);
