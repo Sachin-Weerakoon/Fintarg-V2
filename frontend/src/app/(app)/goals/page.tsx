@@ -306,30 +306,32 @@ function GoalsContent() {
           <div className="font-semibold text-sm text-text">Personal / Enjoyment spending plan</div>
           <Badge tone="neutral" size="sm">Auto-tracked from expenses</Badge>
         </div>
-        <div className="flex flex-wrap items-end gap-6 mb-3">
-          <Field id="personal-budget" label="Monthly budget (Rs.)">
-            <Input
-              id="personal-budget"
-              className="!w-36"
-              type="number"
-              min="0"
-              value={budgetInput}
-              onChange={e => setBudgetInput(e.target.value)}
-            />
-          </Field>
-          <div>
-            <div className="text-xs text-muted mb-1">Actual spent (Personal category)</div>
-            <div className="text-lg font-bold text-text num">{formatRs(personalSpent)}</div>
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-3 sm:gap-6 mb-3">
+          <div className="col-span-2 sm:col-span-1">
+            <Field id="personal-budget" label="Monthly budget (Rs.)">
+              <Input
+                id="personal-budget"
+                className="w-full sm:!w-36"
+                type="number"
+                min="0"
+                value={budgetInput}
+                onChange={e => setBudgetInput(e.target.value)}
+              />
+            </Field>
           </div>
-          <div>
-            <div className="text-xs text-muted mb-1">Remaining</div>
-            <div className={`text-lg font-bold num ${personalRemaining < 0 ? 'text-danger-text' : 'text-success-text'}`}>
+          <div className="bg-surface-hover/40 p-2.5 rounded-xl border border-border/60 sm:bg-transparent sm:p-0 sm:border-0">
+            <div className="text-[11px] text-muted mb-0.5">Actual spent</div>
+            <div className="text-base sm:text-lg font-bold text-text num">{formatRs(personalSpent)}</div>
+          </div>
+          <div className="bg-surface-hover/40 p-2.5 rounded-xl border border-border/60 sm:bg-transparent sm:p-0 sm:border-0">
+            <div className="text-[11px] text-muted mb-0.5">Remaining</div>
+            <div className={`text-base sm:text-lg font-bold num ${personalRemaining < 0 ? 'text-danger-text' : 'text-success-text'}`}>
               {formatRs(personalRemaining)}
             </div>
           </div>
-          <div>
-            <div className="text-xs text-muted mb-1">Daily allowance</div>
-            <div className="text-lg font-bold text-text num">{formatRs(personalAllowance.dailyAllowance)} / day</div>
+          <div className="col-span-2 sm:col-span-1 bg-surface-hover/40 p-2.5 rounded-xl border border-border/60 sm:bg-transparent sm:p-0 sm:border-0">
+            <div className="text-[11px] text-muted mb-0.5">Daily allowance</div>
+            <div className="text-base sm:text-lg font-bold text-text num">{formatRs(personalAllowance.dailyAllowance)} / day</div>
           </div>
         </div>
 

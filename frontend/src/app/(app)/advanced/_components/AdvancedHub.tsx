@@ -59,6 +59,8 @@ export function AdvancedHub({ hasBusiness, onOpen }: AdvancedHubProps) {
       description: 'Multi-job pay slip deductions, EPF/ETF tracking, and automatic payday savings allocation.',
       icon: 'wallet',
       badge: 'Income',
+      isExternalRoute: true,
+      href: '/salary',
     },
     {
       id: 'companies',

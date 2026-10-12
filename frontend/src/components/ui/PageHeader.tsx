@@ -26,11 +26,11 @@ export function PageHeader({
           </div>
         )}
         {asH1 ? (
-          <h1 className="text-2xl font-bold tracking-tight text-text">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text">
             {title}
           </h1>
         ) : (
-          <div className="text-2xl font-bold tracking-tight text-text">
+          <div className="text-xl sm:text-2xl font-bold tracking-tight text-text">
             {title}
           </div>
         )}

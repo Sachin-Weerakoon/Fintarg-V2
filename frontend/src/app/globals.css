@@ -402,10 +402,11 @@ body:has(.dark-mode) {
   background: var(--color-surface);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   outline: none;
-  min-height: 40px;
+  min-height: 44px;
 }
 @media (min-width: 640px) {
   .form-input {
+    min-height: 40px;
     font-size: 14px;
   }
 }

@@ -448,6 +448,21 @@ export default function DashboardClient() {
                 <Icon name="arrow-right" size={14} className="text-muted group-hover:text-primary-text transition-colors" />
               </Link>
 
+              {state.profile.workMode !== 'business' && (
+                <Link
+                  href="/salary"
+                  className="flex items-center justify-between p-3 rounded-xl border border-border bg-surface hover:bg-surface-hover hover:border-primary-500/50 text-xs font-semibold text-text transition-all duration-200 group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-primary-tint text-primary-text flex items-center justify-center">
+                      <Icon name="wallet" size={16} />
+                    </div>
+                    <span>Salary & Payday Planning</span>
+                  </div>
+                  <Icon name="arrow-right" size={14} className="text-muted group-hover:text-primary-text transition-colors" />
+                </Link>
+              )}
+
               <Link
                 href="/financial?tab=accounts"
                 className="flex items-center justify-between p-3 rounded-xl border border-border bg-surface hover:bg-surface-hover hover:border-primary-500/50 text-xs font-semibold text-text transition-all duration-200 group"

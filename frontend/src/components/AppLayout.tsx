@@ -11,26 +11,17 @@ import { Button } from '@/components/ui/Button';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { NotificationCenter } from '@/components/NotificationCenter';
 
-const navItems = [
-  { href: '/', label: 'Home', page: 'dashboard' },
-  { href: '/financial', label: 'Financial', page: 'financial' },
-  { href: '/analysis', label: 'Analysis', page: 'analysis' },
-  { href: '/goals', label: 'Goals', page: 'goals' },
-  { href: '/advanced', label: 'Advanced Features', page: 'advanced' },
-  { href: '/settings', label: 'Settings', page: 'settings' },
-];
-
 const salaryBottomItems = [
   { href: '/', label: 'Home', page: 'dashboard' },
+  { href: '/salary', label: 'Salary', page: 'salary' },
   { href: '/financial', label: 'Financial', page: 'financial' },
   { href: '/analysis', label: 'Analysis', page: 'analysis' },
-  { href: '/goals', label: 'Goals', page: 'goals' },
 ];
 
 const businessBottomItems = [
   { href: '/', label: 'Home', page: 'dashboard' },
   { href: '/financial', label: 'Financial', page: 'financial' },
-  { href: '/goals', label: 'Goals', page: 'goals' },
+  { href: '/analysis', label: 'Analysis', page: 'analysis' },
   { href: '/advanced', label: 'Advanced', page: 'advanced' },
 ];
 
@@ -38,6 +29,8 @@ function getPageIconName(page: string): IconName {
   switch (page) {
     case 'dashboard':
       return 'home';
+    case 'salary':
+      return 'wallet';
     case 'financial':
       return 'financial';
     case 'analysis':
@@ -55,10 +48,12 @@ function getPageIconName(page: string): IconName {
 
 function pageTitleOf(pathname: string, tab?: string): string {
   if (pathname === '/') return 'Home';
+  if (pathname === '/salary') return 'Salary & Payday';
   if (pathname === '/financial') return 'Financial';
   if (pathname === '/analysis') return 'Analysis';
   if (pathname === '/goals') return 'Goals';
   if (pathname === '/advanced') {
+    if (tab === 'salary') return 'Salary & Payday';
     if (tab === 'letters') return 'Letters';
     if (tab === 'medical') return 'Medical';
     if (tab === 'agreements') return 'Business Agreements';
@@ -97,6 +92,16 @@ export default function AppLayout({
   const isMorePage = !mobileBottomItems.some(item => item.page === pathname.replace('/', ''));
   const currentTab = searchParams?.get('tab') || undefined;
 
+  const navItems = [
+    { href: '/', label: 'Home', page: 'dashboard' },
+    ...(user.workMode !== 'business' ? [{ href: '/salary', label: 'Salary & Payday', page: 'salary' }] : []),
+    { href: '/financial', label: 'Financial', page: 'financial' },
+    { href: '/analysis', label: 'Analysis', page: 'analysis' },
+    { href: '/goals', label: 'Goals', page: 'goals' },
+    { href: '/advanced', label: 'Advanced Features', page: 'advanced' },
+    { href: '/settings', label: 'Settings', page: 'settings' },
+  ];
+
   const handleSignOut = async () => {
     setSigningOut(true);
     try {
@@ -109,7 +114,7 @@ export default function AppLayout({
   };
 
   return (
-    <AppProvider initialProfile={user.profile || {}}>
+    <AppProvider initialProfile={{ ...(user.profile || {}), workMode: user.workMode as any }}>
       <div className={`min-h-screen flex flex-col ${darkClass} ${textSizeClass}`} style={layoutStyle}>
         {/* Skip to main content accessibility link */}
         <a
@@ -235,26 +240,26 @@ export default function AppLayout({
         {/* Mobile layout */}
         <div className="mobile-shell md:hidden flex flex-col min-h-screen">
           <header
-            className="mobile-topbar flex items-center justify-between px-4 py-3 sticky top-0 z-10 no-print bg-chrome-900 border-b border-white/[0.08]"
+            className="mobile-topbar flex items-center justify-between px-3.5 py-2.5 sticky top-0 z-10 no-print bg-chrome-900 border-b border-white/[0.08]"
           >
-            <div className="flex items-center gap-2">
-              <BrandLogo variant="full" height={26} />
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <BrandLogo variant="full" height={24} />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
               <NotificationCenter variant="dark" />
-              <span className="text-xs font-semibold px-2 py-1 rounded-full bg-white/10 text-white">
+              <span className="hidden xs:inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/10 text-white whitespace-nowrap">
                 {modeLabel}
               </span>
               <Link
                 href="/settings"
-                className="rounded-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-white/40"
+                className="rounded-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-white/40 flex-shrink-0"
                 aria-label="Settings"
               >
                 <Avatar
                   name={user.name || 'User'}
                   fileId={user.profile?.profilePictureFileId}
                   size="sm"
-                  className="!w-8 !h-8"
+                  className="!w-7 !h-7"
                 />
               </Link>
               <Button
@@ -262,17 +267,14 @@ export default function AppLayout({
                 size="sm"
                 onClick={handleSignOut}
                 loading={signingOut}
-                className="!text-xs !py-1 !px-2.5 !min-h-[28px] !rounded-full text-white border border-white/20 bg-white/5"
+                className="!text-xs !py-1 !px-2.5 !min-h-[30px] !rounded-full text-white border border-white/20 bg-white/5 flex-shrink-0"
               >
                 Sign out
               </Button>
             </div>
           </header>
 
-          <main id="main-content" tabIndex={-1} className="mobile-main flex-1 overflow-y-auto p-4 pb-20 focus:outline-none bg-background">
-            <div className="mobile-page-title text-lg font-semibold mb-4 text-text">
-              {pageTitleOf(pathname, currentTab)}
-            </div>
+          <main id="main-content" tabIndex={-1} className="mobile-main flex-1 overflow-y-auto p-4 pb-28 focus:outline-none bg-background">
             {children}
           </main>
 

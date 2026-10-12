@@ -20,15 +20,13 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { THEME_COLORS, LIGHT_DEFAULTS, validateCustomOverrides } from '@/lib/theme';
-import type { Document } from '@/types';
 
-type Tab = 'appearance' | 'profile' | 'contacts' | 'documents' | 'reminders' | 'account';
+type Tab = 'appearance' | 'profile' | 'contacts' | 'reminders' | 'account';
 
 const SETTING_TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'appearance', label: 'Appearance', icon: <Icon name="bolt" size={16} /> },
   { id: 'profile', label: 'Profile', icon: <Icon name="user" size={16} /> },
   { id: 'contacts', label: 'Contacts', icon: <Icon name="heart" size={16} /> },
-  { id: 'documents', label: 'Documents', icon: <Icon name="documents" size={16} /> },
   { id: 'reminders', label: 'Reminders', icon: <Icon name="bell" size={16} /> },
   { id: 'account', label: 'Account', icon: <Icon name="shield" size={16} /> },
 ];
@@ -608,169 +606,6 @@ function ContactsTab() {
   );
 }
 
-const DOC_TYPES: { value: Document['type']; label: string }[] = [
-  { value: 'profile-picture', label: 'Profile Picture' },
-  { value: 'cv', label: 'Curriculum Vitae (CV)' },
-  { value: 'nic-front', label: 'NIC Front Scan' },
-  { value: 'nic-back', label: 'NIC Back Scan' },
-  { value: 'bank', label: 'Bank Statement / Slip' },
-  { value: 'other', label: 'Other Document' },
-];
-
-function DocumentsTab() {
-  const { state, dispatch, showToast } = useApp();
-  const confirm = useConfirm();
-  const [form, setForm] = useState({ type: 'cv' as Document['type'], label: '', note: '' });
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowed.includes(file.type)) {
-      showToast('Accepted formats: PDF, JPG, PNG, DOCX', 'error');
-      return;
-    }
-    if (file.size > 4 * 1024 * 1024) {
-      showToast('Max file size is 4 MB', 'error');
-      return;
-    }
-    dispatch({
-      type: 'ADD_DOCUMENT',
-      entry: {
-        id: 'doc_' + Date.now(),
-        type: form.type,
-        label: form.label || DOC_TYPES.find(d => d.value === form.type)?.label || file.name,
-        uploadDate: new Date().toISOString().slice(0, 10),
-        note: form.note,
-        fileName: file.name,
-      },
-    });
-    setForm({ type: 'cv', label: '', note: '' });
-    e.target.value = '';
-    showToast('Document uploaded to vault.', 'success');
-  };
-
-  const deleteDoc = async (id: string, label: string) => {
-    const ok = await confirm({
-      title: 'Delete Document',
-      message: `Delete "${label}" from your personal vault?`,
-      confirmLabel: 'Yes, Delete',
-      tone: 'danger',
-    });
-    if (ok) {
-      dispatch({ type: 'DELETE_DOCUMENT', id });
-      showToast('Document deleted.', 'info');
-    }
-  };
-
-  const vaultDocs = state.documents.filter(d => d.note !== 'Medical document');
-
-  return (
-    <Card className="p-6 space-y-6">
-      <div>
-        <h3 className="text-base font-bold text-text">Document Vault</h3>
-        <p className="text-xs text-muted mt-0.5">Secure cloud repository for official identification, CVs, and statements.</p>
-      </div>
-
-      {vaultDocs.length === 0 ? (
-        <EmptyState
-          title="Vault is empty"
-          helper="Upload your NIC, resume, and bank verification files for rapid attachment to letters."
-          className="py-8"
-        />
-      ) : (
-        <div className="space-y-2">
-          {vaultDocs.map(d => (
-            <div
-              key={d.id}
-              className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-surface-hover/30"
-            >
-              <div>
-                <div className="text-xs font-bold text-text flex items-center gap-2">
-                  <span>{d.label}</span>
-                  <Badge tone="neutral" size="sm">
-                    {d.type}
-                  </Badge>
-                </div>
-                <div className="text-[11px] text-muted mt-0.5">
-                  {d.fileName} · Uploaded on {d.uploadDate}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => deleteDoc(d.id, d.label)}
-                  className="!text-danger-text hover:!bg-danger-tint"
-                  iconLeft={<Icon name="trash" size={14} />}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Upload Form */}
-      <div className="pt-6 border-t border-border space-y-4">
-        <h4 className="text-sm font-bold text-text">Upload to Vault</h4>
-        <FormGrid columns={3}>
-          <FormField id="doc-type" label="Document Category">
-            <Select
-              id="doc-type"
-              value={form.type}
-              onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))}
-            >
-              {DOC_TYPES.map(d => (
-                <option key={d.value} value={d.value}>
-                  {d.label}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-
-          <FormField id="doc-label" label="Custom File Label">
-            <Input
-              id="doc-label"
-              placeholder="e.g. NIC Copy 2026"
-              value={form.label}
-              onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
-            />
-          </FormField>
-
-          <FormField id="doc-note" label="Optional Notes">
-            <Input
-              id="doc-note"
-              placeholder="e.g. Certified copy"
-              value={form.note}
-              onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
-            />
-          </FormField>
-        </FormGrid>
-
-        <div className="flex items-center justify-between pt-2">
-          <Input
-            ref={fileInputRef}
-            type="file"
-            aria-label="Upload document file"
-            accept=".pdf,.jpg,.jpeg,.png,.docx"
-            className="hidden"
-            onChange={handleFile}
-          />
-          <Button
-            variant="primary"
-            onClick={() => fileInputRef.current?.click()}
-            iconLeft={<Icon name="upload" size={16} />}
-          >
-            Choose & Upload File
-          </Button>
-          <span className="text-xs text-muted">Max 4 MB (PDF, JPG, PNG, DOCX)</span>
-        </div>
-      </div>
-    </Card>
-  );
-}
 
 function RemindersTab() {
   const { state, dispatch, showToast } = useApp();
@@ -1252,7 +1087,6 @@ function SettingsContent() {
           {tab === 'appearance' && <AppearanceTab />}
           {tab === 'profile' && <ProfileTab />}
           {tab === 'contacts' && <ContactsTab />}
-          {tab === 'documents' && <DocumentsTab />}
           {tab === 'reminders' && <RemindersTab />}
           {tab === 'account' && <AccountTab />}
         </div>

@@ -31,8 +31,8 @@ export function SegmentedTabs<T extends string = string>({
   };
 
   const itemSizeClasses = {
-    sm: 'py-1 px-2.5 min-h-[28px] rounded-lg',
-    md: 'py-1.5 px-3 min-h-[34px] rounded-xl',
+    sm: 'py-1 px-2.5 min-h-[32px] rounded-lg touch-manipulation',
+    md: 'py-2 px-3.5 min-h-[40px] rounded-xl touch-manipulation',
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
