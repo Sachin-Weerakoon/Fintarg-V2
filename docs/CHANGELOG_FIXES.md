@@ -64,3 +64,61 @@
 - **What changed:** Implemented `isValidIsoDate` (validating real calendar dates including leap years) and `isValidIsoMonth`. Configured `records.ts` schemas to require `isoDateSchema` on all mandatory date fields and `optionalIsoDateSchema` on optional date fields. Updated `/api/profile/personal-budget` to strictly validate `YYYY-MM`. Created `backend/src/scripts/checkNormalizeDates.ts` with `--dry-run` default to scan and report invalid stored dates across all collections.
 - **How verified:** Added unit tests in `records.test.ts` and `checkNormalizeDates.test.ts`, and integration tests in `api.test.ts` verifying rejection of invalid dates and months.
 
+## Phase 2 — Ledger Integrity & Financial Calculations
+
+### 2.1 Double-Entry Foundations, `openingBalanceCents`, and Built-in Cash Wallet
+- **What was wrong:** Bank accounts stored a standalone `balanceCents` field that drifted when transactions were added, updated, or removed. There was no concept of an opening balance, and cash transactions lacked an account backing.
+- **What changed:** Added `openingBalanceCents` to `BankAccount` model. Created an automatic, non-deletable `cash` account per user (`accountType: 'cash'`) via `ensureCashWallet`. Implemented `ledgerService.ts` containing `postTransaction`, `reverseTransaction`, `recomputeBalance`, and `backfillOpeningBalances`.
+- **How verified:** Added unit tests in `ledgerService.test.ts` verifying that `recomputeBalance` reports `driftCents === 0` against `openingBalanceCents + sum(signed transactions)`.
+
+### 2.2 Route Expenses and Incomes Through `ledgerService` with Account Validation
+- **What was wrong:** Creating, updating, or deleting expenses and incomes directly created unlinked transaction rows without validating whether the user owned the bank account or card. Deleting an expense left balance adjustments orphaned.
+- **What changed:** Routed expense and income creation, update, and deletion in `recordService` through `postTransaction`, `replaceTransaction`, and `reverseTransaction`. Enforced account ownership and payment method pairing (bank-linked methods require an owned `bankAccountId`; credit card requires an owned `cardId`; cash defaults to user's cash wallet). Adjusts credit card outstanding balance accurately.
+- **How verified:** Unit tests in `recordService.test.ts` confirmed balance adjustments on accounts and credit cards with zero drift after create and delete.
+
+### 2.3 Loan Repayment Ledger Integration & Payoff Calculation
+- **What was wrong:** Loan repayments recorded repayment history without debiting user bank accounts or cash wallets. Payoff settle amounts had no endpoint or recalculation logic.
+- **What changed:** Integrated `recordLoanRepayment` with `ledgerService` to debit bank account or cash wallet and post a transaction. Computed principal and interest split using amortization schedule. Implemented `deleteLoanRepayment` with full transaction reversal. Added `calculateLoanPayoff` payoff endpoint (`GET /records/loans/:id/payoff`) and modal dialog in UI.
+- **How verified:** Unit tests in `recordService.test.ts` verified that loan repayments debit accounts, split principal/interest, adjust loan balance, and undo cleanly with zero drift.
+
+### 2.4 Pawned Items Payments, Part-Principal, Redemption, and Undo
+- **What was wrong:** Pawned items lacked a payment history subdocument, could not record part-principal or full redemption payments, and interest payments were not reflected in the cash flow ledger.
+- **What changed:** Added `ticketNumber`, `status` (`active`/`redeemed`/`forfeited`), `principalOutstandingCents`, `interestPaidCents`, and `payments` subdocument array to `PawnedItem`. Implemented `recordPawnPayment` supporting payment types (`interest`, `part_principal`, `redemption`) with method/account ledger debits. Implemented `deletePawnPayment` for clean undo. Added Payment Sheet in UI.
+- **How verified:** Unit tests in `recordService.test.ts` verified interest, part-principal, redemption, and undo payment flows with zero balance drift.
+
+### 2.5 Finance Payments, Next Due Date Derivation, and Mark as Paid
+- **What was wrong:** Finance obligations lacked payment tracking, `nextDueDate` was not auto-derived from `dueDay`, and `monthsRemaining` could not reach 0 to mark obligations completed. Dashboard overdue queries relied on unvalidated fields.
+- **What changed:** Implemented `deriveNextDueDate` based on `dueDay`. Implemented `recordFinancePayment` ("Mark as paid"), posting an expense transaction via `ledgerService`, advancing `nextDueDate`, and decrementing `monthsRemaining` down to 0 (`status: 'completed'`). Implemented `deleteFinancePaymentPayment` for undo. Updated Dashboard queries to use real `nextDueDate`.
+- **How verified:** Unit tests in `recordService.test.ts` verified date advancement, ledger debits, and completion transitions.
+
+### 2.6 Goal Contributions with Optional Ledger Debit and Undo
+- **What was wrong:** Savings goal contributions only updated goal progress without providing the option to debit an actual bank account or cash wallet.
+- **What changed:** Added optional `debitAccount` flag, `paymentMethod`, and `bankAccountId` to `addGoalContribution`. When enabled, validates account ownership, creates a ledger transaction, and debits the account. Implemented `deleteGoalContribution` undo reversing the ledger transaction and restoring account balance. Added checkbox and account selector in UI.
+- **How verified:** Unit tests in `recordService.test.ts` verified both offline tracking and ledger-debited contributions with zero balance drift.
+
+### 2.7 Transfers Between Own Accounts, Cash, and Card
+- **What was wrong:** Moving money between accounts or paying credit cards required disconnected manual entries that corrupted cash flow analytics.
+- **What changed:** Implemented `transferFunds` creating two linked transactions with shared `transferGroupId` and `transferDirection` (`outgoing`/`incoming`). Handled account-to-account, account-to-cash, cash-to-account, and account-to-card transfers. Added endpoints `POST /records/transfers` and `DELETE /records/transfers/:transferGroupId` with full reversal. Added Transfer Funds UI modal.
+- **How verified:** Added unit tests in `ledgerService.test.ts` and `storeApi.test.ts` confirming two-legged transfers, balance updates, and zero drift.
+
+### 2.8 Generic Transaction CRUD Ledger Routing & System Row Protection
+- **What was wrong:** Direct CRUD on `/records/transactions` bypassed `ledgerService`, resulting in balance drift. System-generated transactions (from expenses, incomes, loans, pawns, finances, transfers) could be deleted or updated directly, corrupting parent records.
+- **What changed:** Routed generic transaction create, update, and delete through `postTransaction`, `updateTransactionById`, and `reverseTransactionById`. Protected system-generated rows (any transaction with `referenceId` or `transferGroupId`) by rejecting direct update or delete with `403 Forbidden`.
+- **How verified:** Unit tests in `recordService.test.ts` verified generic transaction CRUD with zero drift and confirmed 403 rejection on system-generated rows.
+
+### 2.9 Aggregation Pipeline for Transaction History with True Running Balance
+- **What was wrong:** `getTransactionHistory` loaded all user transactions into memory, calculated running balance starting from zero without considering `openingBalanceCents`, and sliced in memory.
+- **What changed:** Implemented MongoDB aggregation pipeline using `$setWindowFields` partitioned by `bankAccountId` and `$lookup` to incorporate `openingBalanceCents`, computing true running balance per account. Added compound indexes `{ userId: 1, bankAccountId: 1, date: -1 }`, `{ userId: 1, date: -1 }`, and `{ userId: 1, referenceId: 1 }`. Supported stable sort (`date: -1, createdAt: -1, _id: -1`), pagination (`skip`, `limit`), and filters (`startDate`, `endDate`, `category`, `type`, `paymentMethod`, `bankAccountId`, `cardId`, `search`).
+- **How verified:** Unit tests in `recordService.test.ts` verified running balance calculations against opening balance, pagination, filters, and stable sort order.
+
+### 2.10 Frontend StoreApi Contract Alignment, Pagination, and Error State
+- **What was wrong:** `TransactionsHistoryTab.tsx` silently swallowed fetch errors and fell back to stale local state. It lacked pagination controls and did not utilize server-side pagination and search.
+- **What changed:** Aligned `fetchTransactionHistory` return contract with backend response (`transactions`, `data`, `totalCount`, `summary`). Removed silent fallback, added explicit error banner with "Retry" action, and implemented responsive pagination controls ("Page X of Y", Previous/Next).
+- **How verified:** Vitest tests in `storeApi.test.ts` and UI component tests in `buildingBlocks.test.ts` verified the response mapping and pagination behavior.
+
+### 2.11 Property-Based Ledger Verification Script (`verifyLedger.ts`)
+- **What was wrong:** No automated stress-testing existed to verify that arbitrary combinations and sequences of financial operations never introduce balance drift.
+- **What changed:** Created `backend/src/scripts/verifyLedger.ts` property-based testing script executing randomized sequences of financial actions (expenses, incomes, transfers, loan repayments, pawn payments, finance payments, goal contributions, generic transactions, and undos) and asserting `driftCents === 0` across all accounts after every single operation. Added `verifyLedger.test.ts` into backend test runner.
+- **How verified:** Ran property verification test with 30+ randomized operations in `npm test`. All 119 backend tests passed with zero balance drift.
+
+
