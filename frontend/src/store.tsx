@@ -178,7 +178,7 @@ type Action =
   | { type: 'DELETE_GOAL'; id: string }
   | { type: 'ADD_SAVING_CONTRIBUTION'; goalId: string; amount: number; date: string; note?: string; debitAccount?: boolean; paymentMethod?: string; bankAccountId?: string | null }
   | { type: 'DELETE_SAVING_CONTRIBUTION'; goalId: string; contributionId: string }
-  | { type: 'SET_PERSONAL_SPENDING_BUDGET'; budget: number }
+  | { type: 'SET_PERSONAL_SPENDING_BUDGET'; budget: number; month?: string }
   | { type: 'ADD_LETTER'; entry: Letter }
   | { type: 'DELETE_LETTER'; id: string }
   | { type: 'ADD_AGREEMENT'; entry: Agreement }
@@ -201,7 +201,7 @@ type Action =
   | { type: 'ADD_REMINDER'; entry: Reminder }
   | { type: 'UPDATE_REMINDER'; id: string; status: Reminder['status'] }
   | { type: 'DELETE_REMINDER'; id: string }
-  | { type: 'ADD_LOAN_FROM_SHORTFALL'; amount: number; month: string }
+  | { type: 'ADD_LOAN_FROM_SHORTFALL'; amount: number; month: string; id?: string }
   | { type: 'SET_MONTH'; month: string }
   | { type: 'ROLLBACK'; previousState: AppState };
 
@@ -545,8 +545,10 @@ function reducer(state: AppState, action: Action): AppState {
     case 'UPDATE_REMINDER': return { ...state, reminders: state.reminders.map(r => r.id === action.id ? { ...r, status: action.status } : r) };
     case 'DELETE_REMINDER': return { ...state, reminders: state.reminders.filter(r => r.id !== action.id) };
     case 'ADD_LOAN_FROM_SHORTFALL': {
+      const localId = action.id || ('loan_' + Date.now());
+      action.id = localId;
       const loan: Loan = {
-        id: 'loan_' + Date.now(),
+        id: localId,
         lender: 'Self (shortfall ' + action.month + ')',
         principal: action.amount,
         rate: 0,
@@ -608,9 +610,12 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
         ADD_PAWNED: 'pawnedItems', ADD_GOAL: 'savingsGoals', ADD_LETTER: 'letters', ADD_AGREEMENT: 'agreements',
         ADD_COMPANY: 'companies', ADD_BRANCH: 'businessBranches', ADD_EMPLOYMENT: 'employmentProfiles',
         ADD_OWNER_DRAW: 'ownerDraws', ADD_MEDICAL_EXPENSE: 'medicalExpenses', ADD_DOCUMENT: 'documents', ADD_REMINDER: 'reminders',
+        ADD_LOAN_FROM_SHORTFALL: 'loans',
       };
       const collection = collectionByAction[action.type];
-      const localId = 'entry' in action && action.entry && 'id' in action.entry ? String(action.entry.id) : undefined;
+      const localId = action.type === 'ADD_LOAN_FROM_SHORTFALL'
+        ? String(action.id)
+        : ('entry' in action && action.entry && 'id' in action.entry ? String(action.entry.id) : undefined);
       if (serverId && collection && localId) reduce({ type: 'REPLACE_RECORD_ID', collection, localId, serverId });
       return serverId;
     } catch (error: any) {

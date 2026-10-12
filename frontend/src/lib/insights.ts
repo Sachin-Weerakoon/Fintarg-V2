@@ -481,11 +481,17 @@ export interface DebtSummary {
   items: { kind: 'loan' | 'finance' | 'pawn'; label: string; balance: number; monthlyCost: number; ratePct: number | null }[];
 }
 
+function activeFinancePayments(state: AppState): FinancePayment[] {
+  return state.financePayments.filter(f => f.status !== 'completed' && f.status !== 'cancelled' && f.status !== 'cleared');
+}
+
 export function debtSummary(state: AppState, month: string): DebtSummary {
   const income = monthPoint(state, month).income;
   const items: DebtSummary['items'] = [];
   state.loans.forEach(l => {
-    const monthly = l.method === 'compound' ? l.balance * (Math.pow(1 + l.rate / 100, 1) - 1) : (l.balance * l.rate) / 100;
+    const effectiveAnnualRate = l.interestBasis === 'monthly' ? l.rate * 12 : l.rate;
+    const monthlyRate = (effectiveAnnualRate / 100) / 12;
+    const monthly = Math.round(l.balance * monthlyRate * 100) / 100;
     if (l.balance > 0) items.push({ kind: 'loan', label: l.lender, balance: l.balance, monthlyCost: monthly, ratePct: l.rate });
   });
   const active = activeFinancePayments(state);

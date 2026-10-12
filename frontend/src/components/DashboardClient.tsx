@@ -54,7 +54,7 @@ export default function DashboardClient() {
     month: selectedMonth,
     asOfDate: today,
   });
-  const freeCashLeft = budgetCalculation.remainingBudget;
+  const daysLeft = budgetCalculation.daysLeft;
   const dailyBudget = budgetCalculation.dailyBudget;
 
   // Determine net position detail

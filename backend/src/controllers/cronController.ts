@@ -53,7 +53,7 @@ export const reminders: RequestHandler = asyncHandler(async (request, response) 
 
   const userIds = [...new Set(pending.map(r => r.userId))];
   const users = await UserModel.find({ _id: { $in: userIds } }).select('email').lean();
-  const userMap = new Map(users.map(u => [u._id.toString(), u.email]));
+  const userMap = new Map(users.map((u: any) => [u._id.toString(), u.email as string]));
 
   let sent = 0;
   for (const reminder of pending) {

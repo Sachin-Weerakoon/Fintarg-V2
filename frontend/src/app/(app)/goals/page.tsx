@@ -1,8 +1,17 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { useApp, formatRs, calcAnalysis, calcPersonalSpent } from '@/store';
+import {
+  useApp,
+  formatRs,
+  calcAnalysis,
+  calcPersonalSpent,
+  getDaysInMonth,
+  calcTotalSavingsTarget,
+  validateGoalPace,
+  calcDailyPersonalAllowance,
+} from '@/store';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -49,7 +58,7 @@ export default function Goals() {
     }
   };
 
-  const DAYS_IN_MONTH = 30;
+  const daysInMonth = getDaysInMonth(month);
   const a = calcAnalysis(state, month);
   const { freeCash } = a;
 
@@ -58,9 +67,26 @@ export default function Goals() {
   const budget = state.personalSpendingBudget;
   const personalRemaining = budget - personalSpent;
   const personalPct = budget > 0 ? (personalSpent / budget) * 100 : 0;
+  const personalAllowance = calcDailyPersonalAllowance({ personalBudget: budget, personalSpent, month });
+
+  // Debounced personal budget editing
+  const [budgetInput, setBudgetInput] = useState(String(state.personalSpendingBudget || 0));
+
+  useEffect(() => {
+    setBudgetInput(String(state.personalSpendingBudget || 0));
+  }, [state.personalSpendingBudget]);
+
+  useEffect(() => {
+    const val = Number(budgetInput) || 0;
+    if (val === state.personalSpendingBudget) return;
+    const timer = setTimeout(() => {
+      dispatch({ type: 'SET_PERSONAL_SPENDING_BUDGET', budget: val, month });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [budgetInput, dispatch, month, state.personalSpendingBudget]);
 
   // Multi-goal feasibility: check if total savings targets exceed free cash
-  const totalSavingsTarget = state.savingsGoals.reduce((s, g) => s + g.monthlyTarget, 0);
+  const totalSavingsTarget = calcTotalSavingsTarget(state.savingsGoals, month);
   const savingsExceedsCash = totalSavingsTarget > freeCash;
 
   // Auto calculate daily amount when targetAmount & targetDate are provided
@@ -84,7 +110,7 @@ export default function Goals() {
       return;
     }
     const calculatedDaily = daily > 0 ? daily : Math.ceil(Number(goalForm.targetAmount) / 365);
-    const monthly = calculatedDaily * DAYS_IN_MONTH;
+    const monthly = calculatedDaily * daysInMonth;
     const targetAmt = goalForm.targetAmount ? Number(goalForm.targetAmount) : monthly * 12;
 
     const goalId = 'g_' + Date.now();
@@ -179,7 +205,7 @@ export default function Goals() {
   const submitAdjust = (goalId: string) => {
     const daily = Number(adjustForm.dailyAmount);
     if (!daily || daily <= 0) return;
-    dispatch({ type: 'UPDATE_GOAL', id: goalId, dailyAmount: daily, monthlyTarget: daily * DAYS_IN_MONTH });
+    dispatch({ type: 'UPDATE_GOAL', id: goalId, dailyAmount: daily, monthlyTarget: daily * daysInMonth });
     setAdjusting(null);
   };
 
@@ -276,8 +302,8 @@ export default function Goals() {
               className="!w-36"
               type="number"
               min="0"
-              value={budget}
-              onChange={e => dispatch({ type: 'SET_PERSONAL_SPENDING_BUDGET', budget: Number(e.target.value) })}
+              value={budgetInput}
+              onChange={e => setBudgetInput(e.target.value)}
             />
           </Field>
           <div>
@@ -289,6 +315,10 @@ export default function Goals() {
             <div className={`text-lg font-bold num ${personalRemaining < 0 ? 'text-danger-text' : 'text-success-text'}`}>
               {formatRs(personalRemaining)}
             </div>
+          </div>
+          <div>
+            <div className="text-xs text-muted mb-1">Daily allowance</div>
+            <div className="text-lg font-bold text-text num">{formatRs(personalAllowance.dailyAllowance)} / day</div>
           </div>
         </div>
 
@@ -393,6 +423,22 @@ export default function Goals() {
                   TARGET · <span className="num font-semibold text-text">{formatRs(goal.dailyAmount)}</span> / day · Monthly target <span className="num font-semibold text-text">{formatRs(goal.monthlyTarget)}</span>
                 </div>
 
+                {/* Target pace check */}
+                {(() => {
+                  const pace = validateGoalPace(goal);
+                  if (!pace.onTrack && pace.shortfall > 0) {
+                    return (
+                      <div className="mb-3 text-xs text-warning-text bg-warning-tint/20 border border-warning-solid/30 rounded-lg p-2.5 flex items-center gap-2">
+                        <Icon name="alert" size={14} className="flex-shrink-0" />
+                        <span>
+                          At {formatRs(goal.dailyAmount)}/day ({pace.daysLeft} days left), pace falls short by {formatRs(pace.shortfall)}. Required: {formatRs(pace.requiredDaily)}/day.
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
                 {/* Progress */}
                 <ProgressBar
                   value={goal.savedAmount}
@@ -449,7 +495,7 @@ export default function Goals() {
                         className="!p-0 mt-2 text-xs font-semibold text-primary-text hover:underline block"
                         onClick={() => {
                           setAdjusting(goal.id);
-                          setAdjustForm({ dailyAmount: String(Math.max(0, Math.floor(cashForThisGoal / DAYS_IN_MONTH))) });
+                          setAdjustForm({ dailyAmount: String(Math.max(0, Math.floor(cashForThisGoal / daysInMonth))) });
                         }}
                       >
                         Adjust goal to feasible amount →
@@ -557,11 +603,11 @@ export default function Goals() {
                 </div>
 
                 {/* Recent contributions */}
-                {goal.contributions.length > 0 && (
+                {(goal.contributions?.length ?? 0) > 0 && (
                   <div className="mt-4 pt-4 border-t border-border">
                     <div className="text-xs font-semibold mb-2 text-muted">Recent savings contributions</div>
                     <div className="space-y-1.5">
-                      {goal.contributions.slice(-6).reverse().map((c, i) => {
+                      {(goal.contributions || []).slice(-6).reverse().map((c, i) => {
                         const contribId = c.id || c._id || '';
                         return (
                           <div key={i} className="flex justify-between items-center text-xs">

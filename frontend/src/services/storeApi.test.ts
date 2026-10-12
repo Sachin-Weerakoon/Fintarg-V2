@@ -277,5 +277,71 @@ describe('fetchTransactionHistory contract alignment (2.10)', () => {
     expect(res.summary.netFlow).toBe(1500);
     expect(res.summary.closingBalance).toBe(2500);
   });
+
+  it('ADD_LOAN_FROM_SHORTFALL persists as a normal loan create (4.6)', async () => {
+    let capturedUrl: string | undefined;
+    let capturedMethod: string | undefined;
+    let capturedBody: any;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (url, init) => {
+      capturedUrl = String(url);
+      capturedMethod = init?.method;
+      capturedBody = JSON.parse(init?.body as string);
+      return new Response(JSON.stringify({ data: { _id: 'loan_shortfall_999' } }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    const id = await persistStoreAction({
+      type: 'ADD_LOAN_FROM_SHORTFALL',
+      amount: 15000,
+      month: '2026-09',
+    });
+
+    expect(id).toBe('loan_shortfall_999');
+    expect(capturedUrl).toContain('/api/backend/records/loans');
+    expect(capturedMethod).toBe('POST');
+    expect(capturedBody).toEqual({
+      lender: 'Self (shortfall 2026-09)',
+      amount: 15000,
+      rate: 0,
+      method: 'simple',
+      interestBasis: 'annual',
+      tenureMonths: 12,
+      startDate: '2026-09-01',
+      dueDate: '',
+    });
+  });
+
+  it('SET_PERSONAL_SPENDING_BUDGET persists budget and month to /api/backend/profile/personal-budget (4.5)', async () => {
+    let capturedUrl: string | undefined;
+    let capturedMethod: string | undefined;
+    let capturedBody: any;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (url, init) => {
+      capturedUrl = String(url);
+      capturedMethod = init?.method;
+      capturedBody = JSON.parse(init?.body as string);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    await persistStoreAction({
+      type: 'SET_PERSONAL_SPENDING_BUDGET',
+      budget: 25000,
+      month: '2026-09',
+    });
+
+    expect(capturedUrl).toContain('/api/backend/profile/personal-budget');
+    expect(capturedMethod).toBe('PUT');
+    expect(capturedBody).toEqual({
+      budget: 25000,
+      month: '2026-09',
+    });
+  });
 });
+
 

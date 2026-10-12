@@ -136,6 +136,15 @@ describe('Shared Money & Period Module (lib/money.ts)', () => {
       expect(calcMonthlyIncome(rawSalaryIncome, '2026-09', employmentProfiles)).toBe(78200);
     });
 
+    it('computes recurring income and one-time income separately', () => {
+      const income: IncomeEntry[] = [
+        { id: '1', source: 'Job', type: 'salary', amount: 50000, frequency: 'monthly', date: '2026-09-01' },
+        { id: '2', source: 'Bonus', type: 'other', amount: 15000, frequency: 'one-time', date: '2026-09-15' },
+      ];
+      expect(calcRecurringIncome(income, '2026-09')).toBe(50000);
+      expect(calcOneTimeIncome(income, '2026-09')).toBe(15000);
+    });
+
     it('table-driven verification of calcMonthlyIncome combinations', () => {
       const testCases = [
         {
@@ -178,6 +187,30 @@ describe('Shared Money & Period Module (lib/money.ts)', () => {
         Food: 5000,
         transport: 2500,
       });
+    });
+
+    it('computes personal spent and expenses by day', () => {
+      const expenses: ExpenseEntry[] = [
+        { id: 'e1', date: '2026-09-10', amount: 3000, category: 'Personal', note: '', recurring: false },
+        { id: 'e2', date: '2026-09-10', amount: 2000, category: 'Food', note: '', recurring: false },
+        { id: 'e3', date: '2026-09-15', amount: 1500, category: 'Personal', note: '', recurring: false },
+      ];
+      expect(calcPersonalSpent(expenses, '2026-09')).toBe(4500);
+      expect(calcExpensesByDay(expenses, '2026-09')).toEqual({
+        '2026-09-10': 5000,
+        '2026-09-15': 1500,
+      });
+    });
+  });
+
+  describe('Finance Payments and Obligations', () => {
+    it('filters out completed and cancelled finance payments', () => {
+      const fps: FinancePayment[] = [
+        { id: 'fp1', lender: 'Active Bank', amount: 10000, dueDay: 5, monthsRemaining: 6, status: 'active' },
+        { id: 'fp2', lender: 'Done Bank', amount: 5000, dueDay: 5, monthsRemaining: 0, status: 'completed' },
+        { id: 'fp3', lender: 'Cancelled', amount: 2000, dueDay: 5, monthsRemaining: 2, status: 'cancelled' },
+      ];
+      expect(calcFinancePayments(fps)).toBe(10000);
     });
   });
 
@@ -308,9 +341,30 @@ describe('Shared Money & Period Module (lib/money.ts)', () => {
       expect(result2.shortfall).toBe(30000);
       expect(result2.requiredDaily).toBe(2000);
     });
+
+    it('calculates total savings target across multiple goals', () => {
+      const goals: SavingsGoal[] = [
+        { id: 'g1', name: 'Emergency', dailyAmount: 500, monthlyTarget: 15000, savedAmount: 0 },
+        { id: 'g2', name: 'Vacation', dailyAmount: 300, monthlyTarget: 9000, savedAmount: 0 },
+      ];
+      expect(calcTotalSavingsTarget(goals, '2026-09')).toBe(24000);
+    });
   });
 
   describe('Daily Budget and Allowance (4.5 & 4.7)', () => {
+    it('computes daily personal allowance from remaining budget and days left', () => {
+      const fixedToday = new Date(2026, 8, 15);
+      const allowance = calcDailyPersonalAllowance({
+        personalBudget: 20000,
+        personalSpent: 4000,
+        month: '2026-09',
+        asOfDate: fixedToday,
+      });
+      expect(allowance.remainingAllowance).toBe(16000);
+      expect(allowance.daysLeft).toBe(16);
+      expect(allowance.dailyAllowance).toBe(1000);
+    });
+
     it('calculates daily budget using remaining days and handles past/future months', () => {
       const fixedToday = new Date(2026, 8, 15); // Sept 15, 2026 (16 days left in Sept)
 
@@ -355,6 +409,7 @@ describe('Shared Money & Period Module (lib/money.ts)', () => {
     it('ensures calcAnalysis produces identical figures used across Dashboard, Analysis, and Goals', () => {
       const sampleState: AppState = {
         currentPage: 'dashboard',
+        setupComplete: true,
         selectedMonth: '2026-09',
         profile: {} as any,
         income: [

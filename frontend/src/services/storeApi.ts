@@ -472,6 +472,17 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
     }
     case 'DELETE_LOAN':
       return void (await send(`/api/backend/records/loans/${id}`, 'DELETE'));
+    case 'ADD_LOAN_FROM_SHORTFALL':
+      return create('/api/backend/records/loans', {
+        lender: 'Self (shortfall ' + action.month + ')',
+        amount: action.amount,
+        rate: 0,
+        method: 'simple',
+        interestBasis: 'annual',
+        tenureMonths: 12,
+        startDate: action.month + '-01',
+        dueDate: '',
+      });
     case 'RECORD_LOAN_REPAYMENT':
       return void (await send(`/api/backend/records/loans/${id}/repay`, 'POST', {
         amount: action.amount,
@@ -535,7 +546,10 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
       ));
 
     case 'SET_PERSONAL_SPENDING_BUDGET':
-      return void (await send('/api/backend/profile/personal-budget', 'PUT', { budget: action.budget }));
+      return void (await send('/api/backend/profile/personal-budget', 'PUT', {
+        budget: action.budget,
+        month: action.month || new Date().toISOString().slice(0, 7),
+      }));
     case 'UPDATE_PROFILE':
       return void (await send('/api/backend/profile', 'PATCH', action.profile));
     case 'ADD_LETTER':
