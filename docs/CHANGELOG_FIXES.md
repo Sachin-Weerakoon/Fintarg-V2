@@ -173,4 +173,48 @@
 - **What changed:** Mapped Mongoose `ValidationError` and `CastError`, as well as body-parser `SyntaxError`, to HTTP 400 Bad Request with clean, user-friendly error messages. Configured Pino logger with comprehensive redaction for `password`, `currentPassword`, `newPassword`, `confirmPassword`, `passwordHash`, `salt`, `token`, `tokenHash`, `resetToken`, and sensitive headers.
 - **How verified:** Added unit tests in `errors.test.ts` asserting 400 status codes for Mongoose validation/cast errors and malformed JSON payloads without stack trace leaks.
 
+## Phase 4 — Calculation & Logic Errors
+
+### 4.1 & 4.2 Shared Financial Math Module (`frontend/src/lib/money.ts`)
+- **What was wrong:** Financial calculations (income, expenses, loans, debt commitments, savings goals, free cash) were duplicated and fragmented across `store.tsx`, `insights.ts`, `goals/page.tsx`, and `DashboardClient.tsx`. Each file implemented slightly different filtering rules and edge cases, causing visual discrepancies across pages.
+- **What changed:** Created single canonical shared money module `frontend/src/lib/money.ts` exporting:
+  - `calcMonthlyIncome`, `calcRecurringIncome`, `calcOneTimeIncome`
+  - `calcMonthlyExpenses`, `calcFinancePayments`, `calcLoanInterest`
+  - `calcGoalMonthlyTarget`, `calcTotalSavingsTarget`, `validateGoalPace`
+  - `calcDailyExpenseBudget`, `calcDailyPersonalAllowance`
+  - `calcAnalysis` (deriving monthly income, expenses, commitments, net cash flow, and free cash).
+  Re-exported these functions from `frontend/src/store.tsx` to preserve backward compatibility while guaranteeing single source of truth calculations.
+- **How verified:** Created unit test suite `frontend/src/lib/money.test.ts` with 21 unit tests covering all functions and edge cases.
+
+### 4.3 Accurate Days in Month Math & Savings Goal Date Alignment
+- **What was wrong:** Both backend and frontend hardcoded 30 days per month (`dailyAmount * 30`), leading to inaccurate monthly targets for February (28/29 days) and 31-day months. Goals used inconsistent date fields (`targetDate` vs `endDate`).
+- **What changed:** Created `backend/src/utils/dateMath.ts` (`getDaysInMonth`) and `dateMath.test.ts`. Updated backend `recordService.ts` to derive `monthlyTargetCents` via `dailyAmount * daysInMonth` for the target date's month. Updated frontend `types.ts` making `targetDate` first-class on `SavingsGoal` with fallback to `endDate`.
+- **How verified:** Unit tests in `dateMath.test.ts` and `recordService.test.ts` verified accurate month days and goal target derivation across 28, 29, 30, and 31-day months.
+
+### 4.4 Amortization-Based Loan Interest & Deduction Deduplication
+- **What was wrong:** `calcAnalysis` used flat `principal * rate` monthly interest estimates regardless of loan amortisation or whether payments were already tracked under `financePayments`, resulting in double-counting of debt obligations.
+- **What changed:** Updated `calcLoanInterest` in `money.ts` to compute amortized interest (`balance * monthlyRate`), honoring `interestBasis` ('monthly' vs 'annual'). Deduplicated loan commitments against active `financePayments` sharing the same lender/identifier.
+- **How verified:** Unit tests in `money.test.ts` verified that reducing balance loans calculate interest on remaining balance and deduplicate matching finance obligations.
+
+### 4.4b Resilient Money Input Handling (`MoneyField.tsx`)
+- **What was wrong:** Monetary inputs across the app could accept negative values where prohibited, NaN on invalid string inputs, or erratic decimal places.
+- **What changed:** Enhanced `frontend/src/components/ui/MoneyField.tsx` with `sanitizeMoneyInput` and `formatMoneyValue`. Added `allowNegative?: boolean` (defaults to `false`), automatic NaN rejection, and standard 2-decimal formatting.
+- **How verified:** Added unit tests in `frontend/src/components/ui/MoneyField.test.tsx` verifying negative value prevention, decimal formatting, and zero/empty input handling.
+
+### 4.5 Month-Specific Personal Spending Budget & Debounced Editing
+- **What was wrong:** Personal spending budget in `goals/page.tsx` was edited with immediate un-debounced dispatches that could trigger rapid API calls. The store action did not pass `month`, ignoring month-specific budget storage.
+- **What changed:** Added `month` parameter support to `SET_PERSONAL_SPENDING_BUDGET` in `frontend/src/services/storeApi.ts`. Implemented 400ms debounced input for personal spending budget in `goals/page.tsx`, displaying live daily allowance calculations.
+- **How verified:** Unit tests in `storeApi.test.ts` verified that `SET_PERSONAL_SPENDING_BUDGET` persists month-specific budgets.
+
+### 4.6 Persistent Shortfall Loan Creation (`ADD_LOAN_FROM_SHORTFALL`)
+- **What was wrong:** When personal spending exceeded budget, the prompt to create a shortfall loan dispatched `ADD_LOAN_FROM_SHORTFALL`, which was not handled by `persistStoreAction` and remained ephemeral in memory, disappearing upon refresh.
+- **What changed:** Implemented `ADD_LOAN_FROM_SHORTFALL` handler in `persistStoreAction` (`frontend/src/services/storeApi.ts`), translating the shortfall action into a persistent loan creation request at `/api/backend/records/loans`.
+- **How verified:** Unit test in `frontend/src/services/storeApi.test.ts` confirmed that `ADD_LOAN_FROM_SHORTFALL` calls `createRecord` with formatted loan payload.
+
+### 4.7 Real Days-Left Budgeting (`calcDailyExpenseBudget`)
+- **What was wrong:** Daily expense budget divided remaining monthly allowance by a constant 30 days, giving misleading daily allowances mid-month or near month-end. It also erroneously included internal account transfers in expense calculations.
+- **What changed:** Implemented `calcDailyExpenseBudget` in `money.ts`. For past months, days left is 0; for future months, full month length; for current month, real days remaining (`daysInMonth - today + 1`). Filtered out transfers from monthly expense totals.
+- **How verified:** Unit tests in `money.test.ts` verified day calculations for past, current, and future months.
+
+
 
