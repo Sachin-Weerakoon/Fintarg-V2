@@ -1405,6 +1405,93 @@ describe('Backend API Integration Tests', () => {
       assert.ok(Array.isArray(data.businessRecords.companies));
       assert.ok(Array.isArray(data.businessRecords.agreements));
     });
+
+    it('PATCH /api/profile strictly validates colors, URLs, NICs, and phone numbers (3.8)', async () => {
+      const profEmail = `prof_val_${Date.now()}@test.com`;
+      const profPass = 'Password123!';
+
+      const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Original Name',
+          email: profEmail,
+          password: profPass,
+          workMode: 'salary',
+        }),
+      });
+      assert.strictEqual(regRes.status, 201);
+      const cookie = regRes.headers.get('set-cookie')?.split(';')[0] || '';
+
+      // 1. Rejects invalid themeColor (e.g. invalid hex format)
+      const badColorRes = await fetch(`${baseUrl}/api/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ themeColor: 'not-a-color' }),
+      });
+      assert.strictEqual(badColorRes.status, 400);
+
+      // 2. Rejects invalid colorText override
+      const badTextColRes = await fetch(`${baseUrl}/api/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ colorText: '#XYZ123' }),
+      });
+      assert.strictEqual(badTextColRes.status, 400);
+
+      // 3. Rejects invalid portfolio link (javascript: or plain text without http(s))
+      const badUrlRes = await fetch(`${baseUrl}/api/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ portfolioLink: 'javascript:alert(1)' }),
+      });
+      assert.strictEqual(badUrlRes.status, 400);
+
+      // 4. Rejects invalid NIC format
+      const badNicRes = await fetch(`${baseUrl}/api/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ nicNumber: '12345ABC' }),
+      });
+      assert.strictEqual(badNicRes.status, 400);
+
+      // 5. Rejects invalid mobile number (too short or letters)
+      const badPhoneRes = await fetch(`${baseUrl}/api/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ mobile: '123' }),
+      });
+      assert.strictEqual(badPhoneRes.status, 400);
+
+      // 6. Accepts valid profile update and syncs UserModel.name
+      const goodRes = await fetch(`${baseUrl}/api/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          name: 'Updated Name',
+          themeColor: '#7C3AED',
+          colorText: '#1E293B',
+          colorMuted: '',
+          portfolioLink: 'https://example.com/portfolio',
+          nicNumber: '199512345678',
+          mobile: '+94 77 123 4567',
+          contacts: [
+            { id: 'c1', name: 'Emergency Contact', relationship: 'Spouse', number: '0771234567' },
+          ],
+        }),
+      });
+      assert.strictEqual(goodRes.status, 200);
+      const goodData = await goodRes.json();
+      assert.strictEqual(goodData.profile.name, 'Updated Name');
+      assert.strictEqual(goodData.profile.themeColor, '#7C3AED');
+      assert.strictEqual(goodData.profile.portfolioLink, 'https://example.com/portfolio');
+      assert.strictEqual(goodData.profile.nicNumber, '199512345678');
+
+      // Verify UserModel.name was also updated
+      const { UserModel } = await import('../models/User');
+      const user = await UserModel.findOne({ email: profEmail });
+      assert.strictEqual(user?.name, 'Updated Name');
+    });
   });
 });
 
