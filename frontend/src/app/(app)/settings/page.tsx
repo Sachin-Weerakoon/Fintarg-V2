@@ -13,6 +13,7 @@ import { SettingRow } from '@/components/ui/SettingRow';
 import { FormField, FormGrid } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import type { UserPlan } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { ColorSwatch } from '@/components/ui/ColorSwatch';
@@ -353,7 +354,9 @@ function ProfileTab() {
   };
 
   const save = async () => {
-    await dispatch({ type: 'UPDATE_PROFILE', profile: form });
+    const derivedPlan: UserPlan = form.workMode === 'salary' ? 'basic' : 'business';
+    const payload = { ...form, plan: derivedPlan };
+    await dispatch({ type: 'UPDATE_PROFILE', profile: payload });
     showToast('Profile details saved successfully.', 'success');
   };
 
@@ -477,7 +480,11 @@ function ProfileTab() {
             <Select
               id="prof-workmode"
               value={form.workMode || 'salary'}
-              onChange={e => setForm(f => ({ ...f, workMode: e.target.value as any }))}
+              onChange={e => {
+                const newMode = e.target.value as any;
+                const newPlan = newMode === 'salary' ? 'basic' : 'business';
+                setForm(f => ({ ...f, workMode: newMode, plan: newPlan }));
+              }}
             >
               <option value="salary">Salary Earner (Pay slips & deductions)</option>
               <option value="business">Business Owner (Outlets & branches)</option>

@@ -114,7 +114,7 @@ export default function AppLayout({
   };
 
   return (
-    <AppProvider initialProfile={{ ...(user.profile || {}), workMode: user.workMode as any }}>
+    <AppProvider initialProfile={{ ...(user.profile || {}), plan: (user.plan as any) || user.profile?.plan || 'basic', workMode: user.workMode as any }}>
       <div className={`min-h-screen flex flex-col ${darkClass} ${textSizeClass}`} style={layoutStyle}>
         {/* Skip to main content accessibility link */}
         <a

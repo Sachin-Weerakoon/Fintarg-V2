@@ -116,4 +116,26 @@ describe('Error Middleware & HttpError', () => {
     assert.strictEqual(capturedJson.error, 'Internal server error');
     assert.strictEqual(capturedJson.stack, undefined);
   });
+
+  it('errorHandler maps HttpError with code and extra metadata (PLAN_REQUIRED)', async () => {
+    const { errorHandler } = await import('./errors');
+    let capturedStatus = 0;
+    let capturedJson: any = null;
+    const mockRes: any = {
+      status(code: number) {
+        capturedStatus = code;
+        return this;
+      },
+      json(payload: any) {
+        capturedJson = payload;
+      },
+    };
+
+    const planErr = new HttpError(403, 'This feature requires the Business edition', 'PLAN_REQUIRED', { requiredPlan: 'business' });
+    errorHandler(planErr, {} as any, mockRes, () => {});
+    assert.strictEqual(capturedStatus, 403);
+    assert.strictEqual(capturedJson.error, 'This feature requires the Business edition');
+    assert.strictEqual(capturedJson.code, 'PLAN_REQUIRED');
+    assert.strictEqual(capturedJson.requiredPlan, 'business');
+  });
 });

@@ -8,6 +8,7 @@ import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 import { AdvancedHub } from './_components/AdvancedHub';
 import { BusinessWorkspace } from './_components/BusinessWorkspace';
@@ -22,7 +23,8 @@ function AdvancedContent() {
   const searchParams = useSearchParams();
   const rawTab = (searchParams?.get('tab') as AdvancedTab) || 'hub';
   const { state } = useApp();
-  const hasBusiness = state.profile.workMode !== 'salary';
+  const isBusinessPlan = state.profile.plan === 'business';
+  const hasBusiness = state.profile.workMode !== 'salary' && isBusinessPlan;
 
   // Redirect legacy tabs to dedicated routes
   useEffect(() => {
@@ -131,10 +133,55 @@ function AdvancedContent() {
 
       {/* Tab Panels */}
       {activeTab === 'hub' && <AdvancedHub hasBusiness={hasBusiness} onOpen={setTab} />}
-      {activeTab === 'businesses' && <BusinessWorkspace />}
+      {activeTab === 'businesses' && (
+        isBusinessPlan ? (
+          <BusinessWorkspace />
+        ) : (
+          <EmptyState
+            icon={<Icon name="shield" size={28} className="text-primary-500" />}
+            title="Business Edition Required"
+            helper="Enterprise and branch workspaces require the Business edition of Fintarg. Upgrade your plan in Settings to unlock multi-branch operations."
+            action={
+              <Button variant="primary" size="sm" onClick={() => router.push('/settings')}>
+                Upgrade in Settings
+              </Button>
+            }
+          />
+        )
+      )}
       {activeTab === 'salary' && <SalaryWorkspace />}
-      {activeTab === 'agreements' && <AgreementsTab />}
-      {activeTab === 'companies' && <CompaniesTab />}
+      {activeTab === 'agreements' && (
+        isBusinessPlan ? (
+          <AgreementsTab />
+        ) : (
+          <EmptyState
+            icon={<Icon name="shield" size={28} className="text-primary-500" />}
+            title="Business Edition Required"
+            helper="Commercial contract and agreement tracking requires the Business edition of Fintarg. Upgrade your plan in Settings to unlock agreement management."
+            action={
+              <Button variant="primary" size="sm" onClick={() => router.push('/settings')}>
+                Upgrade in Settings
+              </Button>
+            }
+          />
+        )
+      )}
+      {activeTab === 'companies' && (
+        isBusinessPlan ? (
+          <CompaniesTab />
+        ) : (
+          <EmptyState
+            icon={<Icon name="shield" size={28} className="text-primary-500" />}
+            title="Business Edition Required"
+            helper="Corporate legal entities registration requires the Business edition of Fintarg. Upgrade your plan in Settings to register enterprise corporate entities."
+            action={
+              <Button variant="primary" size="sm" onClick={() => router.push('/settings')}>
+                Upgrade in Settings
+              </Button>
+            }
+          />
+        )
+      )}
     </PageContainer>
   );
 }
