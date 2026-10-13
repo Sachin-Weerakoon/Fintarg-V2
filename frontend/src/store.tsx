@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useReducer, useRef, useState, useCallback, ReactNode } from 'react';
-import { loadPersistedData, persistStoreAction } from '@/services/storeApi';
+import { loadPersistedData, persistStoreAction, loadBusinessData } from '@/services/storeApi';
 import { useToast } from '@/components/ui/ToastProvider';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
@@ -9,7 +9,7 @@ import type {
   AppState, Page, IncomeEntry, ExpenseEntry, FinancePayment, Loan, PawnedItem,
   SavingsGoal, Letter, Agreement, Company, MedicalExpense, Document, Reminder,
   BusinessBranch, EmploymentProfile, WorkMode, OwnerDraw,
-  BankAccount, Card, Transaction,
+  BankAccount, Card, Transaction, UserPlan,
 } from './types';
 
 const SEP_2026 = '2026-09';
@@ -569,11 +569,18 @@ function reducer(state: AppState, action: Action): AppState {
 
 export type Toast = { id: string; message: string; tone: 'success' | 'error' | 'info' };
 
+export interface LoadErrorInfo {
+  message: string;
+  status?: number;
+  collection?: string;
+}
+
 const AppContext = createContext<{
   state: AppState;
   dispatch: (action: Action) => Promise<string | undefined>;
   showToast: (message: string, tone?: 'success' | 'error' | 'info') => void;
   loadError?: string | null;
+  loadErrorInfo?: LoadErrorInfo | null;
   isLoading?: boolean;
   retryLoad?: () => Promise<void>;
 } | null>(null);
@@ -592,21 +599,30 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
   }, [toast]);
 
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadErrorInfo, setLoadErrorInfo] = useState<LoadErrorInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
+    setLoadErrorInfo(null);
     try {
-      const data = await loadPersistedData();
+      const currentPlan = (stateRef.current?.profile?.plan || initialProfile?.plan || 'basic') as UserPlan;
+      const data = await loadPersistedData(currentPlan);
       reduce({ type: 'HYDRATE', data });
       setIsLoading(false);
     } catch (error: any) {
       console.error('Unable to load account records', error);
-      setLoadError(error?.message || 'Unable to connect to the backend server. Please verify your connection and retry.');
+      const msg = error?.message || 'Unable to connect to the backend server. Please verify your connection and retry.';
+      setLoadError(msg);
+      setLoadErrorInfo({
+        message: msg,
+        status: typeof error?.status === 'number' ? error.status : undefined,
+        collection: typeof error?.collection === 'string' ? error.collection : undefined,
+      });
       setIsLoading(false);
     }
-  }, []);
+  }, [initialProfile?.plan]);
 
   useEffect(() => {
     void loadData();
@@ -631,11 +647,39 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
         ? String(action.id)
         : ('entry' in action && action.entry && 'id' in action.entry ? String(action.entry.id) : undefined);
       if (serverId && collection && localId) reduce({ type: 'REPLACE_RECORD_ID', collection, localId, serverId });
+
+      // Handle plan change hydration/clearance
+      const nextPlan = action.type === 'SET_PLAN'
+        ? action.plan
+        : (action.type === 'UPDATE_PROFILE' && action.profile?.plan ? action.profile.plan : undefined);
+
+      if (nextPlan && nextPlan !== prevState.profile.plan) {
+        if (nextPlan === 'business') {
+          try {
+            const businessData = await loadBusinessData();
+            reduce({ type: 'HYDRATE', data: businessData });
+          } catch (e) {
+            console.warn('[store] Failed to load business records after plan upgrade:', e);
+          }
+        } else if (nextPlan === 'basic') {
+          reduce({
+            type: 'HYDRATE',
+            data: {
+              companies: [],
+              businessBranches: [],
+              ownerDraws: [],
+              agreements: [],
+            },
+          });
+        }
+      }
+
       return serverId;
     } catch (error: any) {
       console.error('Unable to save account change', error);
       try {
-        const freshData = await loadPersistedData();
+        const currentPlan = (stateRef.current?.profile?.plan || initialProfile?.plan || 'basic') as UserPlan;
+        const freshData = await loadPersistedData(currentPlan);
         reduce({ type: 'HYDRATE', data: freshData });
       } catch {
         reduce({ type: 'ROLLBACK', previousState: prevState });
@@ -657,6 +701,13 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
             <p className="text-xs text-muted mt-1 leading-relaxed">
               {loadError}
             </p>
+            {(loadErrorInfo?.status || loadErrorInfo?.collection) && (
+              <div className="mt-3 inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-danger-tint text-[11px] font-mono text-danger-text border border-danger-solid/20">
+                {loadErrorInfo.status && <span>HTTP {loadErrorInfo.status}</span>}
+                {loadErrorInfo.status && loadErrorInfo.collection && <span>•</span>}
+                {loadErrorInfo.collection && <span>collection: {loadErrorInfo.collection}</span>}
+              </div>
+            )}
           </div>
           <div className="pt-2 flex justify-center gap-3">
             <Button
@@ -674,7 +725,7 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
   }
 
   return (
-    <AppContext.Provider value={{ state, dispatch, showToast, loadError, isLoading, retryLoad: loadData }}>
+    <AppContext.Provider value={{ state, dispatch, showToast, loadError, loadErrorInfo, isLoading, retryLoad: loadData }}>
       {children}
     </AppContext.Provider>
   );
