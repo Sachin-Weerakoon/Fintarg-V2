@@ -49,6 +49,8 @@ const businessRecordKinds = new Set(['companies', 'businessBranches', 'ownerDraw
 export const requireBusinessPlan: RequestHandler = asyncHandler(async (request, _response, next) => {
   if (!businessRecordKinds.has(request.params.kind)) return next();
   const user = (request.userRecord as any) || ((await UserModel.findById(request.auth?.userId).select('plan').lean()) as any);
-  if (!user || user.plan !== 'business') return next(new HttpError(403, 'This feature requires the Business edition'));
+  if (!user || user.plan !== 'business') {
+    return next(new HttpError(403, 'This feature requires the Business edition', 'PLAN_REQUIRED', { requiredPlan: 'business' }));
+  }
   next();
 });
