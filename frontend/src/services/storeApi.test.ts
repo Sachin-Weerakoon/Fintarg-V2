@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fetchTransactionHistory, persistStoreAction, loadPersistedData } from './storeApi';
+import { fetchTransactionHistory, persistStoreAction, loadPersistedData, list, loadBusinessData } from './storeApi';
 
 describe('storeApi loan mapping and readonly field stripping (1.2)', () => {
   beforeEach(() => {
@@ -410,6 +410,133 @@ describe('fetchTransactionHistory contract alignment (2.10)', () => {
 
     await expect(loadPersistedData()).rejects.toThrow('Database connection failed');
   });
+
+  describe('plan-gated store loading and 403 PLAN_REQUIRED resilience', () => {
+    it('loadPersistedData(basic) does not request business collections and returns empty arrays', async () => {
+      const requestedUrls: string[] = [];
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+        const u = String(url);
+        requestedUrls.push(u);
+        if (u.includes('/api/backend/profile/personal-budget')) {
+          return new Response(JSON.stringify({ budget: 5000 }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      });
+
+      const data = await loadPersistedData('basic');
+
+      // Verify business endpoints were never fetched
+      expect(requestedUrls.some(u => u.includes('/records/companies'))).toBe(false);
+      expect(requestedUrls.some(u => u.includes('/records/businessBranches'))).toBe(false);
+      expect(requestedUrls.some(u => u.includes('/records/ownerDraws'))).toBe(false);
+      expect(requestedUrls.some(u => u.includes('/records/agreements'))).toBe(false);
+
+      // Verify empty collections in data
+      expect(data.companies).toEqual([]);
+      expect(data.businessBranches).toEqual([]);
+      expect(data.ownerDraws).toEqual([]);
+      expect(data.agreements).toEqual([]);
+      expect(data.personalSpendingBudget).toBe(5000);
+    });
+
+    it('loadPersistedData(business) fetches business collections and populates them', async () => {
+      const requestedUrls: string[] = [];
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+        const u = String(url);
+        requestedUrls.push(u);
+        if (u.includes('/records/companies')) {
+          return new Response(JSON.stringify({ data: [{ _id: 'comp_1', name: 'Acme Corp' }] }), { status: 200 });
+        }
+        if (u.includes('/records/agreements')) {
+          return new Response(JSON.stringify({ data: [{ _id: 'agr_1', title: 'Service Agreement', valueCents: 500000 }] }), { status: 200 });
+        }
+        if (u.includes('/api/backend/profile/personal-budget')) {
+          return new Response(JSON.stringify({ budget: 0 }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      });
+
+      const data = await loadPersistedData('business');
+
+      expect(requestedUrls.some(u => u.includes('/records/companies'))).toBe(true);
+      expect(requestedUrls.some(u => u.includes('/records/businessBranches'))).toBe(true);
+      expect(requestedUrls.some(u => u.includes('/records/ownerDraws'))).toBe(true);
+      expect(requestedUrls.some(u => u.includes('/records/agreements'))).toBe(true);
+
+      expect(data.companies).toHaveLength(1);
+      expect(data.companies?.[0].name).toBe('Acme Corp');
+      expect(data.agreements).toHaveLength(1);
+      expect(data.agreements?.[0].value).toBe(5000);
+    });
+
+    it('list() tolerates 403 PLAN_REQUIRED, logs warning, and returns empty array', async () => {
+      vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
+        return new Response(
+          JSON.stringify({
+            error: 'This feature requires the Business edition',
+            code: 'PLAN_REQUIRED',
+            requiredPlan: 'business',
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        );
+      });
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const result = await list('companies');
+
+      expect(result).toEqual([]);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping record kind "companies"')
+      );
+    });
+
+    it('list() rethrows 500 server error and attaches collection name to error', async () => {
+      vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
+        return new Response(
+          JSON.stringify({ error: 'Database query timeout' }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
+      });
+
+      let caughtErr: any;
+      try {
+        await list('expenses');
+      } catch (err) {
+        caughtErr = err;
+      }
+
+      expect(caughtErr).toBeDefined();
+      expect(caughtErr.message).toBe('Database query timeout');
+      expect(caughtErr.status).toBe(500);
+      expect(caughtErr.collection).toBe('expenses');
+    });
+
+    it('loadBusinessData fetches and maps all four business collections', async () => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+        const u = String(url);
+        if (u.includes('/records/companies')) {
+          return new Response(JSON.stringify({ data: [{ _id: 'c1', name: 'Corp 1', address: 'Colombo' }] }), { status: 200 });
+        }
+        if (u.includes('/records/businessBranches')) {
+          return new Response(JSON.stringify({ data: [{ _id: 'b1', name: 'Branch 1', monthlyTargetCents: 100000 }] }), { status: 200 });
+        }
+        if (u.includes('/records/agreements')) {
+          return new Response(JSON.stringify({ data: [{ _id: 'a1', title: 'Lease', valueCents: 200000 }] }), { status: 200 });
+        }
+        if (u.includes('/records/ownerDraws')) {
+          return new Response(JSON.stringify({ data: [{ _id: 'd1', amountCents: 50000, date: '2026-10-01' }] }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      });
+
+      const res = await loadBusinessData();
+      expect(res.companies[0].name).toBe('Corp 1');
+      expect(res.businessBranches[0].monthlyTarget).toBe(1000);
+      expect(res.agreements[0].value).toBe(2000);
+      expect(res.ownerDraws[0].amount).toBe(500);
+    });
+  });
 });
+
 
 

@@ -1,5 +1,5 @@
-import { apiClient } from './apiClient';
-import type { AppState, Transaction } from '@/types';
+import { apiClient, ApiError } from './apiClient';
+import type { AppState, Transaction, UserPlan } from '@/types';
 
 type RawRecord = Record<string, any> & { _id: string };
 type ListResult = { data: RawRecord[] };
@@ -26,12 +26,99 @@ export async function resolveRecordId(rawId: string | undefined): Promise<string
   return rawId;
 }
 
-async function list(kind: string): Promise<RawRecord[]> {
-  const result = await apiClient<ListResult>(`/api/backend/records/${kind}`);
-  return result?.data || [];
+export async function list(kind: string): Promise<RawRecord[]> {
+  try {
+    const result = await apiClient<ListResult>(`/api/backend/records/${kind}`);
+    return result?.data || [];
+  } catch (err: unknown) {
+    if (
+      err instanceof ApiError &&
+      (err.status === 403 || err.code === 'PLAN_REQUIRED' || err.message.toLowerCase().includes('business edition'))
+    ) {
+      console.warn(`[storeApi] Skipping record kind "${kind}": requires Business edition (${err.message}).`);
+      return [];
+    }
+    if (err && typeof err === 'object') {
+      (err as { collection?: string }).collection = kind;
+    }
+    throw err;
+  }
 }
 
-export async function loadPersistedData(): Promise<Partial<AppState>> {
+function mapAgreements(agreements: RawRecord[] = []) {
+  return agreements.map(row => ({
+    id: row._id,
+    title: row.title,
+    otherParty: row.otherParty,
+    startDate: row.startDate,
+    endDate: row.endDate,
+    value: (row.valueCents || 0) / 100,
+    summary: row.summary,
+    status: row.status,
+    fileName: row.fileName,
+  }));
+}
+
+function mapCompanies(companies: RawRecord[] = []) {
+  return companies.map(row => ({
+    id: row._id,
+    name: row.name,
+    address: row.address,
+    contact: row.contact,
+    logo: row.logo,
+  }));
+}
+
+function mapBusinessBranches(businessBranches: RawRecord[] = []) {
+  return businessBranches.map(row => ({
+    id: row._id,
+    companyId: row.companyId,
+    name: row.name,
+    location: row.location,
+    branchType: row.branchType,
+    openingDate: row.openingDate,
+    logo: row.logo,
+    monthlyTarget: (row.monthlyTargetCents || 0) / 100,
+    annualTarget: (row.annualTargetCents || 0) / 100,
+    entries: (row.entries || []).map((entry: RawRecord) => ({
+      id: entry._id,
+      date: entry.date,
+      type: entry.type,
+      category: entry.category,
+      amount: (entry.amountCents || 0) / 100,
+      note: entry.note,
+    })),
+  }));
+}
+
+function mapOwnerDraws(ownerDraws: RawRecord[] = []) {
+  return ownerDraws.map(row => ({
+    id: row._id,
+    companyId: row.companyId,
+    amount: (row.amountCents || 0) / 100,
+    date: row.date,
+  }));
+}
+
+export async function loadBusinessData(): Promise<Pick<AppState, 'agreements' | 'companies' | 'businessBranches' | 'ownerDraws'>> {
+  const [agreements, companies, businessBranches, ownerDraws] = await Promise.all([
+    list('agreements'),
+    list('companies'),
+    list('businessBranches'),
+    list('ownerDraws'),
+  ]);
+  return {
+    agreements: mapAgreements(agreements),
+    companies: mapCompanies(companies),
+    businessBranches: mapBusinessBranches(businessBranches),
+    ownerDraws: mapOwnerDraws(ownerDraws),
+  };
+}
+
+export async function loadPersistedData(plan: UserPlan = 'basic'): Promise<Partial<AppState>> {
+  const isBusiness = plan === 'business';
+  const emptyRecords = Promise.resolve([] as RawRecord[]);
+
   const [
     income,
     expenses,
@@ -63,11 +150,11 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
     list('pawnedItems'),
     list('goals'),
     list('letters'),
-    list('agreements'),
-    list('companies'),
-    list('businessBranches'),
+    isBusiness ? list('agreements') : emptyRecords,
+    isBusiness ? list('companies') : emptyRecords,
+    isBusiness ? list('businessBranches') : emptyRecords,
     list('employmentProfiles'),
-    list('ownerDraws'),
+    isBusiness ? list('ownerDraws') : emptyRecords,
     list('medicalExpenses'),
     list('documents'),
     list('reminders'),
@@ -244,43 +331,9 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
       body: row.body,
       companyId: row.companyId,
     })),
-    agreements: agreements.map(row => ({
-      id: row._id,
-      title: row.title,
-      otherParty: row.otherParty,
-      startDate: row.startDate,
-      endDate: row.endDate,
-      value: (row.valueCents || 0) / 100,
-      summary: row.summary,
-      status: row.status,
-      fileName: row.fileName,
-    })),
-    companies: companies.map(row => ({
-      id: row._id,
-      name: row.name,
-      address: row.address,
-      contact: row.contact,
-      logo: row.logo,
-    })),
-    businessBranches: businessBranches.map(row => ({
-      id: row._id,
-      companyId: row.companyId,
-      name: row.name,
-      location: row.location,
-      branchType: row.branchType,
-      openingDate: row.openingDate,
-      logo: row.logo,
-      monthlyTarget: (row.monthlyTargetCents || 0) / 100,
-      annualTarget: (row.annualTargetCents || 0) / 100,
-      entries: (row.entries || []).map((entry: RawRecord) => ({
-        id: entry._id,
-        date: entry.date,
-        type: entry.type,
-        category: entry.category,
-        amount: (entry.amountCents || 0) / 100,
-        note: entry.note,
-      })),
-    })),
+    agreements: mapAgreements(agreements),
+    companies: mapCompanies(companies),
+    businessBranches: mapBusinessBranches(businessBranches),
     employmentProfiles: employmentProfiles.map(row => ({
       id: row._id,
       employer: row.employer,
@@ -291,12 +344,7 @@ export async function loadPersistedData(): Promise<Partial<AppState>> {
       monthlySavingsTarget: (row.monthlySavingsTargetCents || 0) / 100,
       careerGoal: row.careerGoal,
     })),
-    ownerDraws: ownerDraws.map(row => ({
-      id: row._id,
-      companyId: row.companyId,
-      amount: (row.amountCents || 0) / 100,
-      date: row.date,
-    })),
+    ownerDraws: mapOwnerDraws(ownerDraws),
     medicalExpenses: medicalExpenses.map(row => ({
       id: row._id,
       date: row.date,
