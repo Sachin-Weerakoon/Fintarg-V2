@@ -382,11 +382,14 @@ body:has(.dark-mode) {
   cursor: not-allowed;
 }
 
-/* Form inputs: 8px radius per spec, min 16px font on mobile to prevent iOS auto-zoom */
+/* Form inputs: modern 10px radius, smooth transitions, min 16px font on mobile to prevent iOS auto-zoom */
 .form-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 13px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--color-text-2);
   margin-bottom: 6px;
 }
@@ -394,13 +397,13 @@ body:has(.dark-mode) {
 .form-input {
   width: 100%;
   border: 1.5px solid var(--color-border-input);
-  border-radius: 8px;
-  padding: 8px 12px;
+  border-radius: 10px;
+  padding: 8px 13px;
   font-size: 16px; /* 16px on mobile prevents iOS auto-zoom */
   font-family: inherit;
   color: var(--color-text);
   background: var(--color-surface);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
   outline: none;
   min-height: 44px;
 }
@@ -415,7 +418,7 @@ body:has(.dark-mode) {
 }
 .form-input:focus {
   border-color: var(--color-primary-600);
-  box-shadow: 0 0 0 2px var(--color-primary-tint);
+  box-shadow: 0 0 0 3px rgba(15, 163, 177, 0.18), 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 .dark-mode .form-input {
   background-color: #0E1626;
@@ -427,14 +430,41 @@ body:has(.dark-mode) {
 }
 .dark-mode .form-input:focus {
   border-color: var(--color-primary-400);
-  background-color: #080E1A;
-  box-shadow: 0 0 0 2px rgba(53, 194, 208, 0.25);
+  background-color: #0B1322;
+  box-shadow: 0 0 0 3px rgba(53, 194, 208, 0.22), 0 2px 4px rgba(0, 0, 0, 0.25);
 }
 .form-input::placeholder {
   color: var(--color-placeholder);
 }
 .dark-mode .form-input::placeholder {
   color: #64748B;
+}
+
+/* Luxury SaaS Form Card */
+.form-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-card-border);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px -2px rgba(15, 29, 50, 0.06), 0 2px 6px -1px rgba(15, 29, 50, 0.04);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
+}
+.form-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #0FA3B1 0%, #35C2D0 50%, #0A6D78 100%);
+  opacity: 0.95;
+}
+.dark-mode .form-card {
+  box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+.dark-mode .form-card::before {
+  background: linear-gradient(90deg, #0FA3B1 0%, #35C2D0 50%, #0B7F8B 100%);
 }
 
 /* Explicit dark input utility to match theme */
@@ -448,8 +478,8 @@ body:has(.dark-mode) {
 }
 .form-input-dark:focus {
   border-color: #35C2D0 !important;
-  background-color: #080E1A !important;
-  box-shadow: 0 0 0 2px rgba(53, 194, 208, 0.25) !important;
+  background-color: #0B1322 !important;
+  box-shadow: 0 0 0 3px rgba(53, 194, 208, 0.25) !important;
 }
 .form-input-dark::placeholder {
   color: #64748B !important;

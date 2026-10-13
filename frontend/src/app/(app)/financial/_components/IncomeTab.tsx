@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
+import { FormCard } from '@/components/ui/FormCard';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
@@ -164,86 +165,118 @@ export function IncomeTab({ month }: { month: string }) {
         )}
       </div>
 
-      <Card className="p-5 h-fit">
-        <h3 className="font-semibold text-sm mb-4 text-text">{editId ? 'Edit income' : 'Add income source'}</h3>
-        <div className="space-y-3.5">
-          <Field id="income-source" label="Source" error={error}>
-            <Input
-              value={form.source}
-              onChange={e => setForm(f => ({ ...f, source: e.target.value }))}
-              placeholder="e.g. Government Salary, Consulting"
-            />
-          </Field>
-          <Field id="income-type" label="Type">
-            <Select
-              value={form.type}
-              onChange={e => setForm(f => ({ ...f, type: e.target.value as 'salary' | 'business' | 'other' }))}
+      <FormCard
+        icon="arrow-up"
+        title={editId ? 'Edit Income' : 'Record Income'}
+        description={editId ? 'Update this income source details' : 'Log an earnings stream or salary credit for this month'}
+        badge={editId ? 'Editing' : undefined}
+        actions={
+          editId ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setEditId(null);
+                setForm({
+                  source: '',
+                  type: 'salary',
+                  amount: '',
+                  frequency: 'monthly',
+                  date: new Date().toISOString().slice(0, 10),
+                  paymentMethod: 'bank_transfer',
+                  bankAccountId: '',
+                });
+                setError('');
+              }}
             >
-              <option value="salary">Salary</option>
-              <option value="business">Business</option>
-              <option value="other">Other</option>
-            </Select>
-          </Field>
-          <Field id="income-amount" label="Amount (Rs.)">
-            <MoneyField
-              value={form.amount}
-              onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
-              placeholder="50,000"
-            />
-          </Field>
-          <PaymentMethodField
-            value={form.paymentMethod}
-            onChange={method => setForm(f => ({ ...f, paymentMethod: method }))}
-          />
-          <BankSelect
-            value={form.bankAccountId}
-            onChange={id => setForm(f => ({ ...f, bankAccountId: id }))}
-            bankAccounts={state.bankAccounts}
-            label="Deposited to Account (optional)"
-          />
-          <Field id="income-frequency" label="Frequency">
-            <Select
-              value={form.frequency}
-              onChange={e => setForm(f => ({ ...f, frequency: e.target.value as any }))}
-            >
-              <option value="monthly">Monthly</option>
-              <option value="weekly">Weekly</option>
-              <option value="daily">Daily</option>
-              <option value="one-time">One-time</option>
-            </Select>
-          </Field>
-          <Field id="income-date" label="Date received">
-            <DateField
-              value={form.date}
-              onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-            />
-          </Field>
-          <div className="flex gap-2 pt-1">
-            <Button variant="primary" className="flex-1" onClick={submit}>
-              {editId ? 'Update Income' : 'Save Income'}
+              Cancel
             </Button>
-            {editId && (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setEditId(null);
-                  setForm({
-                    source: '',
-                    type: 'salary',
-                    amount: '',
-                    frequency: 'monthly',
-                    date: new Date().toISOString().slice(0, 10),
-                    paymentMethod: 'bank_transfer',
-                    bankAccountId: '',
-                  });
-                }}
-              >
-                Cancel
-              </Button>
-            )}
-          </div>
+          ) : undefined
+        }
+        className="h-fit sticky top-4"
+      >
+        <Field id="income-source" label="Source" required error={error}>
+          <Input
+            value={form.source}
+            onChange={e => setForm(f => ({ ...f, source: e.target.value }))}
+            placeholder="e.g. Government Salary, Consulting, Freelance"
+          />
+        </Field>
+        <Field id="income-type" label="Type" required>
+          <Select
+            value={form.type}
+            onChange={e => setForm(f => ({ ...f, type: e.target.value as 'salary' | 'business' | 'other' }))}
+          >
+            <option value="salary">Salary</option>
+            <option value="business">Business</option>
+            <option value="other">Other</option>
+          </Select>
+        </Field>
+        <Field id="income-amount" label="Amount (Rs.)" required>
+          <MoneyField
+            value={form.amount}
+            onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
+            placeholder="50,000"
+          />
+        </Field>
+        <PaymentMethodField
+          value={form.paymentMethod}
+          onChange={method => setForm(f => ({ ...f, paymentMethod: method }))}
+        />
+        <BankSelect
+          value={form.bankAccountId}
+          onChange={id => setForm(f => ({ ...f, bankAccountId: id }))}
+          bankAccounts={state.bankAccounts}
+          label="Deposited to Account (optional)"
+        />
+        <Field id="income-frequency" label="Frequency" required>
+          <Select
+            value={form.frequency}
+            onChange={e => setForm(f => ({ ...f, frequency: e.target.value as any }))}
+          >
+            <option value="monthly">Monthly</option>
+            <option value="weekly">Weekly</option>
+            <option value="daily">Daily</option>
+            <option value="one-time">One-time</option>
+          </Select>
+        </Field>
+        <Field id="income-date" label="Date received" required>
+          <DateField
+            value={form.date}
+            onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+          />
+        </Field>
+        <div className="flex gap-2 pt-2">
+          <Button
+            variant="primary"
+            className="flex-1 shadow-sm hover:shadow-primary-500/20"
+            iconLeft={<Icon name={editId ? 'check' : 'plus'} size={15} />}
+            onClick={submit}
+          >
+            {editId ? 'Update Income' : 'Save Income'}
+          </Button>
+          {editId && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setEditId(null);
+                setForm({
+                  source: '',
+                  type: 'salary',
+                  amount: '',
+                  frequency: 'monthly',
+                  date: new Date().toISOString().slice(0, 10),
+                  paymentMethod: 'bank_transfer',
+                  bankAccountId: '',
+                });
+                setError('');
+              }}
+            >
+              Cancel
+            </Button>
+          )}
         </div>
-      </Card>
+      </FormCard>
     </div>
   );
 }

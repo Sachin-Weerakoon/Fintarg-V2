@@ -13,13 +13,15 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(fun
   },
   ref
 ) {
+  const errorStyles = hasError
+    ? '!border-danger-solid focus:!border-danger-solid focus:!ring-4 focus:!ring-danger-solid/15 !shadow-[0_0_0_1px_rgba(220,38,38,0.2)]'
+    : '';
+
   return (
     <textarea
       ref={ref}
       rows={rows}
-      className={`form-input w-full min-h-[80px] py-2.5 resize-y ${
-        hasError ? '!border-danger-solid focus:!border-danger-solid' : ''
-      } ${className}`.trim()}
+      className={`form-input w-full min-h-[80px] py-2.5 px-3.5 resize-y leading-relaxed ${errorStyles} ${className}`.trim()}
       {...props}
     />
   );

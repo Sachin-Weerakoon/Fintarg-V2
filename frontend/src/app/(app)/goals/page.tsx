@@ -16,6 +16,7 @@ import {
 import { PageContainer } from '@/components/ui/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
+import { FormCard } from '@/components/ui/FormCard';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -28,6 +29,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import { MoneyField } from '@/components/ui/MoneyField';
+import { DateField } from '@/components/ui/DateField';
 
 function GoalsContent() {
   const _router = useRouter();
@@ -249,23 +251,32 @@ function GoalsContent() {
 
       {/* Add goal form */}
       {showAddGoal && (
-        <Card className="p-6 border-primary-500/30 shadow-card">
-          <div className="flex items-center justify-between mb-4">
-            <div className="font-bold text-sm text-text flex items-center gap-2">
-              <Icon name="target" size={16} className="text-primary-text" />
-              <span>Create New Savings Goal</span>
+        <FormCard
+          icon="target"
+          title="Create New Savings Goal"
+          description="Define a target balance, completion date, and daily pace plan"
+          actions={
+            <Button variant="ghost" size="sm" onClick={() => setShowAddGoal(false)}>
+              Cancel
+            </Button>
+          }
+          className="mb-6"
+        >
+          {goalError && (
+            <div className="text-xs mb-3 text-danger-text font-medium bg-danger-tint/60 dark:bg-danger-tint/20 border border-danger-solid/25 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+              <span>⚠</span>
+              <span>{goalError}</span>
             </div>
-          </div>
-          {goalError && <p className="text-xs mb-3 text-danger-text font-medium">{goalError}</p>}
+          )}
           <div className="grid md:grid-cols-2 gap-4">
-            <Field id="goal-name" label="Goal name">
+            <Field id="goal-name" label="Goal Name" required>
               <Input
                 value={goalForm.name}
                 onChange={e => setGoalForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="e.g. Emergency Fund, New Vehicle"
+                placeholder="e.g. Emergency Fund, New Vehicle, Vacation"
               />
             </Field>
-            <Field id="goal-targetamt" label="Target Total Amount (Rs.)">
+            <Field id="goal-targetamt" label="Target Total Amount (Rs.)" required>
               <MoneyField
                 value={goalForm.targetAmount}
                 onChange={v => setGoalForm(f => ({ ...f, targetAmount: String(v) }))}
@@ -273,31 +284,38 @@ function GoalsContent() {
               />
             </Field>
             <Field id="goal-targetdate" label="Target Date">
-              <Input
-                type="date"
+              <DateField
                 value={goalForm.targetDate}
                 onChange={e => setGoalForm(f => ({ ...f, targetDate: e.target.value }))}
               />
             </Field>
             <Field id="goal-daily" label="Daily Target Amount (Rs.)">
-              <Input
-                type="number"
+              <MoneyField
                 value={goalForm.dailyAmount || (autoDaily ? String(autoDaily) : '')}
-                onChange={e => setGoalForm(f => ({ ...f, dailyAmount: e.target.value }))}
+                onChange={v => setGoalForm(f => ({ ...f, dailyAmount: String(v) }))}
                 placeholder={autoDaily ? String(autoDaily) : '1,000'}
               />
               {(goalForm.dailyAmount || autoDaily) && (
                 <p className="text-[11px] mt-1.5 font-medium text-primary-text">
-                  Monthly target: <span className="font-bold num">{formatRs((Number(goalForm.dailyAmount) || autoDaily || 0) * 30)}</span>
+                  Monthly target pace: <span className="font-bold num">{formatRs((Number(goalForm.dailyAmount) || autoDaily || 0) * 30)}</span>
                 </p>
               )}
             </Field>
           </div>
           <div className="flex gap-2.5 mt-5">
-            <Button variant="primary" size="sm" onClick={submitGoal}>Create Goal</Button>
-            <Button variant="secondary" size="sm" onClick={() => setShowAddGoal(false)}>Cancel</Button>
+            <Button
+              variant="primary"
+              size="sm"
+              iconLeft={<Icon name="plus" size={15} />}
+              onClick={submitGoal}
+            >
+              Create Goal
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setShowAddGoal(false)}>
+              Cancel
+            </Button>
           </div>
-        </Card>
+        </FormCard>
       )}
 
       {/* Personal spending plan */}

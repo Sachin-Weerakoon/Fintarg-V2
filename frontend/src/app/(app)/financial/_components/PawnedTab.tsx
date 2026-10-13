@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
+import { FormCard } from '@/components/ui/FormCard';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
@@ -308,58 +309,67 @@ export function PawnedTab() {
         )}
       </div>
 
-      <Card className="p-5 h-fit">
-        <h3 className="font-semibold text-sm mb-4 text-text">Add pawned item</h3>
-        <div className="space-y-3.5">
-          <Field id="pawn-desc" label="Description">
-            <Input
-              value={form.description}
-              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="e.g. Gold chain (22g)"
+      <FormCard
+        icon="financial"
+        title="Add Pawned Item"
+        description="Track pawn receipts, advance amounts, monthly rates, and redemption dates"
+        className="h-fit sticky top-4"
+      >
+        <Field id="pawn-desc" label="Description" required>
+          <Input
+            value={form.description}
+            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+            placeholder="e.g. Gold chain (22g), Sovereign coin"
+          />
+        </Field>
+        <Field id="pawn-ticket" label="Ticket / Receipt # (optional)">
+          <Input
+            value={form.ticketNumber}
+            onChange={e => setForm(f => ({ ...f, ticketNumber: e.target.value }))}
+            placeholder="e.g. TKT-90412"
+          />
+        </Field>
+        <Field id="pawn-amount" label="Amount received (Rs.)" required>
+          <MoneyField
+            value={form.amountReceived}
+            onChange={v => setForm(f => ({ ...f, amountReceived: String(v) }))}
+            placeholder="50,000"
+          />
+        </Field>
+        <Field id="pawn-rate" label="Interest rate (% per month)" required>
+          <Input
+            type="number"
+            step="0.1"
+            value={form.interestRate}
+            onChange={e => setForm(f => ({ ...f, interestRate: e.target.value }))}
+            placeholder="2.0"
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field id="pawn-due" label="Next due date" required>
+            <DateField
+              value={form.nextDue}
+              onChange={e => setForm(f => ({ ...f, nextDue: e.target.value }))}
             />
           </Field>
-          <Field id="pawn-ticket" label="Ticket / Receipt # (optional)">
-            <Input
-              value={form.ticketNumber}
-              onChange={e => setForm(f => ({ ...f, ticketNumber: e.target.value }))}
-              placeholder="e.g. TKT-90412"
+          <Field id="pawn-redemption" label="Redemption date">
+            <DateField
+              value={form.redemptionDate}
+              onChange={e => setForm(f => ({ ...f, redemptionDate: e.target.value }))}
             />
           </Field>
-          <Field id="pawn-amount" label="Amount received (Rs.)">
-            <MoneyField
-              value={form.amountReceived}
-              onChange={v => setForm(f => ({ ...f, amountReceived: String(v) }))}
-              placeholder="50,000"
-            />
-          </Field>
-          <Field id="pawn-rate" label="Interest rate (% per month)">
-            <Input
-              type="number"
-              step="0.1"
-              value={form.interestRate}
-              onChange={e => setForm(f => ({ ...f, interestRate: e.target.value }))}
-              placeholder="2"
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field id="pawn-due" label="Next due date">
-              <DateField
-                value={form.nextDue}
-                onChange={e => setForm(f => ({ ...f, nextDue: e.target.value }))}
-              />
-            </Field>
-            <Field id="pawn-redemption" label="Redemption date">
-              <DateField
-                value={form.redemptionDate}
-                onChange={e => setForm(f => ({ ...f, redemptionDate: e.target.value }))}
-              />
-            </Field>
-          </div>
-          <Button variant="primary" className="w-full pt-1" onClick={submit}>
-            Save Item
+        </div>
+        <div className="pt-2">
+          <Button
+            variant="primary"
+            className="w-full shadow-sm hover:shadow-primary-500/20"
+            iconLeft={<Icon name="plus" size={15} />}
+            onClick={submit}
+          >
+            Save Pawned Item
           </Button>
         </div>
-      </Card>
+      </FormCard>
 
       {/* Payment Sheet */}
       <Sheet

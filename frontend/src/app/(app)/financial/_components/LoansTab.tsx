@@ -2,6 +2,7 @@
 import { useState, useMemo } from 'react';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
+import { FormCard } from '@/components/ui/FormCard';
 import { StatCard } from '@/components/ui/StatCard';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
@@ -351,105 +352,163 @@ export function LoansTab() {
         </div>
 
         {/* Add Loan Form */}
-        <Card className="p-5 h-fit">
-          <h3 className="font-semibold text-sm mb-4 text-text">{editId ? 'Edit loan' : 'Add Loan'}</h3>
-          <div className="space-y-3.5">
-            <Field id="loan-lender" label="Lender / Institution">
+        <FormCard
+          icon="financial"
+          title={editId ? 'Edit Loan' : 'Add Loan'}
+          description={editId ? 'Update loan parameters and rate' : 'Configure personal, business, or bank borrowing terms'}
+          badge={editId ? 'Editing' : undefined}
+          actions={
+            editId ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditId(null);
+                  setForm({
+                    lender: '',
+                    amount: '',
+                    rate: '',
+                    interestBasis: 'annual',
+                    tenureMonths: '12',
+                    method: 'reducing_balance',
+                    startDate: new Date().toISOString().slice(0, 10),
+                    dueDate: '',
+                  });
+                }}
+              >
+                Cancel
+              </Button>
+            ) : undefined
+          }
+          className="h-fit sticky top-4"
+        >
+          <Field id="loan-lender" label="Lender / Institution" required>
+            <Input
+              value={form.lender}
+              onChange={e => setForm(f => ({ ...f, lender: e.target.value }))}
+              placeholder="e.g. Commercial Bank, Mortgage Ltd."
+            />
+          </Field>
+          <Field id="loan-principal" label="Principal Amount (Rs.)" required>
+            <MoneyField
+              value={form.amount}
+              onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
+              placeholder="1,000,000"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field id="loan-rate" label="Interest rate (%)" required>
               <Input
-                value={form.lender}
-                onChange={e => setForm(f => ({ ...f, lender: e.target.value }))}
-                placeholder="e.g. Commercial Bank, Mortgage"
+                type="number"
+                step="0.1"
+                value={form.rate}
+                onChange={e => setForm(f => ({ ...f, rate: e.target.value }))}
+                placeholder="12"
               />
             </Field>
-            <Field id="loan-principal" label="Principal Amount (Rs.)">
-              <MoneyField
-                value={form.amount}
-                onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
-                placeholder="1,000,000"
-              />
+            <Field id="loan-basis" label="Interest Basis" required>
+              <Select
+                value={form.interestBasis}
+                onChange={e => setForm(f => ({ ...f, interestBasis: e.target.value as any }))}
+              >
+                <option value="annual">Annual</option>
+                <option value="monthly">Monthly</option>
+              </Select>
             </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field id="loan-rate" label="Interest rate (%)">
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={form.rate}
-                  onChange={e => setForm(f => ({ ...f, rate: e.target.value }))}
-                  placeholder="12"
-                />
-              </Field>
-              <Field id="loan-basis" label="Interest Basis">
-                <Select
-                  value={form.interestBasis}
-                  onChange={e => setForm(f => ({ ...f, interestBasis: e.target.value as any }))}
-                >
-                  <option value="annual">Annual</option>
-                  <option value="monthly">Monthly</option>
-                </Select>
-              </Field>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field id="loan-tenure" label="Tenure (Months)">
-                <Input
-                  type="number"
-                  value={form.tenureMonths}
-                  onChange={e => setForm(f => ({ ...f, tenureMonths: e.target.value }))}
-                  placeholder="12"
-                />
-              </Field>
-              <Field id="loan-method" label="Method">
-                <Select
-                  value={form.method}
-                  onChange={e => setForm(f => ({ ...f, method: e.target.value as any }))}
-                >
-                  <option value="reducing_balance">Reducing Balance</option>
-                  <option value="simple">Simple / Flat</option>
-                  <option value="compound">Compound</option>
-                </Select>
-              </Field>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field id="loan-start" label="Start Date">
-                <DateField
-                  value={form.startDate}
-                  onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
-                />
-              </Field>
-              <Field id="loan-due" label="Due Date (optional)">
-                <DateField
-                  value={form.dueDate}
-                  onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
-                />
-              </Field>
-            </div>
-
-            {/* Live Loan Calculation Box */}
-            {liveCalc && (
-              <div className="p-3 rounded-xl bg-surface-hover/70 border border-primary-500/30 text-xs space-y-1.5">
-                <div className="font-semibold text-text flex items-center gap-1.5">
-                  <Icon name="check" size={14} className="text-primary-text" />
-                  <span>Loan Projection</span>
-                </div>
-                <div className="flex justify-between text-muted">
-                  <span>Monthly EMI:</span>
-                  <span className="font-bold text-text num">{formatRs(liveCalc.monthlyPayment)}</span>
-                </div>
-                <div className="flex justify-between text-muted">
-                  <span>Total Interest:</span>
-                  <span className="font-semibold text-text num">{formatRs(liveCalc.totalInterest)}</span>
-                </div>
-                <div className="flex justify-between text-muted">
-                  <span>Total Payable:</span>
-                  <span className="font-bold text-primary-text num">{formatRs(liveCalc.totalPayment)}</span>
-                </div>
-              </div>
-            )}
-
-            <Button variant="primary" className="w-full pt-1" onClick={submit}>
-              Save Loan
-            </Button>
           </div>
-        </Card>
+          <div className="grid grid-cols-2 gap-3">
+            <Field id="loan-tenure" label="Tenure (Months)" required>
+              <Input
+                type="number"
+                value={form.tenureMonths}
+                onChange={e => setForm(f => ({ ...f, tenureMonths: e.target.value }))}
+                placeholder="12"
+              />
+            </Field>
+            <Field id="loan-method" label="Method" required>
+              <Select
+                value={form.method}
+                onChange={e => setForm(f => ({ ...f, method: e.target.value as any }))}
+              >
+                <option value="reducing_balance">Reducing Balance</option>
+                <option value="simple">Simple / Flat</option>
+                <option value="compound">Compound</option>
+              </Select>
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field id="loan-start" label="Start Date" required>
+              <DateField
+                value={form.startDate}
+                onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
+              />
+            </Field>
+            <Field id="loan-due" label="Due Date (optional)">
+              <DateField
+                value={form.dueDate}
+                onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
+              />
+            </Field>
+          </div>
+
+          {/* Live Loan Calculation Box */}
+          {liveCalc && (
+            <div className="p-3.5 rounded-xl bg-primary-tint/25 dark:bg-primary-tint/15 border border-primary-500/30 text-xs space-y-2">
+              <div className="font-semibold text-text flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-primary-text font-bold">
+                  <Icon name="bolt" size={14} />
+                  <span>Calculated Projections</span>
+                </div>
+                <span className="text-[10px] uppercase font-bold text-primary-text bg-primary-500/10 px-1.5 py-0.5 rounded">
+                  Amortized
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-muted">
+                <span>Monthly EMI:</span>
+                <span className="font-bold text-text num text-sm">{formatRs(liveCalc.monthlyPayment)}</span>
+              </div>
+              <div className="flex justify-between items-center text-muted">
+                <span>Total Interest:</span>
+                <span className="font-semibold text-text num">{formatRs(liveCalc.totalInterest)}</span>
+              </div>
+              <div className="flex justify-between items-center text-muted border-t border-primary-500/15 pt-1.5">
+                <span className="font-semibold text-text">Total Outflow:</span>
+                <span className="font-bold text-primary-text num text-sm">{formatRs(liveCalc.totalPayment)}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="primary"
+              className="flex-1 shadow-sm hover:shadow-primary-500/20"
+              iconLeft={<Icon name={editId ? 'check' : 'plus'} size={15} />}
+              onClick={submit}
+            >
+              {editId ? 'Update Loan' : 'Save Loan Record'}
+            </Button>
+            {editId && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setEditId(null);
+                  setForm({
+                    lender: '',
+                    amount: '',
+                    rate: '',
+                    interestBasis: 'annual',
+                    tenureMonths: '12',
+                    method: 'reducing_balance',
+                    startDate: new Date().toISOString().slice(0, 10),
+                    dueDate: '',
+                  });
+                }}
+              >
+                Cancel
+              </Button>
+            )}
+          </div>
+        </FormCard>
       </div>
 
       {/* Repayment Sheet */}

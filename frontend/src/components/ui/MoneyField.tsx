@@ -93,10 +93,12 @@ export const MoneyField = React.forwardRef<HTMLInputElement, MoneyFieldProps>(fu
     props.onBlur?.(e);
   };
 
-  return (
-    <div className="relative flex items-center w-full">
-      <div className="absolute left-3.5 flex items-center pointer-events-none text-muted font-semibold text-xs select-none">
-        {currency}
+    return (
+    <div className="group relative flex items-center w-full">
+      <div className="absolute left-2.5 flex items-center pointer-events-none select-none z-10">
+        <span className="px-2 py-0.5 rounded-md bg-primary-tint/70 dark:bg-primary-tint/25 text-primary-text font-bold text-[11px] uppercase tracking-wider border border-primary-500/25 transition-colors duration-200 group-focus-within:border-primary-500 group-focus-within:bg-primary-tint">
+          {currency}
+        </span>
       </div>
       <input
         ref={ref}
@@ -106,8 +108,10 @@ export const MoneyField = React.forwardRef<HTMLInputElement, MoneyFieldProps>(fu
         onChange={handleChange}
         onBlur={handleBlur}
         placeholder={placeholder}
-        className={`form-input w-full !pl-11 num font-semibold ${
-          hasError ? '!border-danger-solid focus:!border-danger-solid' : ''
+        className={`form-input w-full !pl-14 num font-bold text-text transition-all duration-200 ${
+          hasError
+            ? '!border-danger-solid focus:!border-danger-solid focus:!ring-4 focus:!ring-danger-solid/15 !shadow-[0_0_0_1px_rgba(220,38,38,0.2)]'
+            : ''
         } ${className}`.trim()}
         {...props}
       />

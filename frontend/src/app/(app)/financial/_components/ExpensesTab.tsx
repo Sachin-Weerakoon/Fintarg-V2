@@ -10,6 +10,7 @@ import {
   calcDailyExpenseBudget,
 } from '@/store';
 import { Card } from '@/components/ui/Card';
+import { FormCard } from '@/components/ui/FormCard';
 import { StatCard } from '@/components/ui/StatCard';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
@@ -249,93 +250,126 @@ export function ExpensesTab({ month }: { month: string }) {
       </div>
 
       {/* Form */}
-      <Card className="p-5 h-fit">
-        <h3 className="font-semibold text-sm mb-4 text-text">{editId ? 'Edit expense' : 'Record Expense'}</h3>
-        <div className="space-y-3.5">
-          <Field id="expense-date" label="Date">
-            <DateField
-              value={form.date}
-              onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-            />
-          </Field>
-          <Field id="expense-category" label="Category">
-            <Select
-              value={form.category}
-              onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+      <FormCard
+        icon="wallet"
+        title={editId ? 'Edit Expense' : 'Record Expense'}
+        description={editId ? 'Modify this recorded transaction details' : 'Log cash outflow against your monthly budget'}
+        badge={editId ? 'Editing' : undefined}
+        actions={
+          editId ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setEditId(null);
+                setForm({
+                  date: month + '-' + new Date().toISOString().slice(8, 10),
+                  category: 'Food',
+                  amount: '',
+                  note: '',
+                  recurring: false,
+                  paymentMethod: 'cash',
+                  bankAccountId: '',
+                  cardId: '',
+                });
+                setError('');
+              }}
             >
-              {EXPENSE_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+              Cancel
+            </Button>
+          ) : undefined
+        }
+        className="h-fit sticky top-4"
+      >
+        <Field id="expense-date" label="Date" required>
+          <DateField
+            value={form.date}
+            onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+          />
+        </Field>
+        <Field id="expense-category" label="Category" required>
+          <Select
+            value={form.category}
+            onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+          >
+            {EXPENSE_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+          </Select>
+        </Field>
+        <Field id="expense-amount" label="Amount (Rs.)" required error={error}>
+          <MoneyField
+            value={form.amount}
+            onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
+            hasError={!!error}
+          />
+        </Field>
+        <PaymentMethodField
+          value={form.paymentMethod}
+          onChange={method => setForm(f => ({ ...f, paymentMethod: method }))}
+        />
+        {['bank_transfer', 'cheque', 'standing_order'].includes(form.paymentMethod) && (
+          <BankSelect
+            value={form.bankAccountId}
+            onChange={id => setForm(f => ({ ...f, bankAccountId: id }))}
+            bankAccounts={state.bankAccounts}
+          />
+        )}
+        {form.paymentMethod === 'card' && state.cards.length > 0 && (
+          <Field id="expense-card" label="Card">
+            <Select
+              value={form.cardId}
+              onChange={e => setForm(f => ({ ...f, cardId: e.target.value }))}
+            >
+              <option value="">Select Card</option>
+              {state.cards.map(c => (
+                <option key={c.id} value={c.id}>{c.name} (•••• {c.lastFourDigits})</option>
+              ))}
             </Select>
           </Field>
-          <Field id="expense-amount" label="Amount (Rs.)" error={error}>
-            <MoneyField
-              value={form.amount}
-              onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
-              hasError={!!error}
-            />
-          </Field>
-          <PaymentMethodField
-            value={form.paymentMethod}
-            onChange={method => setForm(f => ({ ...f, paymentMethod: method }))}
+        )}
+        <Field id="expense-note" label="Note">
+          <Input
+            value={form.note}
+            onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
+            placeholder="e.g. Supermarket, Electricity bill"
           />
-          {['bank_transfer', 'cheque', 'standing_order'].includes(form.paymentMethod) && (
-            <BankSelect
-              value={form.bankAccountId}
-              onChange={id => setForm(f => ({ ...f, bankAccountId: id }))}
-              bankAccounts={state.bankAccounts}
-            />
-          )}
-          {form.paymentMethod === 'card' && state.cards.length > 0 && (
-            <Field id="expense-card" label="Card">
-              <Select
-                value={form.cardId}
-                onChange={e => setForm(f => ({ ...f, cardId: e.target.value }))}
-              >
-                <option value="">Select Card</option>
-                {state.cards.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} (•••• {c.lastFourDigits})</option>
-                ))}
-              </Select>
-            </Field>
-          )}
-          <Field id="expense-note" label="Note">
-            <Input
-              value={form.note}
-              onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
-              placeholder="e.g. Supermarket, Electricity bill"
-            />
-          </Field>
-          <Checkbox
-            label="Recurring monthly"
-            checked={form.recurring}
-            onChange={checked => setForm(f => ({ ...f, recurring: checked }))}
-          />
-          <div className="flex gap-2 pt-1">
-            <Button variant="primary" className="flex-1" onClick={submit}>
-              {editId ? 'Update Expense' : 'Save Expense'}
+        </Field>
+        <Checkbox
+          label="Recurring monthly obligation"
+          checked={form.recurring}
+          onChange={checked => setForm(f => ({ ...f, recurring: checked }))}
+        />
+        <div className="flex gap-2 pt-2">
+          <Button
+            variant="primary"
+            className="flex-1 shadow-sm hover:shadow-primary-500/20"
+            iconLeft={<Icon name={editId ? 'check' : 'plus'} size={15} />}
+            onClick={submit}
+          >
+            {editId ? 'Update Expense' : 'Save Expense'}
+          </Button>
+          {editId && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setEditId(null);
+                setForm({
+                  date: month + '-' + new Date().toISOString().slice(8, 10),
+                  category: 'Food',
+                  amount: '',
+                  note: '',
+                  recurring: false,
+                  paymentMethod: 'cash',
+                  bankAccountId: '',
+                  cardId: '',
+                });
+                setError('');
+              }}
+            >
+              Cancel
             </Button>
-            {editId && (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setEditId(null);
-                  setForm({
-                    date: month + '-' + new Date().toISOString().slice(8, 10),
-                    category: 'Food',
-                    amount: '',
-                    note: '',
-                    recurring: false,
-                    paymentMethod: 'cash',
-                    bankAccountId: '',
-                    cardId: '',
-                  });
-                }}
-              >
-                Cancel
-              </Button>
-            )}
-          </div>
+          )}
         </div>
-      </Card>
+      </FormCard>
     </div>
   );
 }

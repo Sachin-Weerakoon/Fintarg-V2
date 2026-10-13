@@ -16,23 +16,25 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
   },
   ref
 ) {
+  const errorStyles = hasError
+    ? '!border-danger-solid focus:!border-danger-solid focus:!ring-4 focus:!ring-danger-solid/15 !shadow-[0_0_0_1px_rgba(220,38,38,0.2)]'
+    : '';
+
   if (iconLeft || iconRight) {
     return (
-      <div className="relative flex items-center w-full">
+      <div className="group relative flex items-center w-full">
         {iconLeft && (
-          <div className="absolute left-3.5 flex items-center pointer-events-none text-muted">
+          <div className="absolute left-3.5 flex items-center pointer-events-none text-muted transition-colors duration-200 group-focus-within:text-primary-600 dark:group-focus-within:text-primary-400">
             {iconLeft}
           </div>
         )}
         <input
           ref={ref}
-          className={`form-input w-full ${iconLeft ? '!pl-10' : ''} ${iconRight ? '!pr-10' : ''} ${
-            hasError ? '!border-danger-solid focus:!border-danger-solid' : ''
-          } ${className}`.trim()}
+          className={`form-input w-full ${iconLeft ? '!pl-10.5' : ''} ${iconRight ? '!pr-10.5' : ''} ${errorStyles} ${className}`.trim()}
           {...props}
         />
         {iconRight && (
-          <div className="absolute right-3.5 flex items-center pointer-events-none text-muted">
+          <div className="absolute right-3.5 flex items-center pointer-events-none text-muted transition-colors duration-200 group-focus-within:text-primary-600 dark:group-focus-within:text-primary-400">
             {iconRight}
           </div>
         )}
@@ -43,9 +45,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
   return (
     <input
       ref={ref}
-      className={`form-input w-full ${
-        hasError ? '!border-danger-solid focus:!border-danger-solid' : ''
-      } ${className}`.trim()}
+      className={`form-input w-full ${errorStyles} ${className}`.trim()}
       {...props}
     />
   );

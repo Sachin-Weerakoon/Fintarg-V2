@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
+import { FormCard } from '@/components/ui/FormCard';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -331,162 +332,196 @@ export function FinanceTab() {
         )}
       </div>
 
-      <Card className="p-5 h-fit">
-        <h3 className="font-semibold text-sm mb-4 text-text">{editId ? 'Edit Payment' : 'Add Finance Payment'}</h3>
-        <div className="space-y-3.5">
-          <Field id="fp-kind" label="Payment Type">
-            <Select
-              value={form.paymentKind}
-              onChange={e => setForm(f => ({ ...f, paymentKind: e.target.value as any }))}
+      <FormCard
+        icon="calendar"
+        title={editId ? 'Edit Payment' : 'Add Finance Payment'}
+        description={editId ? 'Update scheduled commitment details' : 'Track leases, hire purchases, cheques, or standing orders'}
+        badge={editId ? 'Editing' : undefined}
+        actions={
+          editId ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setEditId(null);
+                setForm({
+                  paymentKind: 'instalment',
+                  lender: '',
+                  payee: '',
+                  chequeNumber: '',
+                  amount: '',
+                  dueDay: '',
+                  nextDueDate: '',
+                  monthsRemaining: '',
+                  frequency: 'monthly',
+                  bankAccountId: '',
+                  status: 'active',
+                });
+              }}
             >
-              <option value="instalment">Hire Purchase / Instalment</option>
-              <option value="lease">Vehicle Lease</option>
-              <option value="cheque">Post-Dated Cheque</option>
-              <option value="standing_order">Standing Order</option>
-            </Select>
-          </Field>
+              Cancel
+            </Button>
+          ) : undefined
+        }
+        className="h-fit sticky top-4"
+      >
+        <Field id="fp-kind" label="Payment Type" required>
+          <Select
+            value={form.paymentKind}
+            onChange={e => setForm(f => ({ ...f, paymentKind: e.target.value as any }))}
+          >
+            <option value="instalment">Hire Purchase / Instalment</option>
+            <option value="lease">Vehicle Lease</option>
+            <option value="cheque">Post-Dated Cheque</option>
+            <option value="standing_order">Standing Order</option>
+          </Select>
+        </Field>
 
-          {form.paymentKind === 'cheque' ? (
-            <>
-              <Field id="fp-payee" label="Payee">
-                <Input
-                  value={form.payee}
-                  onChange={e => setForm(f => ({ ...f, payee: e.target.value, lender: e.target.value }))}
-                  placeholder="e.g. Landlord, Supplier Ltd."
-                />
-              </Field>
-              <Field id="fp-chequenum" label="Cheque Number">
-                <Input
-                  value={form.chequeNumber}
-                  onChange={e => setForm(f => ({ ...f, chequeNumber: e.target.value }))}
-                  placeholder="e.g. 784512"
-                />
-              </Field>
-            </>
-          ) : form.paymentKind === 'standing_order' ? (
-            <>
-              <Field id="fp-payee" label="Beneficiary / Payee">
-                <Input
-                  value={form.payee}
-                  onChange={e => setForm(f => ({ ...f, payee: e.target.value, lender: e.target.value }))}
-                  placeholder="e.g. Insurance Premium, School Fee"
-                />
-              </Field>
-              <Field id="fp-freq" label="Frequency">
-                <Select
-                  value={form.frequency}
-                  onChange={e => setForm(f => ({ ...f, frequency: e.target.value as any }))}
-                >
-                  <option value="monthly">Monthly</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="annually">Annually</option>
-                </Select>
-              </Field>
-            </>
-          ) : (
-            <Field id="fp-lender" label="Lender / Institution">
+        {form.paymentKind === 'cheque' ? (
+          <>
+            <Field id="fp-payee" label="Payee" required>
               <Input
-                value={form.lender}
-                onChange={e => setForm(f => ({ ...f, lender: e.target.value, payee: e.target.value }))}
-                placeholder="e.g. People's Bank, Singer"
+                value={form.payee}
+                onChange={e => setForm(f => ({ ...f, payee: e.target.value, lender: e.target.value }))}
+                placeholder="e.g. Landlord, Supplier Ltd."
               />
             </Field>
-          )}
-
-          <Field id="fp-amount" label="Amount (Rs.)">
-            <MoneyField
-              value={form.amount}
-              onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
-              placeholder="25,000"
+            <Field id="fp-chequenum" label="Cheque Number" required>
+              <Input
+                value={form.chequeNumber}
+                onChange={e => setForm(f => ({ ...f, chequeNumber: e.target.value }))}
+                placeholder="e.g. 784512"
+              />
+            </Field>
+          </>
+        ) : form.paymentKind === 'standing_order' ? (
+          <>
+            <Field id="fp-payee" label="Beneficiary / Payee" required>
+              <Input
+                value={form.payee}
+                onChange={e => setForm(f => ({ ...f, payee: e.target.value, lender: e.target.value }))}
+                placeholder="e.g. Insurance Premium, School Fee"
+              />
+            </Field>
+            <Field id="fp-freq" label="Frequency" required>
+              <Select
+                value={form.frequency}
+                onChange={e => setForm(f => ({ ...f, frequency: e.target.value as any }))}
+              >
+                <option value="monthly">Monthly</option>
+                <option value="weekly">Weekly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="annually">Annually</option>
+              </Select>
+            </Field>
+          </>
+        ) : (
+          <Field id="fp-lender" label="Lender / Institution" required>
+            <Input
+              value={form.lender}
+              onChange={e => setForm(f => ({ ...f, lender: e.target.value, payee: e.target.value }))}
+              placeholder="e.g. People's Bank, Singer"
             />
           </Field>
+        )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field id="fp-dueday" label="Due Day (1-31)">
-              <Input
-                type="number"
-                min="1"
-                max="31"
-                value={form.dueDay}
-                onChange={e => setForm(f => ({ ...f, dueDay: e.target.value }))}
-                placeholder="10"
-              />
-            </Field>
-            <Field id="fp-nextdue" label="Next Due Date">
-              <DateField
-                value={form.nextDueDate}
-                onChange={e => {
-                  const val = e.target.value;
-                  const day = val ? Number(val.slice(8, 10)) : '';
-                  setForm(f => ({ ...f, nextDueDate: val, dueDay: day ? String(day) : f.dueDay }));
-                }}
-              />
-            </Field>
-          </div>
-
-          {form.paymentKind !== 'cheque' && (
-            <Field id="fp-months" label="Months Remaining">
-              <Input
-                type="number"
-                min="0"
-                value={form.monthsRemaining}
-                onChange={e => setForm(f => ({ ...f, monthsRemaining: e.target.value }))}
-                placeholder="18"
-              />
-            </Field>
-          )}
-
-          <BankSelect
-            value={form.bankAccountId}
-            onChange={id => setForm(f => ({ ...f, bankAccountId: id }))}
-            bankAccounts={state.bankAccounts}
-            label="Linked Bank Account"
+        <Field id="fp-amount" label="Amount (Rs.)" required>
+          <MoneyField
+            value={form.amount}
+            onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
+            placeholder="25,000"
           />
+        </Field>
 
-          <Field id="fp-status" label="Status">
-            <Select
-              value={form.status}
-              onChange={e => setForm(f => ({ ...f, status: e.target.value as any }))}
-            >
-              <option value="active">Active</option>
-              <option value="completed">Completed</option>
-              <option value="pending">Pending</option>
-              <option value="cleared">Cleared</option>
-              <option value="cancelled">Cancelled</option>
-            </Select>
+        <div className="grid grid-cols-2 gap-3">
+          <Field id="fp-dueday" label="Due Day (1-31)" required>
+            <Input
+              type="number"
+              min="1"
+              max="31"
+              value={form.dueDay}
+              onChange={e => setForm(f => ({ ...f, dueDay: e.target.value }))}
+              placeholder="10"
+            />
           </Field>
-
-          <div className="flex gap-2 pt-1">
-            <Button variant="primary" className="flex-1" onClick={submit}>
-              {editId ? 'Update Payment' : 'Save Payment'}
-            </Button>
-            {editId && (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setEditId(null);
-                  setForm({
-                    paymentKind: 'instalment',
-                    lender: '',
-                    payee: '',
-                    chequeNumber: '',
-                    amount: '',
-                    dueDay: '',
-                    nextDueDate: '',
-                    monthsRemaining: '',
-                    frequency: 'monthly',
-                    bankAccountId: '',
-                    status: 'active',
-                  });
-                }}
-              >
-                Cancel
-              </Button>
-            )}
-          </div>
+          <Field id="fp-nextdue" label="Next Due Date" required>
+            <DateField
+              value={form.nextDueDate}
+              onChange={e => {
+                const val = e.target.value;
+                const day = val ? Number(val.slice(8, 10)) : '';
+                setForm(f => ({ ...f, nextDueDate: val, dueDay: day ? String(day) : f.dueDay }));
+              }}
+            />
+          </Field>
         </div>
-      </Card>
+
+        {form.paymentKind !== 'cheque' && (
+          <Field id="fp-months" label="Months Remaining">
+            <Input
+              type="number"
+              min="0"
+              value={form.monthsRemaining}
+              onChange={e => setForm(f => ({ ...f, monthsRemaining: e.target.value }))}
+              placeholder="18"
+            />
+          </Field>
+        )}
+
+        <BankSelect
+          value={form.bankAccountId}
+          onChange={id => setForm(f => ({ ...f, bankAccountId: id }))}
+          bankAccounts={state.bankAccounts}
+          label="Linked Bank Account"
+        />
+
+        <Field id="fp-status" label="Status" required>
+          <Select
+            value={form.status}
+            onChange={e => setForm(f => ({ ...f, status: e.target.value as any }))}
+          >
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="pending">Pending</option>
+            <option value="cleared">Cleared</option>
+            <option value="cancelled">Cancelled</option>
+          </Select>
+        </Field>
+
+        <div className="flex gap-2 pt-2">
+          <Button
+            variant="primary"
+            className="flex-1 shadow-sm hover:shadow-primary-500/20"
+            iconLeft={<Icon name={editId ? 'check' : 'plus'} size={15} />}
+            onClick={submit}
+          >
+            {editId ? 'Update Payment' : 'Save Payment'}
+          </Button>
+          {editId && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setEditId(null);
+                setForm({
+                  paymentKind: 'instalment',
+                  lender: '',
+                  payee: '',
+                  chequeNumber: '',
+                  amount: '',
+                  dueDay: '',
+                  nextDueDate: '',
+                  monthsRemaining: '',
+                  frequency: 'monthly',
+                  bankAccountId: '',
+                  status: 'active',
+                });
+              }}
+            >
+              Cancel
+            </Button>
+          )}
+        </div>
+      </FormCard>
 
       {/* Mark as paid sheet */}
       <Sheet

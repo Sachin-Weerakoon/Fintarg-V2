@@ -39,3 +39,5 @@ export * from './ErrorState';
 export * from './Divider';
 export * from './PageSection';
 export * from './ColorSwatch';
+export * from './BrandLogo';
+export * from './FormCard';

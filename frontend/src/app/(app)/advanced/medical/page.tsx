@@ -6,10 +6,13 @@ import { useApp, formatRs } from '@/store';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
+import { FormCard } from '@/components/ui/FormCard';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { MoneyField } from '@/components/ui/MoneyField';
+import { DateField } from '@/components/ui/DateField';
 import { Badge } from '@/components/ui/Badge';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -246,47 +249,54 @@ export default function MedicalClient() {
           </div>
 
           {/* Add form */}
-          <Card className="p-5 h-fit">
-            <h3 className="font-semibold text-sm mb-4 text-text">Add medical expense</h3>
-            <div className="space-y-3.5">
-              <Field id="med-date" label="Date">
-                <Input
-                  type="date"
-                  value={form.date}
-                  onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                />
-              </Field>
-              <Field id="med-type" label="Type">
-                <Select
-                  value={form.type}
-                  onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
-                >
-                  {MEDICAL_TYPES.map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </Select>
-              </Field>
-              <Field id="med-amount" label="Amount (Rs.)" error={error}>
-                <Input
-                  type="number"
-                  min="1"
-                  value={form.amount}
-                  onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
-                  placeholder="2,500"
-                />
-              </Field>
-              <Field id="med-note" label="Note">
-                <Input
-                  value={form.note}
-                  onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
-                  placeholder="e.g. GP visit, blood panel"
-                />
-              </Field>
-              <Button variant="primary" className="w-full pt-1" onClick={submit}>
+          <FormCard
+            icon="heart"
+            title="Add Medical Expense"
+            description="Track healthcare consultations, medicine, and hospital charges"
+            className="h-fit sticky top-4"
+          >
+            <Field id="med-date" label="Date" required>
+              <DateField
+                value={form.date}
+                onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+              />
+            </Field>
+            <Field id="med-type" label="Type" required>
+              <Select
+                value={form.type}
+                onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+              >
+                {MEDICAL_TYPES.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field id="med-amount" label="Amount (Rs.)" required error={error}>
+              <MoneyField
+                value={form.amount}
+                onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
+                placeholder="2,500"
+                hasError={!!error}
+              />
+            </Field>
+            <Field id="med-note" label="Clinical Note">
+              <Input
+                value={form.note}
+                onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
+                placeholder="e.g. GP visit, blood panel, pharmacy Rx"
+              />
+            </Field>
+            <div className="pt-2">
+              <Button
+                variant="primary"
+                className="w-full shadow-sm hover:shadow-primary-500/20"
+                iconLeft={<Icon name="plus" size={15} />}
+                onClick={submit}
+              >
                 Save Expense
               </Button>
             </div>
-          </Card>
+          </FormCard>
         </div>
       )}
 
