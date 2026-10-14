@@ -17,9 +17,11 @@ import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
-import type { BusinessBranch, BranchEntry } from '@/types';
+import type { BusinessBranch, BranchEntry, SavingsGoal } from '@/types';
+import { SalaryWorkspace } from './SalaryWorkspace';
+import { AgreementsTab } from './AgreementsTab';
 
-type BranchTab = 'overview' | 'income' | 'costs' | 'targets';
+type BranchTab = 'overview' | 'finances' | 'salary' | 'targets' | 'agreements' | 'letters';
 
 export function BusinessWorkspace() {
   const { state, dispatch, showToast } = useApp();
@@ -47,6 +49,7 @@ export function BusinessWorkspace() {
   const branch = state.businessBranches.find(b => b.id === branchId && b.companyId === (selectedCompany?.id || companyId)) || companyBranches[0];
 
   const [activeTab, setActiveTab] = useState<BranchTab>('overview');
+  const [financeSubTab, setFinanceSubTab] = useState<'inflows' | 'costs' | 'expenses'>('inflows');
   const [showBusinessForm, setShowBusinessForm] = useState(false);
   const [showBranchForm, setShowBranchForm] = useState(false);
 
@@ -129,6 +132,45 @@ export function BusinessWorkspace() {
     setShowBranchForm(false);
     setBranchForm({ name: '', branchType: 'Retail Outlet', location: '', monthlyTarget: '' });
     showToast('Branch registered.', 'success');
+  };
+
+  // Branch Milestone Goal Form
+  const [showBranchGoalForm, setShowBranchGoalForm] = useState(false);
+  const [branchGoalName, setBranchGoalName] = useState('');
+  const [branchGoalAmount, setBranchGoalAmount] = useState('');
+  const [branchGoalDate, setBranchGoalDate] = useState('');
+  const [branchGoalType, setBranchGoalType] = useState('expansion');
+
+  const addBranchGoal = () => {
+    if (!branchGoalName.trim() || !branchGoalAmount || !branch) {
+      showToast('Please enter a goal title and target amount.', 'error');
+      return;
+    }
+    const amt = Number(branchGoalAmount) || 0;
+    const goalId = 'g_' + Date.now();
+    dispatch({
+      type: 'ADD_GOAL',
+      entry: {
+        id: goalId,
+        name: branchGoalName.trim(),
+        dailyAmount: Math.ceil(amt / 90),
+        monthlyTarget: Math.ceil(amt / 3),
+        targetAmount: amt,
+        targetDate: branchGoalDate || undefined,
+        endDate: branchGoalDate || new Date().toISOString().slice(0, 10),
+        savedAmount: 0,
+        contributions: [],
+        scope: 'branch',
+        companyId: branch.companyId,
+        branchId: branch.id,
+        targetType: branchGoalType as SavingsGoal['targetType'],
+      },
+    });
+    setBranchGoalName('');
+    setBranchGoalAmount('');
+    setBranchGoalDate('');
+    setShowBranchGoalForm(false);
+    showToast('Branch milestone goal created.', 'success');
   };
 
   const recordSales = () => {
@@ -244,10 +286,12 @@ export function BusinessWorkspace() {
   const targetPct = target > 0 ? Math.min(100, Math.round((monthlyRevenue / target) * 100)) : 0;
 
   const tabOptions = [
-    { id: 'overview' as BranchTab, label: 'Overview' },
-    { id: 'income' as BranchTab, label: 'Inflows' },
-    { id: 'costs' as BranchTab, label: 'Costs & Bills' },
-    { id: 'targets' as BranchTab, label: 'Targets' },
+    { id: 'overview' as BranchTab, label: 'Outlets & Sales' },
+    { id: 'finances' as BranchTab, label: 'Finances & Ledger' },
+    { id: 'salary' as BranchTab, label: 'Salary & Compensation' },
+    { id: 'targets' as BranchTab, label: 'Goals & Targets' },
+    { id: 'agreements' as BranchTab, label: 'Contracts' },
+    { id: 'letters' as BranchTab, label: 'Official Letters' },
   ];
 
   return (
@@ -648,178 +692,583 @@ export function BusinessWorkspace() {
             </div>
           )}
 
-          {/* Tab 2: Inflows */}
-          {activeTab === 'income' && (
+          {/* Tab 2: Finances & Ledger (Entire Business & Branches) */}
+          {activeTab === 'finances' && (
             <div className="space-y-6">
-              <Card className="p-6 space-y-4">
-                <h4 className="text-sm font-bold text-text">Log Commercial Inflow</h4>
-                <FormGrid columns={3}>
-                  <FormField id="inc-date" label="Date">
-                    <DateField id="inc-date" value={incomeDate} onChange={e => setIncomeDate(e.target.value)} />
-                  </FormField>
-                  <FormField id="inc-amt" label="Amount (Rs.) *" required>
-                    <MoneyField
-                      id="inc-amt"
-                      placeholder="150,000"
-                      value={incomeAmount}
-                      onChange={v => setIncomeAmount(String(v))}
-                    />
-                  </FormField>
-                  <FormField id="inc-note" label="Customer / Order Note">
-                    <Input
-                      id="inc-note"
-                      placeholder="Invoice #048, Client payment"
-                      value={incomeNote}
-                      onChange={e => setIncomeNote(e.target.value)}
-                    />
-                  </FormField>
-                </FormGrid>
-                <div className="flex justify-end pt-2">
-                  <Button variant="primary" onClick={recordIncome}>
-                    Save Inflow
-                  </Button>
-                </div>
-              </Card>
+              {/* Finance sub-navigation and link to main ledger */}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <SegmentedTabs
+                  size="sm"
+                  options={[
+                    { id: 'inflows', label: 'Commercial Inflows' },
+                    { id: 'costs', label: 'Branch Costs & Utilities' },
+                    { id: 'expenses', label: `Logged Operating Expenses (${state.expenses.filter(e => e.companyId === selectedCompany?.id).length})` },
+                  ]}
+                  value={financeSubTab}
+                  onChange={v => setFinanceSubTab(v as any)}
+                />
 
-              {/* Inflows List */}
-              <Card className="p-6 space-y-3">
-                <h4 className="text-sm font-bold text-text">Inflow History</h4>
-                {branchEntries.filter(e => e.type === 'revenue').length === 0 ? (
-                  <EmptyState title="No inflows recorded" helper="Revenue transactions logged for this branch will appear here." className="py-8" />
-                ) : (
-                  <div className="space-y-2">
-                    {branchEntries
-                      .filter(e => e.type === 'revenue')
-                      .map(e => (
-                        <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border border-border bg-surface">
-                          <div>
-                            <div className="text-xs font-semibold text-text">{e.category}</div>
-                            <div className="text-[11px] text-muted">{e.date} · {e.note || 'No note'}</div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs font-bold text-success-text num">+{formatRs(e.amount)}</span>
-                            <Button variant="ghost" size="sm" onClick={() => deleteEntry(e.id)} className="!text-danger-text hover:!bg-danger-tint" iconLeft={<Icon name="trash" size={14} />} />
-                          </div>
-                        </div>
-                      ))}
+                <Link href={`/financial?stream=business`}>
+                  <Button variant="secondary" size="sm" iconLeft={<Icon name="financial" size={13} />}>
+                    Open Main Financial Ledger
+                  </Button>
+                </Link>
+              </div>
+
+              {/* Sub-view: Commercial Inflows */}
+              {financeSubTab === 'inflows' && (
+                <div className="space-y-6">
+                  <Card className="p-6 space-y-4">
+                    <h4 className="text-sm font-bold text-text">Log Commercial Inflow</h4>
+                    <FormGrid columns={3}>
+                      <FormField id="inc-date" label="Date">
+                        <DateField id="inc-date" value={incomeDate} onChange={e => setIncomeDate(e.target.value)} />
+                      </FormField>
+                      <FormField id="inc-amt" label="Amount (Rs.) *" required>
+                        <MoneyField
+                          id="inc-amt"
+                          placeholder="150,000"
+                          value={incomeAmount}
+                          onChange={v => setIncomeAmount(String(v))}
+                        />
+                      </FormField>
+                      <FormField id="inc-note" label="Customer / Order Note">
+                        <Input
+                          id="inc-note"
+                          placeholder="Invoice #048, Client payment"
+                          value={incomeNote}
+                          onChange={e => setIncomeNote(e.target.value)}
+                        />
+                      </FormField>
+                    </FormGrid>
+                    <div className="flex justify-end pt-2">
+                      <Button variant="primary" onClick={recordIncome}>
+                        Save Inflow
+                      </Button>
+                    </div>
+                  </Card>
+
+                  {/* Inflows List */}
+                  <Card className="p-6 space-y-3">
+                    <h4 className="text-sm font-bold text-text">Inflow History</h4>
+                    {branchEntries.filter(e => e.type === 'revenue').length === 0 ? (
+                      <EmptyState title="No inflows recorded" helper="Revenue transactions logged for this branch will appear here." className="py-8" />
+                    ) : (
+                      <div className="space-y-2">
+                        {branchEntries
+                          .filter(e => e.type === 'revenue')
+                          .map(e => (
+                            <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border border-border bg-surface">
+                              <div>
+                                <div className="text-xs font-semibold text-text">{e.category}</div>
+                                <div className="text-[11px] text-muted">{e.date} · {e.note || 'No note'}</div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-success-text num">+{formatRs(e.amount)}</span>
+                                <Button variant="ghost" size="sm" onClick={() => deleteEntry(e.id)} className="!text-danger-text hover:!bg-danger-tint" iconLeft={<Icon name="trash" size={14} />} />
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </Card>
+                </div>
+              )}
+
+              {/* Sub-view: Costs & Utilities */}
+              {financeSubTab === 'costs' && (
+                <div className="space-y-6">
+                  <Card className="p-6 space-y-4">
+                    <h4 className="text-sm font-bold text-text">Log Operational Expense or Utility Bill</h4>
+                    <FormGrid columns={3}>
+                      <FormField id="cost-cat" label="Expense Category">
+                        <Select id="cost-cat" value={costCategory} onChange={e => setCostCategory(e.target.value)}>
+                          <option value="Electricity">Electricity Bill (CEB)</option>
+                          <option value="Water">Water Supply (NWSDB)</option>
+                          <option value="Rent">Shop / Facility Rent</option>
+                          <option value="Inventory">Raw Materials / Inventory</option>
+                          <option value="Salaries">Branch Staff Salaries</option>
+                          <option value="Logistics">Logistics & Transport</option>
+                          <option value="Marketing">Advertising & Marketing</option>
+                          <option value="Other">Other Operating Cost</option>
+                        </Select>
+                      </FormField>
+                      <FormField id="cost-amt" label="Amount (Rs.) *" required>
+                        <MoneyField
+                          id="cost-amt"
+                          placeholder="35,000"
+                          value={costAmount}
+                          onChange={v => setCostAmount(String(v))}
+                        />
+                      </FormField>
+                      <FormField id="cost-date" label="Date Incurred">
+                        <DateField id="cost-date" value={costDate} onChange={e => setCostDate(e.target.value)} />
+                      </FormField>
+                      <div className="md:col-span-3">
+                        <FormField id="cost-note" label="Bill / Reference Note">
+                          <Input
+                            id="cost-note"
+                            placeholder="Account number, month, or receipt notes"
+                            value={costNote}
+                            onChange={e => setCostNote(e.target.value)}
+                          />
+                        </FormField>
+                      </div>
+                    </FormGrid>
+                    <div className="flex justify-end pt-2">
+                      <Button variant="danger" onClick={recordCost}>
+                        Save Cost Entry
+                      </Button>
+                    </div>
+                  </Card>
+
+                  {/* Costs List */}
+                  <Card className="p-6 space-y-3">
+                    <h4 className="text-sm font-bold text-text">Operational Costs History</h4>
+                    {branchEntries.filter(e => e.type !== 'revenue').length === 0 ? (
+                      <EmptyState title="No costs logged" helper="Operating overheads and bill payments will appear here." className="py-8" />
+                    ) : (
+                      <div className="space-y-2">
+                        {branchEntries
+                          .filter(e => e.type !== 'revenue')
+                          .map(e => (
+                            <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border border-border bg-surface">
+                              <div>
+                                <div className="text-xs font-semibold text-text">{e.category}</div>
+                                <div className="text-[11px] text-muted">{e.date} · {e.note || 'No note'}</div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-danger-text num">-{formatRs(e.amount)}</span>
+                                <Button variant="ghost" size="sm" onClick={() => deleteEntry(e.id)} className="!text-danger-text hover:!bg-danger-tint" iconLeft={<Icon name="trash" size={14} />} />
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </Card>
+                </div>
+              )}
+
+              {/* Sub-view: Cross-synced expenses from /financial */}
+              {financeSubTab === 'expenses' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-text">Cross-Ledger Business Expenses</h4>
+                      <p className="text-xs text-muted">
+                        Expenses paid out from {selectedCompany?.name}&apos;s operating cash logged via the Financial Hub.
+                      </p>
+                    </div>
+                    <Link href="/financial?tab=expenses&stream=business">
+                      <Button variant="primary" size="sm" iconLeft={<Icon name="plus" size={13} />}>
+                        Record Expense
+                      </Button>
+                    </Link>
                   </div>
-                )}
-              </Card>
+
+                  {state.expenses.filter(e => e.companyId === selectedCompany?.id).length === 0 ? (
+                    <EmptyState
+                      title="No business expenses logged"
+                      helper="When logging expenses in the Financial Ledger with 'Business Cash', they will automatically appear here."
+                      className="py-8"
+                    />
+                  ) : (
+                    <div className="space-y-2">
+                      {state.expenses.filter(e => e.companyId === selectedCompany?.id).slice().reverse().map(e => {
+                        const br = state.businessBranches.find(b => b.id === e.branchId);
+                        return (
+                          <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border border-border bg-surface">
+                            <div>
+                              <div className="text-xs font-semibold text-text flex items-center gap-2">
+                                <span>{e.category}</span>
+                                {br && <Badge tone="primary" size="sm">{br.name}</Badge>}
+                              </div>
+                              <div className="text-[11px] text-muted">{e.date} · {e.note || (e.paymentMethod || 'cash').replace('_', ' ')}</div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-bold text-danger-text num">-{formatRs(e.amount)}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  dispatch({ type: 'DELETE_EXPENSE', id: e.id });
+                                  showToast('Expense removed from business ledger', 'info');
+                                }}
+                                className="!text-danger-text hover:!bg-danger-tint !p-1"
+                                iconLeft={<Icon name="trash" size={14} />}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Tab 3: Costs & Bills */}
-          {activeTab === 'costs' && (
+          {/* Tab 3: Salary, Payday & Director Compensation */}
+          {activeTab === 'salary' && (
             <div className="space-y-6">
-              <Card className="p-6 space-y-4">
-                <h4 className="text-sm font-bold text-text">Log Operational Expense or Utility Bill</h4>
-                <FormGrid columns={3}>
-                  <FormField id="cost-cat" label="Expense Category">
-                    <Select id="cost-cat" value={costCategory} onChange={e => setCostCategory(e.target.value)}>
-                      <option value="Electricity">Electricity Bill (CEB)</option>
-                      <option value="Water">Water Supply (NWSDB)</option>
-                      <option value="Rent">Shop / Facility Rent</option>
-                      <option value="Inventory">Raw Materials / Inventory</option>
-                      <option value="Salaries">Branch Staff Salaries</option>
-                      <option value="Logistics">Logistics & Transport</option>
-                      <option value="Marketing">Advertising & Marketing</option>
-                      <option value="Other">Other Operating Cost</option>
-                    </Select>
-                  </FormField>
-                  <FormField id="cost-amt" label="Amount (Rs.) *" required>
-                    <MoneyField
-                      id="cost-amt"
-                      placeholder="35,000"
-                      value={costAmount}
-                      onChange={v => setCostAmount(String(v))}
-                    />
-                  </FormField>
-                  <FormField id="cost-date" label="Date Incurred">
-                    <DateField id="cost-date" value={costDate} onChange={e => setCostDate(e.target.value)} />
-                  </FormField>
-                  <div className="md:col-span-3">
-                    <FormField id="cost-note" label="Bill / Reference Note">
-                      <Input
-                        id="cost-note"
-                        placeholder="Account number, month, or receipt notes"
-                        value={costNote}
-                        onChange={e => setCostNote(e.target.value)}
-                      />
-                    </FormField>
-                  </div>
-                </FormGrid>
-                <div className="flex justify-end pt-2">
-                  <Button variant="danger" onClick={recordCost}>
-                    Save Cost Entry
-                  </Button>
-                </div>
-              </Card>
-
-              {/* Costs List */}
-              <Card className="p-6 space-y-3">
-                <h4 className="text-sm font-bold text-text">Operational Costs History</h4>
-                {branchEntries.filter(e => e.type !== 'revenue').length === 0 ? (
-                  <EmptyState title="No costs logged" helper="Operating overheads and bill payments will appear here." className="py-8" />
-                ) : (
-                  <div className="space-y-2">
-                    {branchEntries
-                      .filter(e => e.type !== 'revenue')
-                      .map(e => (
-                        <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border border-border bg-surface">
-                          <div>
-                            <div className="text-xs font-semibold text-text">{e.category}</div>
-                            <div className="text-[11px] text-muted">{e.date} · {e.note || 'No note'}</div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs font-bold text-danger-text num">-{formatRs(e.amount)}</span>
-                            <Button variant="ghost" size="sm" onClick={() => deleteEntry(e.id)} className="!text-danger-text hover:!bg-danger-tint" iconLeft={<Icon name="trash" size={14} />} />
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </Card>
+              <SalaryWorkspace companyName={selectedCompany?.name} companyId={selectedCompany?.id} />
             </div>
           )}
 
           {/* Tab 4: Targets */}
-          {activeTab === 'targets' && (
-            <Card className="p-6 space-y-4">
-              <h4 className="text-base font-bold text-text">Branch Revenue Target Setting</h4>
-              <p className="text-xs text-muted">
-                Define the monthly revenue benchmark to monitor team performance and growth pace.
-              </p>
+          {activeTab === 'targets' && (() => {
+            const daysInMonth = 30;
+            const todayDate = new Date();
+            const currentDay = todayDate.getDate();
+            const daysRemaining = Math.max(1, daysInMonth - currentDay);
+            const shortfall = Math.max(0, target - monthlyRevenue);
+            const requiredDailyPace = Math.ceil(shortfall / daysRemaining);
+            const currentDailyPace = currentDay > 0 ? Math.round(monthlyRevenue / currentDay) : 0;
+            const pacingStatus =
+              target === 0
+                ? 'no-target'
+                : monthlyRevenue >= target
+                ? 'achieved'
+                : currentDailyPace >= requiredDailyPace
+                ? 'on-track'
+                : 'behind';
 
-              <div className="max-w-md pt-2">
-                <FormField id="br-target-input" label="Monthly Target Ceiling (Rs.)">
-                  <MoneyField
-                    id="br-target-input"
-                    value={target}
-                    onChange={v => {
-                      dispatch({
-                        type: 'UPDATE_BRANCH',
-                        entry: { ...branch, monthlyTarget: Number(v) || 0, annualTarget: (Number(v) || 0) * 12 },
-                      });
-                      showToast('Monthly target updated.', 'success');
-                    }}
-                  />
-                </FormField>
-              </div>
+            const branchMilestoneGoals = (state.savingsGoals || []).filter(
+              g => g.scope === 'branch' && g.branchId === branch.id
+            );
 
-              <div className="mt-6 pt-6 border-t border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-text">Current Month Achievement</span>
-                  <span className="text-xs font-bold text-primary-text">{targetPct}%</span>
-                </div>
-                <ProgressBar value={targetPct} max={100} />
-                <p className="text-xs text-muted mt-3">
-                  {targetPct >= 100
-                    ? 'Target achieved! Outstanding commercial performance for this branch.'
-                    : `Requires ${formatRs(Math.max(0, target - monthlyRevenue))} more to reach monthly target.`}
-                </p>
+            return (
+              <div className="space-y-6">
+                {/* 1. Branch Revenue Target & Daily Run-Rate */}
+                <Card className="p-6 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-base font-bold text-text flex items-center gap-2">
+                        <span>Branch Revenue Benchmark & Daily Run-Rate</span>
+                        <Badge
+                          tone={
+                            pacingStatus === 'achieved'
+                              ? 'success'
+                              : pacingStatus === 'on-track'
+                              ? 'primary'
+                              : pacingStatus === 'behind'
+                              ? 'danger'
+                              : 'neutral'
+                          }
+                          size="sm"
+                        >
+                          {pacingStatus === 'achieved'
+                            ? 'Target Achieved'
+                            : pacingStatus === 'on-track'
+                            ? 'Pacing On Track'
+                            : pacingStatus === 'behind'
+                            ? 'Behind Run-Rate'
+                            : 'No Target'}
+                        </Badge>
+                      </h4>
+                      <p className="text-xs text-muted mt-0.5">
+                        Define monthly benchmark to monitor outlet sales throughput and run-rate pacing.
+                      </p>
+                    </div>
+
+                    <Link href={`/goals?domain=branch&companyId=${companyId}&branchId=${branch.id}`}>
+                      <Button variant="ghost" size="sm" iconLeft={<Icon name="target" size={14} />}>
+                        Manage In Goals Hub →
+                      </Button>
+                    </Link>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+                    <div className="p-3.5 rounded-xl border border-border bg-surface-hover/50">
+                      <div className="text-[11px] text-muted mb-1">Monthly Target Ceiling</div>
+                      <MoneyField
+                        id="br-target-input"
+                        value={target}
+                        onChange={v => {
+                          dispatch({
+                            type: 'UPDATE_BRANCH',
+                            entry: { ...branch, monthlyTarget: Number(v) || 0, annualTarget: (Number(v) || 0) * 12 },
+                          });
+                          showToast('Monthly target updated.', 'success');
+                        }}
+                      />
+                    </div>
+                    <div className="p-3.5 rounded-xl border border-border bg-surface-hover/50 flex flex-col justify-between">
+                      <div className="text-[11px] text-muted">Achieved Inflows</div>
+                      <div className="text-lg font-bold text-success-text num">{formatRs(monthlyRevenue)}</div>
+                      <div className="text-[11px] text-muted">{currentDay} days recorded</div>
+                    </div>
+                    <div className="p-3.5 rounded-xl border border-border bg-surface-hover/50 flex flex-col justify-between">
+                      <div className="text-[11px] text-muted">Actual Daily Pace</div>
+                      <div className="text-lg font-bold text-text num">{formatRs(currentDailyPace)}/day</div>
+                      <div className="text-[11px] text-muted">Average daily revenue</div>
+                    </div>
+                    <div className="p-3.5 rounded-xl border border-border bg-surface-hover/50 flex flex-col justify-between">
+                      <div className="text-[11px] text-muted">Required Daily Pace</div>
+                      <div className={`text-lg font-bold num ${shortfall > 0 && requiredDailyPace > currentDailyPace ? 'text-warning-text' : 'text-primary-text'}`}>
+                        {shortfall > 0 ? `${formatRs(requiredDailyPace)}/day` : 'Target Met!'}
+                      </div>
+                      <div className="text-[11px] text-muted">{daysRemaining} days remaining</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-text">Month Completion Pace</span>
+                      <span className="text-xs font-bold text-primary-text num">{targetPct}%</span>
+                    </div>
+                    <ProgressBar value={targetPct} max={100} tone={targetPct >= 100 ? 'success' : 'primary'} />
+                    <p className="text-xs text-muted mt-2.5">
+                      {targetPct >= 100
+                        ? 'Target achieved! Outstanding commercial performance for this branch.'
+                        : `Requires ${formatRs(shortfall)} more over the next ${daysRemaining} days (${formatRs(requiredDailyPace)}/day) to hit monthly ceiling.`}
+                    </p>
+                  </div>
+                </Card>
+
+                {/* 2. Branch Milestone & Equipment Goals */}
+                <Card className="p-6 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-base font-bold text-text">Branch Unit Milestones & Equipment Funds</h4>
+                      <p className="text-xs text-muted mt-0.5">
+                        Specific capital projects, equipment upgrades, and local sales milestones for {branch.name}
+                      </p>
+                    </div>
+
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      iconLeft={<Icon name="plus" size={14} />}
+                      onClick={() => setShowBranchGoalForm(v => !v)}
+                    >
+                      {showBranchGoalForm ? 'Cancel' : 'New Milestone Goal'}
+                    </Button>
+                  </div>
+
+                  {/* Add Branch Goal Inline Drawer */}
+                  {showBranchGoalForm && (
+                    <div className="p-4 rounded-2xl border border-primary/25 bg-primary-tint/20 space-y-3">
+                      <h5 className="text-xs font-bold uppercase tracking-wider text-primary-text">Create Branch Milestone Goal</h5>
+                      <FormGrid columns={3}>
+                        <FormField id="br-goal-name" label="Goal Title *" required>
+                          <Input
+                            id="br-goal-name"
+                            placeholder="e.g. Store Renovation, New POS Terminal"
+                            value={branchGoalName}
+                            onChange={e => setBranchGoalName(e.target.value)}
+                          />
+                        </FormField>
+                        <FormField id="br-goal-amt" label="Target Total (Rs.) *" required>
+                          <MoneyField
+                            id="br-goal-amt"
+                            placeholder="350,000"
+                            value={branchGoalAmount}
+                            onChange={v => setBranchGoalAmount(String(v))}
+                          />
+                        </FormField>
+                        <FormField id="br-goal-date" label="Target Date">
+                          <DateField
+                            id="br-goal-date"
+                            value={branchGoalDate}
+                            onChange={e => setBranchGoalDate(e.target.value)}
+                          />
+                        </FormField>
+                      </FormGrid>
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <Button variant="secondary" size="sm" onClick={() => setShowBranchGoalForm(false)}>
+                          Cancel
+                        </Button>
+                        <Button variant="primary" size="sm" onClick={addBranchGoal}>
+                          Save Branch Goal
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {branchMilestoneGoals.length === 0 ? (
+                    <EmptyState
+                      title="No milestone goals for this branch yet"
+                      helper="Create renovation, hardware, or peak month milestones to track alongside daily revenue."
+                      className="py-6"
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {branchMilestoneGoals.map(goal => {
+                        const effectiveTarget = goal.targetAmount || goal.monthlyTarget;
+                        const pct = Math.min(100, Math.round((goal.savedAmount / (effectiveTarget || 1)) * 100));
+                        return (
+                          <div
+                            key={goal.id}
+                            className="p-4 rounded-xl border border-border bg-surface-hover/30 hover:bg-surface-hover transition-colors space-y-2.5"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <span className="font-bold text-sm text-text">{goal.name}</span>
+                                {goal.targetDate && (
+                                  <span className="text-xs text-muted ml-2">Due: {goal.targetDate}</span>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <span className="text-xs font-bold text-primary-text num">{formatRs(goal.savedAmount)}</span>
+                                <span className="text-xs text-muted num"> / {formatRs(effectiveTarget)}</span>
+                              </div>
+                            </div>
+                            <ProgressBar value={goal.savedAmount} max={effectiveTarget} tone={pct >= 100 ? 'success' : 'primary'} />
+                            <div className="flex items-center justify-between text-xs text-muted">
+                              <span>{pct}% funded</span>
+                              <Link href={`/goals?domain=branch&companyId=${companyId}&branchId=${branch.id}`}>
+                                <span className="text-primary-text font-semibold hover:underline">Manage / Fund →</span>
+                              </Link>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </Card>
+
+                {/* 3. Corporate Enterprise Target Reference Card */}
+                {selectedCompany && (
+                  <div className="p-4 rounded-2xl bg-surface border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-xl bg-primary-500 text-white flex items-center justify-center shrink-0">
+                        <Icon name="briefcase" size={16} />
+                      </span>
+                      <div>
+                        <div className="font-bold text-xs text-text flex items-center gap-2">
+                          <span>{selectedCompany.name} Corporate Revenue Benchmark:</span>
+                          <span className="text-primary-text font-extrabold num">
+                            {(selectedCompany.monthlyRevenueTarget ?? 0) > 0 ? formatRs(selectedCompany.monthlyRevenueTarget!) : 'Not configured'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted mt-0.5">
+                          Set company-wide revenue milestones and corporate reserve funds in the Goals Hub.
+                        </p>
+                      </div>
+                    </div>
+
+                    <Link href={`/goals?domain=business&companyId=${companyId}`}>
+                      <Button variant="secondary" size="sm" iconLeft={<Icon name="briefcase" size={13} />}>
+                        Configure Corporate Goals
+                      </Button>
+                    </Link>
+                  </div>
+                )}
               </div>
-            </Card>
+            );
+          })()}
+
+          {/* Tab 5: Agreements & Legal Contracts */}
+          {activeTab === 'agreements' && (
+            <div className="space-y-6">
+              <AgreementsTab companyId={selectedCompany?.id} />
+            </div>
           )}
+
+          {/* Tab 6: Formal Letters & Notices */}
+          {activeTab === 'letters' && (() => {
+            const companyLetters = state.letters.filter(l => l.companyId === selectedCompany?.id);
+            return (
+              <div className="space-y-6">
+                <Card className="p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-base font-bold text-text flex items-center gap-2">
+                        <span>Corporate Formal Letters & Official Notices</span>
+                        <Badge tone="primary" size="sm">{companyLetters.length} issued</Badge>
+                      </h4>
+                      <p className="text-xs text-muted mt-1">
+                        Draft, export, and manage official business correspondence printed with {selectedCompany?.name || 'the enterprise'}&apos;s legal letterhead (BR: {selectedCompany?.brNumber || 'Pending'}, TIN: {selectedCompany?.tinNumber || 'Pending'}).
+                      </p>
+                    </div>
+
+                    <Link href={`/advanced/letters?companyId=${selectedCompany?.id}`}>
+                      <Button variant="primary" size="sm" iconLeft={<Icon name="plus" size={14} />}>
+                        Draft Formal Letter
+                      </Button>
+                    </Link>
+                  </div>
+                </Card>
+
+                {companyLetters.length === 0 ? (
+                  <EmptyState
+                    icon={<Icon name="documents" size={28} />}
+                    title={`No formal letters issued for ${selectedCompany?.name || 'this company'}`}
+                    helper="Generate bank inquiries, formal quotations, proof of business letters, or corporate resolutions with official Sri Lankan business letterhead."
+                    action={
+                      <Link href={`/advanced/letters?companyId=${selectedCompany?.id}`}>
+                        <Button variant="primary" size="sm" iconLeft={<Icon name="plus" size={14} />}>
+                          Draft Formal Letter
+                        </Button>
+                      </Link>
+                    }
+                    className="py-12"
+                  />
+                ) : (
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {companyLetters.map(letter => (
+                      <Card key={letter.id} className="p-5 flex flex-col justify-between hover:border-primary-300 transition-colors">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <Badge tone={letter.type === 'bank' ? 'primary' : letter.type === 'offer' ? 'success' : 'neutral'} size="sm">
+                              {letter.type === 'bank' ? 'Bank Letter' : letter.type === 'offer' ? 'Offer / Quotation' : 'General Notice'}
+                            </Badge>
+                            <span className="text-xs text-muted num">{letter.date}</span>
+                          </div>
+
+                          <div>
+                            <div className="text-xs font-semibold text-muted uppercase tracking-wider">Addressed To</div>
+                            <div className="text-sm font-bold text-text truncate">{letter.addressedTo || 'Recipient / Bank Manager'}</div>
+                          </div>
+
+                          <div>
+                            <div className="text-xs font-semibold text-muted uppercase tracking-wider">Purpose</div>
+                            <div className="text-xs text-text line-clamp-2">{letter.purpose || 'Official Business Correspondence'}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-4 mt-4 border-t border-border">
+                          <Link href={`/print/letter/${letter.id}`}>
+                            <Button variant="secondary" size="sm" iconLeft={<Icon name="download" size={14} />}>
+                              Print / PDF
+                            </Button>
+                          </Link>
+
+                          <div className="flex items-center gap-2">
+                            <Link href={`/advanced/letters?companyId=${selectedCompany?.id}`}>
+                              <Button variant="ghost" size="sm" iconLeft={<Icon name="edit" size={14} />}>
+                                Edit
+                              </Button>
+                            </Link>
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="!text-danger-text hover:!bg-danger-tint"
+                              iconLeft={<Icon name="trash" size={14} />}
+                              onClick={async () => {
+                                const ok = await confirm({
+                                  title: 'Delete Formal Letter?',
+                                  message: 'Are you sure you want to remove this letter from company records?',
+                                  confirmLabel: 'Delete',
+                                  tone: 'danger',
+                                });
+                                if (ok) {
+                                  dispatch({ type: 'DELETE_LETTER', id: letter.id });
+                                  showToast('Letter removed', 'info');
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </>
       ) : (
         <EmptyState

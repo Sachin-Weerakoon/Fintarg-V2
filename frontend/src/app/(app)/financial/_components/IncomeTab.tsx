@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
 import { FormCard } from '@/components/ui/FormCard';
@@ -16,7 +16,15 @@ import { BankSelect } from '@/components/ui/BankSelect';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 
-export function IncomeTab({ month }: { month: string }) {
+export function IncomeTab({
+  month,
+  streamScope = 'all',
+  companyId: _companyId,
+}: {
+  month: string;
+  streamScope?: 'all' | 'salary' | 'business';
+  companyId?: string;
+}) {
   const { state, dispatch } = useApp();
   const confirm = useConfirm();
   const toast = useToast();
@@ -30,9 +38,12 @@ export function IncomeTab({ month }: { month: string }) {
     paymentMethod: PaymentMethod;
     bankAccountId: string;
   };
+
+  const defaultType: 'salary' | 'business' | 'other' = streamScope === 'business' ? 'business' : 'salary';
+
   const [form, setForm] = useState<IncomeForm>({
     source: '',
-    type: 'salary',
+    type: defaultType,
     amount: '',
     frequency: 'monthly',
     date: new Date().toISOString().slice(0, 10),
@@ -66,7 +77,7 @@ export function IncomeTab({ month }: { month: string }) {
     }
     setForm({
       source: '',
-      type: 'salary',
+      type: defaultType,
       amount: '',
       frequency: 'monthly',
       date: new Date().toISOString().slice(0, 10),
@@ -90,31 +101,43 @@ export function IncomeTab({ month }: { month: string }) {
     }
   };
 
-  const totalMonthly = state.income.reduce((s, i) => {
-    if (i.frequency === 'monthly') return s + i.amount;
-    if (i.frequency === 'weekly') return s + i.amount * 4;
-    if (i.frequency === 'daily') return s + i.amount * 30;
-    if (i.frequency === 'one-time' && i.date.startsWith(month)) return s + i.amount;
-    return s;
-  }, 0);
+  const streamFilteredIncome = useMemo(() => {
+    return state.income.filter(i => {
+      if (streamScope === 'salary') return i.type === 'salary' || i.type === 'other';
+      if (streamScope === 'business') return i.type === 'business';
+      return true;
+    });
+  }, [state.income, streamScope]);
+
+  const totalMonthly = useMemo(() => {
+    return streamFilteredIncome.reduce((s, i) => {
+      if (i.frequency === 'monthly') return s + i.amount;
+      if (i.frequency === 'weekly') return s + i.amount * 4;
+      if (i.frequency === 'daily') return s + i.amount * 30;
+      if (i.frequency === 'one-time' && i.date.startsWith(month)) return s + i.amount;
+      return s;
+    }, 0);
+  }, [streamFilteredIncome, month]);
 
   return (
     <div className="grid md:grid-cols-2 gap-6">
       <div>
         <div className="flex items-center justify-between mb-3">
-          <div className="font-semibold text-sm text-text">Income sources</div>
+          <div className="font-semibold text-sm text-text">
+            {streamScope === 'business' ? 'Business Operating Inflows' : streamScope === 'salary' ? 'Job Salary Inflows' : 'Consolidated Inflow Sources'}
+          </div>
           <div className="text-sm text-muted">
             Monthly total: <span className="font-semibold text-text num">{formatRs(totalMonthly)}</span>
           </div>
         </div>
-        {state.income.length === 0 ? (
+        {streamFilteredIncome.length === 0 ? (
           <EmptyState
             title="No income sources"
-            helper="Add your salary or business earnings to calculate monthly budgets and free cash."
+            helper={streamScope === 'business' ? 'No business revenue or operating inflow sources logged.' : 'Add your salary or business earnings to calculate monthly budgets and free cash.'}
           />
         ) : (
           <div className="space-y-2.5">
-            {state.income.map(i => {
+            {streamFilteredIncome.map(i => {
               const linkedBank = state.bankAccounts.find(b => b.id === i.bankAccountId);
               return (
                 <Card key={i.id} className="p-4 flex items-center justify-between gap-3">
@@ -179,7 +202,7 @@ export function IncomeTab({ month }: { month: string }) {
                 setEditId(null);
                 setForm({
                   source: '',
-                  type: 'salary',
+                  type: defaultType,
                   amount: '',
                   frequency: 'monthly',
                   date: new Date().toISOString().slice(0, 10),
@@ -199,36 +222,25 @@ export function IncomeTab({ month }: { month: string }) {
           <Input
             value={form.source}
             onChange={e => setForm(f => ({ ...f, source: e.target.value }))}
-            placeholder="e.g. Government Salary, Consulting, Freelance"
+            placeholder={streamScope === 'business' ? 'e.g. Client retainer, Wholesale sales' : 'e.g. Tech Corp Salary, Freelance'}
           />
         </Field>
-        <Field id="income-type" label="Type" required>
+        <Field id="income-type" label="Stream Type" required>
           <Select
             value={form.type}
-            onChange={e => setForm(f => ({ ...f, type: e.target.value as 'salary' | 'business' | 'other' }))}
+            onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))}
           >
-            <option value="salary">Salary</option>
-            <option value="business">Business</option>
-            <option value="other">Other</option>
+            <option value="salary">Job Salary</option>
+            <option value="business">Business Inflow</option>
+            <option value="other">Other Inflow</option>
           </Select>
         </Field>
         <Field id="income-amount" label="Amount (Rs.)" required>
           <MoneyField
             value={form.amount}
             onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
-            placeholder="50,000"
           />
         </Field>
-        <PaymentMethodField
-          value={form.paymentMethod}
-          onChange={method => setForm(f => ({ ...f, paymentMethod: method }))}
-        />
-        <BankSelect
-          value={form.bankAccountId}
-          onChange={id => setForm(f => ({ ...f, bankAccountId: id }))}
-          bankAccounts={state.bankAccounts}
-          label="Deposited to Account (optional)"
-        />
         <Field id="income-frequency" label="Frequency" required>
           <Select
             value={form.frequency}
@@ -240,42 +252,31 @@ export function IncomeTab({ month }: { month: string }) {
             <option value="one-time">One-time</option>
           </Select>
         </Field>
-        <Field id="income-date" label="Date received" required>
+        <Field id="income-date" label="Date" required>
           <DateField
             value={form.date}
             onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
           />
         </Field>
-        <div className="flex gap-2 pt-2">
-          <Button
-            variant="primary"
-            className="flex-1 shadow-sm hover:shadow-primary-500/20"
-            iconLeft={<Icon name={editId ? 'check' : 'plus'} size={15} />}
-            onClick={submit}
-          >
-            {editId ? 'Update Income' : 'Save Income'}
-          </Button>
-          {editId && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setEditId(null);
-                setForm({
-                  source: '',
-                  type: 'salary',
-                  amount: '',
-                  frequency: 'monthly',
-                  date: new Date().toISOString().slice(0, 10),
-                  paymentMethod: 'bank_transfer',
-                  bankAccountId: '',
-                });
-                setError('');
-              }}
-            >
-              Cancel
-            </Button>
-          )}
-        </div>
+        <PaymentMethodField
+          value={form.paymentMethod}
+          onChange={method => setForm(f => ({ ...f, paymentMethod: method }))}
+        />
+        {['bank_transfer', 'cheque', 'standing_order'].includes(form.paymentMethod) && (
+          <BankSelect
+            value={form.bankAccountId}
+            onChange={id => setForm(f => ({ ...f, bankAccountId: id }))}
+            bankAccounts={state.bankAccounts}
+          />
+        )}
+        <Button
+          variant="primary"
+          className="w-full mt-2 shadow-sm hover:shadow-primary-500/20"
+          iconLeft={<Icon name={editId ? 'check' : 'plus'} size={15} />}
+          onClick={submit}
+        >
+          {editId ? 'Update Income Source' : 'Save Income Source'}
+        </Button>
       </FormCard>
     </div>
   );

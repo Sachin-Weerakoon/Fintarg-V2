@@ -9,6 +9,10 @@ export interface FormalLetterSheetProps {
   date?: string;
   mode?: 'personal' | 'business';
   companyName?: string;
+  companyBr?: string;
+  companyTin?: string;
+  companyAddress?: string;
+  companyContact?: string;
   className?: string;
 }
 
@@ -18,6 +22,10 @@ export function FormalLetterSheet({
   date,
   mode = 'personal',
   companyName,
+  companyBr,
+  companyTin,
+  companyAddress,
+  companyContact,
   className = '',
 }: FormalLetterSheetProps) {
   const effectiveRef = refNumber || 'FNT-LTR-' + (date ? date.replace(/[^0-9]/g, '') : new Date().toISOString().slice(0, 10).replace(/-/g, ''));
@@ -40,14 +48,14 @@ export function FormalLetterSheet({
 
       <div className="p-8 sm:p-12 print:p-8">
         {/* Formal Letterhead */}
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-200 pb-6 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-200 pb-6 mb-6">
           <div>
             <BrandLogo variant="full" onLight height={34} />
             <div className="text-[11px] font-bold text-[#0A6D78] uppercase tracking-wider mt-2 flex items-center gap-1.5 font-sans">
               <span className="w-1.5 h-1.5 rounded-full bg-[#0FA3B1]" />
               <span>Official Financial Correspondence</span>
               {mode === 'business' && companyName && (
-                <span className="text-slate-400 font-normal">· {companyName}</span>
+                <span className="text-slate-500 font-bold">· {companyName}</span>
               )}
             </div>
           </div>
@@ -62,6 +70,21 @@ export function FormalLetterSheet({
             </div>
           </div>
         </div>
+
+        {/* Corporate Entity Details Bar */}
+        {mode === 'business' && companyName && (
+          <div className="mb-8 p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs font-sans text-slate-600 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <span className="font-extrabold text-slate-900 text-sm">{companyName}</span>
+              {companyAddress && <span className="text-slate-600"> · {companyAddress}</span>}
+            </div>
+            <div className="flex items-center gap-3 text-slate-600 font-medium flex-wrap">
+              {companyBr && <span><strong className="text-slate-800">BR:</strong> {companyBr}</span>}
+              {companyTin && <span><strong className="text-slate-800">TIN:</strong> {companyTin}</span>}
+              {companyContact && <span><strong className="text-slate-800">Tel:</strong> {companyContact}</span>}
+            </div>
+          </div>
+        )}
 
         {/* Formatted Letter Body */}
         <div className="space-y-4 font-serif text-[14px] sm:text-[15px] leading-relaxed text-slate-800">

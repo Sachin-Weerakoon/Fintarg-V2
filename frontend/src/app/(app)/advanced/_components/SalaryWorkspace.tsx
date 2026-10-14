@@ -17,7 +17,13 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import type { EmploymentProfile } from '@/types';
 
-export function SalaryWorkspace() {
+export function SalaryWorkspace({
+  companyName,
+  companyId,
+}: {
+  companyName?: string;
+  companyId?: string;
+} = {}) {
   const { state, dispatch, showToast, isLoading } = useApp();
   const confirm = useConfirm();
   const [selectedId, setSelectedId] = useState<string>('');
@@ -25,8 +31,8 @@ export function SalaryWorkspace() {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState({
-    employer: '',
-    role: '',
+    employer: companyName || '',
+    role: companyName ? 'Executive Director' : '',
     monthlyGross: '',
     payday: '25',
     monthlyDeductions: '',
@@ -34,16 +40,52 @@ export function SalaryWorkspace() {
     careerGoal: '',
   });
 
+  // Owner Draw Form for Directors & Business Owners
+  const [drawAmount, setDrawAmount] = useState('');
+  const [drawDate, setDrawDate] = useState(new Date().toISOString().slice(0, 10));
+  const [recordingDraw, setRecordingDraw] = useState(false);
+
+  const handleRecordDraw = async () => {
+    const amt = Number(drawAmount) || 0;
+    if (amt <= 0 || !companyId) {
+      showToast('Please enter a valid draw amount.', 'error');
+      return;
+    }
+    setRecordingDraw(true);
+    try {
+      const entry = {
+        id: 'draw_' + Date.now(),
+        companyId,
+        amount: amt,
+        date: drawDate,
+      };
+      await dispatch({ type: 'ADD_OWNER_DRAW', entry });
+      setDrawAmount('');
+      showToast(`Recorded ${formatRs(amt)} owner draw and synced to personal cash receipts.`, 'success');
+    } finally {
+      setRecordingDraw(false);
+    }
+  };
+
   // Keep selectedId synchronized when employment profiles hydrate or update
   useEffect(() => {
     if (state.employmentProfiles.length > 0) {
+      if (companyName) {
+        const matchingJob = state.employmentProfiles.find(job =>
+          job.employer.toLowerCase().includes(companyName.toLowerCase())
+        );
+        if (matchingJob) {
+          setSelectedId(matchingJob.id);
+          return;
+        }
+      }
       if (!selectedId || !state.employmentProfiles.some(job => job.id === selectedId)) {
         setSelectedId(state.employmentProfiles[0].id);
       }
     } else {
       if (selectedId) setSelectedId('');
     }
-  }, [state.employmentProfiles, selectedId]);
+  }, [state.employmentProfiles, selectedId, companyName]);
 
   const selected = state.employmentProfiles.find(job => job.id === selectedId) || state.employmentProfiles[0];
 
@@ -562,6 +604,84 @@ export function SalaryWorkspace() {
               </FormField>
             </Card>
           </div>
+
+          {/* Owner Draws & Director Profit Distributions Section */}
+          {companyId && (
+            <Card className="p-6 space-y-4 border-primary/25 bg-primary-tint/10">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-primary-500" />
+                    <h4 className="text-base font-bold text-text">Director Draws & Profit Distributions</h4>
+                    <Badge tone="primary" size="sm">Auto-Synced</Badge>
+                  </div>
+                  <p className="text-xs text-muted mt-0.5">
+                    Draw profits directly from {companyName || 'this enterprise'} without statutory PAYE/EPF deductions. Automatically syncs as a business income credit in your personal ledger.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-surface border border-border space-y-3">
+                <div className="text-xs font-bold text-text uppercase tracking-wide">Record New Director Draw</div>
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <FormField id="draw-date" label="Draw Date">
+                    <Input
+                      id="draw-date"
+                      type="date"
+                      value={drawDate}
+                      onChange={e => setDrawDate(e.target.value)}
+                    />
+                  </FormField>
+                  <FormField id="draw-amount" label="Amount (Rs.) *" required>
+                    <MoneyField
+                      id="draw-amount"
+                      placeholder="e.g. 250,000"
+                      value={drawAmount}
+                      onChange={v => setDrawAmount(String(v))}
+                    />
+                  </FormField>
+                  <div className="flex items-end">
+                    <Button
+                      variant="primary"
+                      className="w-full"
+                      onClick={handleRecordDraw}
+                      disabled={recordingDraw || !drawAmount}
+                      iconLeft={<Icon name="plus" size={14} />}
+                    >
+                      Record & Sync Draw
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Historical Draws for this Company */}
+              <div className="space-y-2 pt-2">
+                <div className="text-xs font-bold text-muted uppercase tracking-wide">
+                  Recent Enterprise Distributions ({state.ownerDraws.filter(d => d.companyId === companyId).length})
+                </div>
+                {state.ownerDraws.filter(d => d.companyId === companyId).length === 0 ? (
+                  <div className="text-xs text-muted italic p-3 bg-surface/50 rounded-lg border border-border">
+                    No owner draws recorded for this enterprise yet.
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {state.ownerDraws.filter(d => d.companyId === companyId).slice().reverse().map(draw => (
+                      <div key={draw.id} className="flex items-center justify-between p-2.5 rounded-lg bg-surface border border-border text-xs">
+                        <div className="flex items-center gap-2">
+                          <Icon name="check" size={13} className="text-success-text" />
+                          <span className="font-semibold text-text">{draw.date}</span>
+                          <span className="text-muted">· Cash Distribution</span>
+                        </div>
+                        <div className="font-extrabold text-primary-text num">
+                          +{formatRs(draw.amount)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
         </>
       )}
     </div>

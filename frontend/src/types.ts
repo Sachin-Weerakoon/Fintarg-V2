@@ -117,7 +117,9 @@ export interface ExpenseEntry {
   paymentMethod?: PaymentMethod;
   bankAccountId?: string;
   cardId?: string;
-  sourceType?: 'manual' | 'medical' | 'salary' | 'draw';
+  sourceType?: 'manual' | 'medical' | 'salary' | 'draw' | 'business';
+  companyId?: string;
+  branchId?: string;
   sourceId?: string;
 }
 
@@ -224,6 +226,10 @@ export interface SavingsGoal {
   savedAmount: number;
   targetAmount?: number;
   contributions?: GoalContribution[];
+  scope?: 'personal' | 'business' | 'branch';
+  companyId?: string;
+  branchId?: string;
+  targetType?: 'savings' | 'revenue' | 'profit' | 'expansion' | 'reserve' | 'other';
 }
 
 export interface Letter {
@@ -263,6 +269,8 @@ export interface Company {
   entityType?: 'sole_proprietorship' | 'partnership' | 'pvt_ltd' | 'public_ltd' | 'other' | string;
   sector?: string;
   email?: string;
+  monthlyRevenueTarget?: number;
+  annualRevenueTarget?: number;
 }
 
 export interface BranchEntry {

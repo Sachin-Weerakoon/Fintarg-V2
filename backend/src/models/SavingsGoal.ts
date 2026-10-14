@@ -20,6 +20,10 @@ export interface ISavingsGoal extends Document {
   endDate: string;
   savedAmountCents: number;
   contributions: ISavingsGoalContribution[];
+  scope?: 'personal' | 'business' | 'branch';
+  companyId?: string;
+  branchId?: string;
+  targetType?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +47,10 @@ const SavingsGoalSchema = new Schema<ISavingsGoal>({
   endDate: { type: String, default: '' },
   savedAmountCents: { type: Number, default: 0, min: 0 },
   contributions: [SavingsGoalContributionSchema],
+  scope: { type: String, enum: ['personal', 'business', 'branch'], default: 'personal' },
+  companyId: { type: String, default: '' },
+  branchId: { type: String, default: '' },
+  targetType: { type: String, default: 'savings' },
 }, { timestamps: true });
 
 export const SavingsGoalModel = mongoose.models.SavingsGoal || mongoose.model<ISavingsGoal>('SavingsGoal', SavingsGoalSchema);

@@ -225,15 +225,56 @@ function reducer(state: AppState, action: Action): AppState {
     case 'ADD_INCOME': return { ...state, income: [...state.income, action.entry] };
     case 'UPDATE_INCOME': return { ...state, income: state.income.map(i => i.id === action.entry.id ? action.entry : i) };
     case 'DELETE_INCOME': return { ...state, income: state.income.filter(i => i.id !== action.id) };
-    case 'ADD_EXPENSE': return { ...state, expenses: [...state.expenses, action.entry] };
+    case 'ADD_EXPENSE': {
+      let updatedBranches = state.businessBranches;
+      if (action.entry.sourceType === 'business' && action.entry.branchId) {
+        updatedBranches = state.businessBranches.map(b => {
+          if (b.id !== action.entry.branchId) return b;
+          const costEntry = {
+            id: 'be_exp_' + action.entry.id,
+            date: action.entry.date,
+            type: (['Electricity', 'Water', 'Internet', 'Phone'].includes(action.entry.category) ? 'utility' : 'other-cost') as 'utility' | 'other-cost',
+            category: action.entry.category,
+            amount: action.entry.amount,
+            note: action.entry.note || action.entry.category,
+          };
+          return {
+            ...b,
+            entries: [costEntry, ...(b.entries || [])],
+          };
+        });
+      }
+      return {
+        ...state,
+        expenses: [...state.expenses, action.entry],
+        businessBranches: updatedBranches,
+      };
+    };
+    case 'UPDATE_EXPENSE': {
+      return {
+        ...state,
+        expenses: state.expenses.map(e => e.id === action.entry.id ? action.entry : e),
+      };
+    };
     case 'DELETE_EXPENSE': {
       const exp = state.expenses.find(e => e.id === action.id);
+      let updatedBranches = state.businessBranches;
+      if (exp?.branchId) {
+        updatedBranches = state.businessBranches.map(b => {
+          if (b.id !== exp.branchId) return b;
+          return {
+            ...b,
+            entries: (b.entries || []).filter(be => be.id !== 'be_exp_' + exp.id),
+          };
+        });
+      }
       return {
         ...state,
         expenses: state.expenses.filter(e => e.id !== action.id),
         medicalExpenses: exp?.sourceType === 'medical'
           ? state.medicalExpenses.filter(m => m.id !== exp.sourceId && m.expenseId !== action.id)
           : state.medicalExpenses,
+        businessBranches: updatedBranches,
       };
     };
     case 'ADD_FINANCE_PAYMENT': return { ...state, financePayments: [...state.financePayments, action.entry] };

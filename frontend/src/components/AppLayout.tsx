@@ -96,7 +96,7 @@ function AppLayoutInner({
   const mobileBottomItems = user.workMode === 'salary' ? salaryBottomItems : businessBottomItems;
   const currentTab = searchParams?.get('tab') || undefined;
 
-  const hasSalary = user.workMode !== 'business';
+  const showSalaryInSidebar = user.workMode === 'salary';
   const hasBusiness = user.workMode !== 'salary' || state.profile?.plan === 'business' || (state.companies && state.companies.length > 0);
 
   const navSections: { title?: string; items: { href: string; label: string; icon: IconName; isActive: boolean; badge?: string }[] }[] = [
@@ -112,17 +112,17 @@ function AppLayoutInner({
     {
       title: 'WORK & ENTERPRISE',
       items: [
-        ...(hasSalary
+        ...(showSalaryInSidebar
           ? [{ href: '/salary', label: 'Salary & Payday', icon: 'wallet' as IconName, isActive: pathname === '/salary' }]
           : []),
         ...(hasBusiness
           ? [
               {
                 href: '/advanced?tab=businesses',
-                label: 'Businesses & Outlets',
+                label: 'Businesses',
                 icon: 'bank' as IconName,
-                isActive: pathname === '/advanced' && currentTab === 'businesses',
-                badge: state.businessBranches?.length > 0 ? `${state.businessBranches.length}` : undefined,
+                isActive: pathname === '/advanced' && (currentTab === 'businesses' || currentTab === 'companies'),
+                badge: state.companies?.length > 0 ? `${state.companies.length}` : undefined,
               },
               {
                 href: '/advanced?tab=agreements',

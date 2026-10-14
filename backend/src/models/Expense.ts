@@ -10,6 +10,9 @@ export interface IExpense extends Document {
   paymentMethod: 'cash' | 'card' | 'debit_card' | 'credit_card' | 'bank_transfer' | 'cheque' | 'standing_order' | 'online' | 'other';
   bankAccountId?: mongoose.Types.ObjectId | null;
   cardId?: mongoose.Types.ObjectId | null;
+  sourceType?: 'salary' | 'business';
+  companyId?: string | null;
+  branchId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,6 +27,9 @@ const ExpenseSchema = new Schema<IExpense>({
   paymentMethod: { type: String, enum: ['cash', 'card', 'debit_card', 'credit_card', 'bank_transfer', 'cheque', 'standing_order', 'online', 'other'], default: 'cash' },
   bankAccountId: { type: Schema.Types.ObjectId, ref: 'BankAccount', default: null },
   cardId: { type: Schema.Types.ObjectId, ref: 'Card', default: null },
+  sourceType: { type: String, enum: ['salary', 'business'], default: 'salary' },
+  companyId: { type: String, default: null },
+  branchId: { type: String, default: null },
 }, { timestamps: true });
 
 export const ExpenseModel = mongoose.models.Expense || mongoose.model<IExpense>('Expense', ExpenseSchema);
