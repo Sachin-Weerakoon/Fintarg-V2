@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/Select';
 import { MoneyField } from '@/components/ui/MoneyField';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
@@ -129,6 +130,32 @@ export function SalaryWorkspace() {
       dispatch({ type: 'UPDATE_EMPLOYMENT', entry: { ...selected, ...updates } });
       showToast('Employment profile updated.', 'success');
     }
+  };
+
+  const isSalaryInIncome = Boolean(
+    selected &&
+    state.income.some(
+      i => i.source === selected.employer && i.date && i.date.startsWith(state.selectedMonth)
+    )
+  );
+
+  const postToIncome = async () => {
+    if (!selected) return;
+    const net = Math.max(0, selected.monthlyGross - selected.monthlyDeductions);
+    const incId = 'inc_sal_' + selected.id + '_' + state.selectedMonth;
+    const day = String(selected.payday || 25).padStart(2, '0');
+    await dispatch({
+      type: 'ADD_INCOME',
+      entry: {
+        id: incId,
+        source: selected.employer,
+        type: 'salary',
+        amount: net,
+        frequency: 'monthly',
+        date: `${state.selectedMonth}-${day}`,
+      },
+    });
+    showToast(`Posted ${formatRs(net)} take-home salary to income ledger.`, 'success');
   };
 
   // Loading skeleton while data hydrates
@@ -426,6 +453,39 @@ export function SalaryWorkspace() {
 
       {selected && (
         <>
+          {/* Payday Sync Action Card */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-surface border border-border shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="w-9 h-9 rounded-xl bg-success-solid/10 text-success-text flex items-center justify-center">
+                <Icon name="wallet" size={18} />
+              </span>
+              <div>
+                <div className="font-bold text-sm text-text flex items-center gap-2">
+                  <span>Payday Take-Home: {formatRs(takeHome)}</span>
+                  <Badge tone={isSalaryInIncome ? 'success' : 'primary'}>
+                    {isSalaryInIncome ? 'Synced to Ledger' : `Payday: Day ${selected.payday}`}
+                  </Badge>
+                </div>
+                <div className="text-xs text-muted">
+                  {isSalaryInIncome
+                    ? `Already recorded in monthly income for ${state.selectedMonth}`
+                    : `Ready to post ${formatRs(takeHome)} take-home salary into your primary income ledger for ${state.selectedMonth}`}
+                </div>
+              </div>
+            </div>
+
+            {!isSalaryInIncome && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={postToIncome}
+                iconLeft={<Icon name="plus" size={14} />}
+              >
+                Post Salary to Income
+              </Button>
+            )}
+          </div>
+
           <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               label="Gross Salary"

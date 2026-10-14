@@ -20,7 +20,7 @@ import { ColorSwatch } from '@/components/ui/ColorSwatch';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { THEME_COLORS, LIGHT_DEFAULTS, validateCustomOverrides } from '@/lib/theme';
+import { THEME_COLORS, LIGHT_DEFAULTS, validateCustomOverrides, SIDEBAR_PRESETS } from '@/lib/theme';
 
 type Tab = 'appearance' | 'profile' | 'contacts' | 'reminders' | 'account';
 
@@ -153,6 +153,85 @@ function AppearanceTab() {
               ariaLabel={`Theme color ${c}`}
             />
           ))}
+        </div>
+      </Card>
+
+      {/* Sidebar Theme Color */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <div>
+            <h3 className="text-sm font-bold text-text">Sidebar Navigation Theme</h3>
+            <p className="text-xs text-muted mt-0.5">
+              Personalize the background and accent tone of the main navigation sidebar.
+            </p>
+          </div>
+          {profile.sidebarColor && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => update({ sidebarColor: '' })}
+            >
+              Reset to Default
+            </Button>
+          )}
+        </div>
+
+        <div className="flex gap-2.5 flex-wrap my-3">
+          {SIDEBAR_PRESETS.map(preset => {
+            const isSelected = (!profile.sidebarColor && preset.id === 'default') || profile.sidebarColor === preset.color;
+            const swatchBg = preset.color === 'brand' ? (profile.themeColor || '#0FA3B1') : preset.color;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => update({ sidebarColor: preset.id === 'default' ? '' : preset.color })}
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+                  isSelected
+                    ? 'border-primary-500 bg-primary-500/10 text-primary-text shadow-sm'
+                    : 'border-border bg-surface hover:bg-surface-hover text-text'
+                }`}
+              >
+                <span
+                  className="w-4 h-4 rounded-full border border-white/20 shadow-sm flex-shrink-0"
+                  style={{ backgroundColor: swatchBg }}
+                />
+                <span>{preset.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="pt-3 border-t border-border/70 flex items-center justify-between gap-4">
+          <div className="text-xs text-muted">
+            Or pick a custom sidebar hex color:
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="relative cursor-pointer" title="Pick custom sidebar color">
+              <div
+                className="w-8 h-8 rounded-lg border border-border shadow-sm"
+                style={{ backgroundColor: profile.sidebarColor && profile.sidebarColor !== 'brand' ? profile.sidebarColor : '#0B1220' }}
+              />
+              <Input
+                type="color"
+                aria-label="Select custom sidebar color"
+                value={profile.sidebarColor && profile.sidebarColor !== 'brand' ? profile.sidebarColor : '#0B1220'}
+                onChange={e => update({ sidebarColor: e.target.value })}
+                className="sr-only"
+              />
+            </label>
+            <div className="w-24">
+              <Input
+                aria-label="Sidebar hex code"
+                value={profile.sidebarColor || '#0B1220'}
+                onChange={e => {
+                  const v = e.target.value;
+                  if (/^#[0-9a-fA-F]{0,6}$/.test(v)) update({ sidebarColor: v });
+                }}
+                maxLength={7}
+                className="!h-8 !py-1 !px-2 text-xs font-mono"
+              />
+            </div>
+          </div>
         </div>
       </Card>
 

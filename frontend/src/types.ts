@@ -19,6 +19,8 @@ export interface UserProfile {
   colorMuted: string;
   colorBg: string;
   colorSurface: string;
+  sidebarColor?: string;
+  sidebarTheme?: string;
   contacts: Contact[];
   bankName: string;
   bankBranch: string;
@@ -115,6 +117,8 @@ export interface ExpenseEntry {
   paymentMethod?: PaymentMethod;
   bankAccountId?: string;
   cardId?: string;
+  sourceType?: 'manual' | 'medical' | 'salary' | 'draw';
+  sourceId?: string;
 }
 
 export interface FinancePaymentHistory {
@@ -307,6 +311,7 @@ export interface MedicalExpense {
   type: string;
   amount: number;
   note: string;
+  expenseId?: string;
 }
 
 export interface Document {

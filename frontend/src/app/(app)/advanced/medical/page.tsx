@@ -45,6 +45,10 @@ export default function MedicalClient() {
       tone: 'danger',
     });
     if (ok) {
+      const target = state.medicalExpenses.find(m => m.id === id);
+      if (target?.expenseId) {
+        dispatch({ type: 'DELETE_EXPENSE', id: target.expenseId });
+      }
       dispatch({ type: 'DELETE_MEDICAL_EXPENSE', id });
       toast.success('Medical expense deleted');
     }
@@ -87,11 +91,26 @@ export default function MedicalClient() {
       setError('Amount must be greater than zero.');
       return;
     }
+    const medId = 'm_' + Date.now();
+    const expId = 'exp_med_' + Date.now();
+    dispatch({
+      type: 'ADD_EXPENSE',
+      entry: {
+        id: expId,
+        date: form.date,
+        amount: Number(form.amount),
+        category: 'Medical',
+        note: form.note ? `Medical: ${form.type} · ${form.note}` : `Medical: ${form.type}`,
+        recurring: false,
+        sourceType: 'medical',
+        sourceId: medId,
+      },
+    });
     dispatch({
       type: 'ADD_MEDICAL_EXPENSE',
-      entry: { id: 'm_' + Date.now(), date: form.date, type: form.type, amount: Number(form.amount), note: form.note },
+      entry: { id: medId, date: form.date, type: form.type, amount: Number(form.amount), note: form.note, expenseId: expId },
     });
-    toast.success('Medical expense recorded');
+    toast.success('Medical expense recorded & synced to financial ledger');
     setForm({ date: new Date().toISOString().slice(0, 10), type: 'Consultation', amount: '', note: '' });
     setError('');
   };

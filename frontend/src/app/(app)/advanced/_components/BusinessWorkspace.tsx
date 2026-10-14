@@ -1,6 +1,7 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useApp, formatRs } from '@/store';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { Card } from '@/components/ui/Card';
@@ -23,10 +24,27 @@ type BranchTab = 'overview' | 'income' | 'costs' | 'targets';
 export function BusinessWorkspace() {
   const { state, dispatch, showToast } = useApp();
   const confirm = useConfirm();
-  const [companyId, setCompanyId] = useState(state.companies[0]?.id || '');
-  const companyBranches = state.businessBranches.filter(b => b.companyId === companyId);
+  const searchParams = useSearchParams();
+  const urlCompanyId = searchParams?.get('companyId');
+
+  const [companyId, setCompanyId] = useState(
+    urlCompanyId && state.companies.some(c => c.id === urlCompanyId)
+      ? urlCompanyId
+      : state.companies[0]?.id || ''
+  );
+
+  useEffect(() => {
+    if (urlCompanyId && state.companies.some(c => c.id === urlCompanyId) && urlCompanyId !== companyId) {
+      setCompanyId(urlCompanyId);
+      const firstBr = state.businessBranches.find(b => b.companyId === urlCompanyId);
+      setBranchId(firstBr?.id || '');
+    }
+  }, [urlCompanyId, state.companies, companyId]);
+
+  const selectedCompany = state.companies.find(c => c.id === companyId) || state.companies[0];
+  const companyBranches = state.businessBranches.filter(b => b.companyId === (selectedCompany?.id || companyId));
   const [branchId, setBranchId] = useState(companyBranches[0]?.id || '');
-  const branch = state.businessBranches.find(b => b.id === branchId && b.companyId === companyId) || companyBranches[0];
+  const branch = state.businessBranches.find(b => b.id === branchId && b.companyId === (selectedCompany?.id || companyId)) || companyBranches[0];
 
   const [activeTab, setActiveTab] = useState<BranchTab>('overview');
   const [showBusinessForm, setShowBusinessForm] = useState(false);
@@ -281,9 +299,9 @@ export function BusinessWorkspace() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-shrink-0">
-            {companyId && (
-              <Link href={`/analysis?scope=company&companyId=${companyId}`}>
-                <Button variant="ghost" size="md" iconLeft={<Icon name="analysis" size={14} />}>
+            {selectedCompany && (
+              <Link href={`/analysis?scope=company&companyId=${selectedCompany.id}`}>
+                <Button variant="secondary" size="md" iconLeft={<Icon name="analysis" size={14} />}>
                   Analyze Business
                 </Button>
               </Link>
@@ -416,6 +434,56 @@ export function BusinessWorkspace() {
           </div>
         )}
       </Card>
+
+      {/* Enterprise Company Overview & Financial Intelligence Banner */}
+      {selectedCompany && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-primary-tint/60 via-surface to-surface border border-primary/25 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <span className="w-11 h-11 rounded-2xl bg-primary-500 text-white flex items-center justify-center font-black text-sm shadow-sm shrink-0">
+                <Icon name="briefcase" size={20} />
+              </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] uppercase font-bold tracking-wider text-primary-text">Business Entity</span>
+                  <h3 className="font-extrabold text-base text-text">{selectedCompany.name}</h3>
+                  {selectedCompany.entityType && (
+                    <Badge tone="primary" size="sm">
+                      {selectedCompany.entityType.replace(/_/g, ' ').toUpperCase()}
+                    </Badge>
+                  )}
+                  {selectedCompany.brNumber && (
+                    <Badge tone="neutral" size="sm">
+                      BR: {selectedCompany.brNumber}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted mt-1 flex items-center gap-2 flex-wrap">
+                  <span>
+                    {companyBranches.length} {companyBranches.length === 1 ? 'operating outlet / branch' : 'operating outlets / branches'}
+                  </span>
+                  {selectedCompany.address && <span>· {selectedCompany.address}</span>}
+                  {selectedCompany.contact && <span>· {selectedCompany.contact}</span>}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 shrink-0">
+              <Link href={`/analysis?scope=company&companyId=${selectedCompany.id}`}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  iconLeft={<Icon name="analysis" size={14} />}
+                  iconRight={<Icon name="chevron-right" size={13} />}
+                  className="font-bold shadow-sm"
+                >
+                  View Business Analysis & Waterfall
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {branch ? (
         <>
