@@ -61,6 +61,10 @@ export default function PrintLetterPage() {
         date={letter?.date}
         mode={mode}
         companyName={company?.name}
+        companyBr={company?.brNumber}
+        companyTin={company?.tinNumber}
+        companyAddress={company?.address}
+        companyContact={company?.contact}
         className="max-w-4xl mx-auto"
       />
     </div>

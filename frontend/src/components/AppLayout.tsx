@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { logout } from '@/actions/logout';
 import { AppProvider, useApp } from '@/store';
-import { deriveBrand, validateCustomOverrides, THEME_COLORS } from '@/lib/theme';
+import { deriveBrand, validateCustomOverrides, THEME_COLORS, deriveSidebarStyles } from '@/lib/theme';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -84,26 +84,74 @@ function AppLayoutInner({
   const darkClass = isDark ? 'dark-mode' : '';
 
   const brandVars = deriveBrand(primary, isDark);
+  const sidebarVars = deriveSidebarStyles(profile?.sidebarColor || user.profile?.sidebarColor, primary);
   const effectiveProfile = profile || user.profile;
   const { validOverrides } = !isDark && effectiveProfile ? validateCustomOverrides(effectiveProfile) : { validOverrides: {} };
   const layoutStyle = {
     ...brandVars,
     ...validOverrides,
+    ...sidebarVars,
   } as React.CSSProperties;
 
   const mobileBottomItems = user.workMode === 'salary' ? salaryBottomItems : businessBottomItems;
-  const isMorePage = !mobileBottomItems.some(item => item.page === pathname.replace('/', ''));
   const currentTab = searchParams?.get('tab') || undefined;
 
-  const navItems = [
-    { href: '/', label: 'Home', page: 'dashboard' },
-    ...(user.workMode !== 'business' ? [{ href: '/salary', label: 'Salary & Payday', page: 'salary' }] : []),
-    { href: '/financial', label: 'Financial', page: 'financial' },
-    { href: '/analysis', label: 'Analysis', page: 'analysis' },
-    { href: '/goals', label: 'Goals', page: 'goals' },
-    { href: '/advanced', label: 'Advanced Features', page: 'advanced' },
-    { href: '/settings', label: 'Settings', page: 'settings' },
+  const showSalaryInSidebar = user.workMode === 'salary';
+  const hasBusiness = user.workMode !== 'salary' || state.profile?.plan === 'business' || (state.companies && state.companies.length > 0);
+
+  const navSections: { title?: string; items: { href: string; label: string; icon: IconName; isActive: boolean; badge?: string }[] }[] = [
+    {
+      title: 'FINANCES',
+      items: [
+        { href: '/', label: 'Home', icon: 'home', isActive: pathname === '/' },
+        { href: '/financial', label: 'Financial Ledger', icon: 'financial', isActive: pathname === '/financial' },
+        { href: '/analysis', label: 'Analysis & Intel', icon: 'analysis', isActive: pathname === '/analysis' },
+        { href: '/goals', label: 'Financial Goals', icon: 'goals', isActive: pathname === '/goals' },
+      ],
+    },
+    {
+      title: 'WORK & ENTERPRISE',
+      items: [
+        ...(showSalaryInSidebar
+          ? [{ href: '/salary', label: 'Salary & Payday', icon: 'wallet' as IconName, isActive: pathname === '/salary' }]
+          : []),
+        ...(hasBusiness
+          ? [
+              {
+                href: '/advanced?tab=businesses',
+                label: 'Businesses',
+                icon: 'bank' as IconName,
+                isActive: pathname === '/advanced' && (currentTab === 'businesses' || currentTab === 'companies'),
+                badge: state.companies?.length > 0 ? `${state.companies.length}` : undefined,
+              },
+              {
+                href: '/advanced?tab=agreements',
+                label: 'Commercial Contracts',
+                icon: 'documents' as IconName,
+                isActive: pathname === '/advanced' && currentTab === 'agreements',
+              },
+            ]
+          : []),
+      ],
+    },
+    {
+      title: 'VAULT & TOOLS',
+      items: [
+        { href: '/advanced/medical', label: 'Medical Vault', icon: 'heart', isActive: pathname === '/advanced/medical' },
+        { href: '/advanced/letters', label: 'Formal Letters', icon: 'file-text', isActive: pathname === '/advanced/letters' },
+        { href: '/advanced', label: 'Advanced Hub', icon: 'advanced', isActive: pathname === '/advanced' && (!currentTab || currentTab === 'hub') },
+      ],
+    },
+    {
+      title: 'PREFERENCES',
+      items: [
+        { href: '/settings', label: 'Settings', icon: 'settings', isActive: pathname === '/settings' },
+      ],
+    },
   ];
+
+  const allNavItems = navSections.flatMap(s => s.items);
+  const isMorePage = !mobileBottomItems.some(item => pathname === item.href);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -129,7 +177,11 @@ function AppLayoutInner({
         {/* Desktop layout */}
         <div className="hidden md:flex min-h-screen">
           <aside
-            className="w-60 min-h-screen sticky top-0 h-screen overflow-y-auto border-r border-white/[0.07] bg-gradient-to-b from-chrome-900 to-chrome-800 flex-shrink-0 flex flex-col"
+            className="w-64 min-h-screen sticky top-0 h-screen overflow-y-auto border-r flex-shrink-0 flex flex-col transition-colors duration-300"
+            style={{
+              background: `linear-gradient(to bottom, var(--color-sidebar-bg, #0B1220), var(--color-sidebar-to, #070D18))`,
+              borderColor: 'var(--color-sidebar-border, rgba(255,255,255,0.08))',
+            }}
           >
             <div className="px-5 py-6">
               <div className="flex flex-col gap-2.5">
@@ -144,21 +196,35 @@ function AppLayoutInner({
               </div>
             </div>
 
-            <nav className="flex-1 px-3 pb-4 flex flex-col gap-1" aria-label="Main navigation">
-              {navItems.map(item => {
-                const isActive = pathname === item.href;
+            <nav className="flex-1 px-3 pb-4 flex flex-col gap-3 overflow-y-auto" aria-label="Main navigation">
+              {navSections.map((section, sIdx) => {
+                if (section.items.length === 0) return null;
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`sidebar-link${isActive ? ' active' : ''}`}
-                    aria-current={isActive ? 'page' : undefined}
-                  >
-                    <span className="sidebar-icon">
-                      <Icon name={getPageIconName(item.page)} size={18} />
-                    </span>
-                    <span>{item.label}</span>
-                  </Link>
+                  <div key={section.title || sIdx} className="space-y-0.5">
+                    {section.title && (
+                      <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-chrome-text/60 select-none">
+                        {section.title}
+                      </div>
+                    )}
+                    {section.items.map(item => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`sidebar-link${item.isActive ? ' active' : ''}`}
+                        aria-current={item.isActive ? 'page' : undefined}
+                      >
+                        <span className="sidebar-icon">
+                          <Icon name={item.icon} size={17} />
+                        </span>
+                        <span className="truncate flex-1 text-xs">{item.label}</span>
+                        {item.badge && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10 text-chrome-text font-bold">
+                            {item.badge}
+                          </span>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
                 );
               })}
             </nav>
@@ -336,8 +402,8 @@ function AppLayoutInner({
                     Close
                   </Button>
                 </div>
-                {navItems
-                  .filter(n => !mobileBottomItems.some(m => m.page === n.page))
+                {allNavItems
+                  .filter(n => !mobileBottomItems.some(m => m.href === n.href))
                   .map(item => (
                     <Link
                       key={item.href}
@@ -345,7 +411,7 @@ function AppLayoutInner({
                       onClick={() => setMoreOpen(false)}
                       className="mobile-more-item flex flex-col items-center justify-center gap-2 py-3 px-2 rounded-xl border border-border bg-surface-hover/50 hover:bg-surface-hover transition-colors min-h-[44px]"
                     >
-                      <Icon name={getPageIconName(item.page)} size={20} className="text-primary-text" />
+                      <Icon name={item.icon} size={20} className="text-primary-text" />
                       <span className="text-xs font-medium text-text text-center">{item.label}</span>
                     </Link>
                   ))}

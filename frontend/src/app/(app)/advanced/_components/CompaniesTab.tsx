@@ -1,5 +1,6 @@
 'use client';
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useApp } from '@/store';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { Card } from '@/components/ui/Card';
@@ -147,49 +148,82 @@ export function CompaniesTab() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-sm text-text">{c.name}</span>
-                        {c.brNumber && (
-                          <Badge tone="neutral" size="sm">
-                            BR: {c.brNumber}
-                          </Badge>
-                        )}
-                        {c.tinNumber && (
-                          <Badge tone="neutral" size="sm">
-                            TIN: {c.tinNumber}
-                          </Badge>
-                        )}
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm text-text">{c.name}</span>
+                          {c.brNumber && (
+                            <Badge tone="neutral" size="sm">
+                              BR: {c.brNumber}
+                            </Badge>
+                          )}
+                          {c.tinNumber && (
+                            <Badge tone="neutral" size="sm">
+                              TIN: {c.tinNumber}
+                            </Badge>
+                          )}
+                        </div>
+                        {c.address && <div className="text-xs text-muted">{c.address}</div>}
+                        {c.contact && <div className="text-xs text-muted">{c.contact}</div>}
                       </div>
-                      {c.address && <div className="text-xs text-muted">{c.address}</div>}
-                      {c.contact && <div className="text-xs text-muted">{c.contact}</div>}
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingId(c.id);
+                            setEditForm({
+                              name: c.name,
+                              brNumber: c.brNumber || '',
+                              tinNumber: c.tinNumber || '',
+                              address: c.address,
+                              contact: c.contact,
+                            });
+                          }}
+                          iconLeft={<Icon name="edit" size={14} />}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteCompany(c.id, c.name)}
+                          className="!text-danger-text hover:!bg-danger-tint"
+                          iconLeft={<Icon name="trash" size={14} />}
+                        />
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditingId(c.id);
-                          setEditForm({
-                            name: c.name,
-                            brNumber: c.brNumber || '',
-                            tinNumber: c.tinNumber || '',
-                            address: c.address,
-                            contact: c.contact,
-                          });
-                        }}
-                        iconLeft={<Icon name="edit" size={14} />}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteCompany(c.id, c.name)}
-                        className="!text-danger-text hover:!bg-danger-tint"
-                        iconLeft={<Icon name="trash" size={14} />}
-                      />
-                    </div>
+                    {/* Direct Company Financial Analysis & Workspace Actions */}
+                    {(() => {
+                      const companyBranches = state.businessBranches.filter(b => b.companyId === c.id);
+                      return (
+                        <div className="mt-3.5 pt-3 border-t border-border flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <Badge tone={companyBranches.length > 0 ? 'primary' : 'neutral'} size="sm">
+                              <Icon name="bank" size={12} className="mr-1 inline" />
+                              {companyBranches.length} {companyBranches.length === 1 ? 'Branch' : 'Branches'}
+                            </Badge>
+                            {c.sector && (
+                              <span className="text-[11px] text-muted">{c.sector}</span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Link href={`/analysis?scope=company&companyId=${c.id}`}>
+                              <Button variant="secondary" size="sm" iconLeft={<Icon name="analysis" size={13} />}>
+                                Analyze Business
+                              </Button>
+                            </Link>
+                            <Link href={`/advanced?tab=businesses&companyId=${c.id}`}>
+                              <Button variant="ghost" size="sm" iconLeft={<Icon name="briefcase" size={13} />}>
+                                Open Workspace
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </Card>

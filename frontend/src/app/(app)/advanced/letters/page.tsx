@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useApp } from '@/store';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -17,7 +18,6 @@ import { Icon } from '@/components/ui/Icon';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import { EmptyState } from '@/components/ui/EmptyState';
-
 import { FormalLetterSheet } from '@/components/ui/FormalLetterSheet';
 
 type Template = 'bank' | 'offer' | 'general';
@@ -32,9 +32,16 @@ function generateBody(
   accountNumber: string,
   defaultAccount?: ReturnType<typeof useApp>['state']['bankAccounts'][0] | null,
 ): string {
-  const name = mode === 'business' && company ? company.name : profile.name || 'Your Name';
-  const address = mode === 'business' && company ? company.address : profile.address || 'Address, City';
-  const contact = mode === 'business' && company ? company.contact : profile.mobile || '';
+  const companyRegLine = company?.brNumber ? `\nBusiness Registration No: ${company.brNumber}` : '';
+  const companyTinLine = company?.tinNumber ? `\nTax Identification No (TIN): ${company.tinNumber}` : '';
+  const fullHeader = mode === 'business' && company
+    ? `${company.name}${companyRegLine}${companyTinLine}\n${company.address || ''}${company.contact ? '\nTel: ' + company.contact : ''}${company.email ? '\nEmail: ' + company.email : ''}`.trim()
+    : `${profile.name || 'Your Name'}\n${profile.address || 'Address, City'}${profile.mobile ? '\nTel: ' + profile.mobile : ''}`.trim();
+
+  const signoffBlock = mode === 'business' && company
+    ? `${profile.name || 'Authorized Signatory'}\nAuthorized Signatory\n${company.name}`
+    : `${profile.name || 'Your Name'}`;
+
   const date = new Date().toLocaleDateString('en-LK', { day: 'numeric', month: 'long', year: 'numeric' });
   const accNum = accountNumber || profile.accountNumber || defaultAccount?.accountNumber || '— — — —';
   const bankName = mode === 'personal'
@@ -42,8 +49,7 @@ function generateBody(
     : 'Bank';
 
   if (template === 'bank') {
-    return `${name}
-${address}${contact ? '\n' + contact : ''}
+    return `${fullHeader}
 
 ${date}
 
@@ -54,18 +60,17 @@ Dear Sir/Madam,
 
 RE: ${purpose || 'Account Enquiry'}
 
-I${mode === 'business' ? ', on behalf of ' + name + ',' : ''} am writing regarding account number ${accNum}. I kindly request your assistance with the above matter.
+I${mode === 'business' && company ? ', on behalf of ' + company.name + ',' : ''} am writing regarding account number ${accNum}. I kindly request your assistance with the above matter.
 
 Please process this at your earliest convenience and do not hesitate to contact us should you require further information.
 
 Yours faithfully,
 
-${name}`;
+${signoffBlock}`;
   }
 
   if (template === 'offer') {
-    return `${name}
-${address}
+    return `${fullHeader}
 
 ${date}
 
@@ -73,19 +78,18 @@ ${addressedTo || 'Sir/Madam'}
 
 Dear Sir/Madam,
 
-RE: ${purpose || 'Offer / Proposal'}
+RE: ${purpose || 'Commercial Proposal / Offer'}
 
-We are pleased to submit this proposal for your consideration. We believe this arrangement would be mutually beneficial and look forward to a positive response.
+We${mode === 'business' && company ? ' at ' + company.name : ''} are pleased to submit this proposal for your consideration. We believe this arrangement will be mutually beneficial and look forward to a positive response.
 
 Please review the enclosed terms and revert at your earliest convenience.
 
 Yours sincerely,
 
-${name}`;
+${signoffBlock}`;
   }
 
-  return `${name}
-${address}
+  return `${fullHeader}
 
 ${date}
 
@@ -93,29 +97,34 @@ ${addressedTo || 'Sir/Madam'}
 
 Dear Sir/Madam,
 
-${purpose || 'Please find this letter for your reference.'}
+RE: ${purpose || 'Formal Correspondence'}
 
-We trust this meets with your satisfaction. Please contact us if you require any further information.
+${purpose ? purpose + '.\n\n' : ''}We trust this communication meets with your satisfaction. Please do not hesitate to contact us should you require any additional information or verification.
 
 Yours faithfully,
 
-${name}`;
+${signoffBlock}`;
 }
 
-export default function LettersClient() {
+function LettersClient() {
   const { state, dispatch } = useApp();
   const confirm = useConfirm();
   const toast = useToast();
+  const searchParams = useSearchParams();
   const { profile } = state;
-  const isBusiness = profile.plan === 'business';
+
+  const hasBusiness = profile.plan === 'business' || profile.workMode === 'business' || profile.workMode === 'both' || (state.companies && state.companies.length > 0);
 
   const nonCashAccounts = state.bankAccounts.filter(b => b.accountType !== 'cash');
   const defaultAccount = nonCashAccounts[0] || state.bankAccounts[0] || null;
   const [selectedAccountId, setSelectedAccountId] = useState(defaultAccount?.id || '');
 
-  const [mode, setMode] = useState<'personal' | 'business'>('personal');
+  const urlCompanyId = searchParams.get('companyId');
+  const initialCompany = state.companies.find(c => c.id === urlCompanyId) || state.companies[0];
+
+  const [mode, setMode] = useState<'personal' | 'business'>(urlCompanyId ? 'business' : 'personal');
   const [template, setTemplate] = useState<Template>('bank');
-  const [selectedCompanyId, setSelectedCompanyId] = useState(state.companies[0]?.id || '');
+  const [selectedCompanyId, setSelectedCompanyId] = useState(initialCompany?.id || '');
   const [form, setForm] = useState({
     addressedTo: defaultAccount ? `The Manager, ${defaultAccount.bankName}` : '',
     accountNumber: defaultAccount?.accountNumber || profile.accountNumber || '',
@@ -125,6 +134,16 @@ export default function LettersClient() {
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState('');
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (urlCompanyId && state.companies.some(c => c.id === urlCompanyId)) {
+      setSelectedCompanyId(urlCompanyId);
+      setMode('business');
+    }
+  }, [urlCompanyId, state.companies]);
+
+  const selectedCompany = state.companies.find(c => c.id === selectedCompanyId) || state.companies[0] || null;
+
   const handleDelete = async (id: string, purpose: string) => {
     const ok = await confirm({
       title: 'Delete Letter',
@@ -139,11 +158,15 @@ export default function LettersClient() {
     }
   };
 
-  const selectedCompany = state.companies.find(c => c.id === selectedCompanyId) || null;
-
   const missingFields: string[] = [];
-  if (!profile.name) missingFields.push('name');
-  if (!profile.address) missingFields.push('address');
+  if (mode === 'personal') {
+    if (!profile.name) missingFields.push('name');
+    if (!profile.address) missingFields.push('address');
+  } else if (selectedCompany) {
+    if (!selectedCompany.name) missingFields.push('company name');
+    if (!selectedCompany.address) missingFields.push('registered office address');
+  }
+
   if (template === 'bank' && !profile.accountNumber && !form.accountNumber && !defaultAccount?.accountNumber) {
     missingFields.push('account number');
   }
@@ -160,7 +183,7 @@ export default function LettersClient() {
         body,
         mode,
         date: new Date().toLocaleDateString('en-LK', { day: 'numeric', month: 'long', year: 'numeric' }),
-        companyId: mode === 'business' ? selectedCompanyId : undefined,
+        companyId: mode === 'business' ? selectedCompany?.id : undefined,
       }));
     } catch {
       // ignore
@@ -181,7 +204,7 @@ export default function LettersClient() {
         addressedTo: form.addressedTo,
         purpose: form.purpose,
         body: finalBody,
-        companyId: mode === 'business' ? selectedCompanyId : undefined,
+        companyId: mode === 'business' ? selectedCompany?.id : undefined,
       },
     });
     setSaved(true);
@@ -191,7 +214,7 @@ export default function LettersClient() {
         body: finalBody,
         mode,
         date: new Date().toLocaleDateString('en-LK', { day: 'numeric', month: 'long', year: 'numeric' }),
-        companyId: mode === 'business' ? selectedCompanyId : undefined,
+        companyId: mode === 'business' ? selectedCompany?.id : undefined,
       }));
     } catch {
       // ignore
@@ -204,7 +227,7 @@ export default function LettersClient() {
     <PageContainer>
       <PageHeader
         title="Formal Letter Generator"
-        description="Draft, customize, and export Sri Lankan legal and banking correspondence."
+        description="Draft, customize, and export Sri Lankan legal, enterprise, and banking correspondence."
         actions={
           <Link href="/advanced">
             <Button variant="secondary" size="sm" iconLeft={<Icon name="arrow-left" size={14} />}>
@@ -217,23 +240,69 @@ export default function LettersClient() {
       <div className="grid md:grid-cols-5 gap-6">
         {/* Form panel */}
         <div className="md:col-span-2 space-y-4">
-          {/* Mode toggle */}
-          {isBusiness && (
-            <SegmentedTabs
-              options={[
-                { id: 'personal', label: 'Personal' },
-                { id: 'business', label: 'Business' },
-              ]}
-              value={mode}
-              onChange={v => setMode(v as any)}
-            />
+          {/* Issuing Entity Toggle */}
+          {hasBusiness && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text uppercase tracking-wide">Issuing Entity / Letterhead</label>
+              <SegmentedTabs
+                options={[
+                  { id: 'personal', label: 'Personal Individual' },
+                  { id: 'business', label: 'Registered Enterprise' },
+                ]}
+                value={mode}
+                onChange={v => setMode(v as any)}
+              />
+            </div>
+          )}
+
+          {/* Company Selection Card for Business Letters */}
+          {mode === 'business' && (
+            <Card className="p-4 space-y-3 bg-primary-tint/20 border-primary/25">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-primary-text flex items-center gap-1.5">
+                  <Icon name="bank" size={14} />
+                  Selected Business Entity
+                </span>
+                <Link href="/advanced?tab=businesses" className="text-[11px] font-semibold text-primary-text hover:underline">
+                  Manage Businesses →
+                </Link>
+              </div>
+
+              {state.companies.length === 0 ? (
+                <div className="p-3 bg-surface rounded-xl border border-border text-xs text-muted">
+                  No registered companies found. Please register an enterprise company to generate corporate letterheads.
+                </div>
+              ) : (
+                <Field id="letter-company" label="Choose Specific Business">
+                  <Select
+                    value={selectedCompanyId}
+                    onChange={e => setSelectedCompanyId(e.target.value)}
+                  >
+                    {state.companies.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.brNumber ? `(BR: ${c.brNumber})` : ''}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+
+              {selectedCompany && (
+                <div className="text-[11px] text-muted space-y-1 pt-1 border-t border-border/50">
+                  <div className="font-semibold text-text">{selectedCompany.name}</div>
+                  {selectedCompany.brNumber && <div>Registration: {selectedCompany.brNumber}</div>}
+                  {selectedCompany.tinNumber && <div>TIN: {selectedCompany.tinNumber}</div>}
+                  {selectedCompany.address && <div>Registered Office: {selectedCompany.address}</div>}
+                </div>
+              )}
+            </Card>
           )}
 
           {missingFields.length > 0 && (
             <div className="p-3.5 rounded-xl border border-warning-solid/30 bg-warning-tint/30 text-warning-text text-xs">
-              <span className="font-semibold">Notice:</span> Missing {missingFields.join(', ')} in your profile.{' '}
-              <Link href="/settings" className="font-semibold underline text-primary-text">
-                Settings →
+              <span className="font-semibold">Notice:</span> Missing {missingFields.join(', ')} in {mode === 'personal' ? 'your profile' : 'selected company profile'}.{' '}
+              <Link href={mode === 'personal' ? '/settings' : '/advanced?tab=businesses'} className="font-semibold underline text-primary-text">
+                Update Profile →
               </Link>
             </div>
           )}
@@ -241,27 +310,17 @@ export default function LettersClient() {
           <Card className="p-5 space-y-3.5">
             <Field id="letter-template" label="Template">
               <Select value={template} onChange={e => setTemplate(e.target.value as Template)}>
-                <option value="bank">Bank letter</option>
-                <option value="offer">Offer letter</option>
-                <option value="general">General letter</option>
+                <option value="bank">Bank Letter (Financial Enquiry / Request)</option>
+                <option value="offer">Commercial Proposal / Offer Letter</option>
+                <option value="general">Formal General Correspondence</option>
               </Select>
             </Field>
-
-            {mode === 'business' && state.companies.length > 0 && (
-              <Field id="letter-company" label="Company">
-                <Select value={selectedCompanyId} onChange={e => setSelectedCompanyId(e.target.value)}>
-                  {state.companies.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </Select>
-              </Field>
-            )}
 
             <Field id="letter-addressee" label="Addressed to">
               <Input
                 value={form.addressedTo}
                 onChange={e => setForm(f => ({ ...f, addressedTo: e.target.value }))}
-                placeholder="The Manager, Bank"
+                placeholder="The Manager, Bank / Recipient"
               />
             </Field>
 
@@ -292,11 +351,11 @@ export default function LettersClient() {
             )}
 
             {template === 'bank' && (
-              <Field id="letter-account" label="Account number">
+              <Field id="letter-account-number" label="Account number">
                 <Input
                   value={form.accountNumber}
                   onChange={e => setForm(f => ({ ...f, accountNumber: e.target.value }))}
-                  placeholder={defaultAccount?.accountNumber || profile.accountNumber || '0012 3456 789'}
+                  placeholder="0011223344"
                 />
               </Field>
             )}
@@ -305,66 +364,85 @@ export default function LettersClient() {
               <Input
                 value={form.purpose}
                 onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))}
-                placeholder="Loan settlement request"
+                placeholder={
+                  template === 'bank'
+                    ? 'Statement request, Loan NOC, Account confirmation'
+                    : template === 'offer'
+                    ? 'IT Consultancy Services, Partnership Proposal'
+                    : 'Formal Inquiry / Notice'
+                }
               />
             </Field>
 
-            <p className="text-xs text-muted">
-              Sender details are auto-populated from your {mode === 'business' ? 'company' : 'profile'}.
-            </p>
-
-            <Button variant="primary" className="w-full pt-1" onClick={generate}>
-              Generate Letter
+            <Button variant="primary" className="w-full" onClick={generate}>
+              Generate Letterhead Preview
             </Button>
           </Card>
 
-          {/* Letter history */}
+          {/* Letter History */}
           {state.letters.length > 0 && (
-            <div>
-              <div className="font-semibold text-xs mb-2 text-muted">Letter history</div>
-              <div className="space-y-1.5">
-                {state.letters.slice().reverse().map(l => (
-                  <Card key={l.id} className="py-2.5 px-3 flex items-center justify-between gap-2">
+            <Card className="p-4 space-y-2">
+              <div className="text-xs font-semibold text-text uppercase tracking-wide">Recent Letters</div>
+              <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                {state.letters.slice().reverse().map(l => {
+                  const company = state.companies.find(c => c.id === l.companyId);
+                  return (
                     <div
-                      className="flex-1 cursor-pointer min-w-0"
-                      onClick={() => {
-                        setGenerated(l.body);
-                        setEditBody(l.body);
-                        setEditing(false);
-                        setSaved(true);
-                      }}
+                      key={l.id}
+                      className="p-2.5 rounded-lg border border-border hover:bg-surface-hover/50 transition-colors flex items-center justify-between text-xs"
                     >
-                      <div className="text-xs font-semibold text-text truncate">
-                        {l.type.toUpperCase()} · {l.mode}
+                      <div className="space-y-0.5 min-w-0 pr-2">
+                        <div className="font-semibold text-text truncate">
+                          {l.purpose || 'Formal Letter'}
+                        </div>
+                        <div className="text-[11px] text-muted flex items-center gap-1.5">
+                          <span>{l.date}</span>
+                          <span>·</span>
+                          <span className="capitalize">{l.mode}</span>
+                          {company && (
+                            <>
+                              <span>·</span>
+                              <span className="text-primary-text font-medium truncate">{company.name}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-xs text-muted truncate">{l.date} · {l.addressedTo || '—'}</div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Link href={`/print/letter/${l.id}`}>
+                          <Button variant="ghost" size="sm" className="!p-1 text-muted hover:text-text" aria-label="Print letter">
+                            <Icon name="download" size={13} />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="!p-1 text-danger-text hover:bg-danger-tint"
+                          onClick={() => handleDelete(l.id, l.purpose)}
+                          aria-label="Delete letter"
+                        >
+                          <Icon name="trash" size={13} />
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-danger-text hover:text-danger-text !p-1.5"
-                      onClick={() => handleDelete(l.id, l.purpose || l.type)}
-                      aria-label="Delete letter"
-                    >
-                      <Icon name="trash" size={14} />
-                    </Button>
-                  </Card>
-                ))}
+                  );
+                })}
               </div>
-            </div>
+            </Card>
           )}
         </div>
 
         {/* Preview panel */}
         <div className="md:col-span-3">
-          {generated ? (
-            <div className="flex flex-col gap-3">
-              <div className="p-3 rounded-2xl bg-surface border border-border flex items-center justify-between flex-wrap gap-2 no-print shadow-xs">
-                <div className="font-semibold text-xs sm:text-sm text-text flex items-center gap-2 pl-1">
-                  <span>Letter Preview</span>
-                  {saved && <Badge tone="success" size="sm">Saved</Badge>}
+          {generated || editing ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Badge tone={mode === 'business' ? 'primary' : 'neutral'}>
+                    {mode === 'business' ? (selectedCompany?.name || 'Business') : 'Personal'}
+                  </Badge>
+                  <span className="text-xs text-muted">Preview ready for export</span>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -401,7 +479,7 @@ export default function LettersClient() {
                           body: e.target.value,
                           mode,
                           date: new Date().toLocaleDateString('en-LK', { day: 'numeric', month: 'long', year: 'numeric' }),
-                          companyId: mode === 'business' ? selectedCompanyId : undefined,
+                          companyId: mode === 'business' ? selectedCompany?.id : undefined,
                         }));
                       } catch {
                         // ignore
@@ -415,6 +493,10 @@ export default function LettersClient() {
                   date={new Date().toLocaleDateString('en-LK', { day: 'numeric', month: 'long', year: 'numeric' })}
                   mode={mode}
                   companyName={selectedCompany?.name}
+                  companyBr={selectedCompany?.brNumber}
+                  companyTin={selectedCompany?.tinNumber}
+                  companyAddress={selectedCompany?.address}
+                  companyContact={selectedCompany?.contact}
                   className="shadow-sm"
                 />
               )}
@@ -423,13 +505,23 @@ export default function LettersClient() {
             <EmptyState
               icon={<Icon name="documents" size={28} />}
               title="No letter generated"
-              helper="Fill in the recipient and purpose on the left, then click Generate Letter to preview."
+              helper="Fill in the issuing entity, recipient, and purpose on the left, then click Generate Letter to preview."
             />
           )}
         </div>
       </div>
-
-
     </PageContainer>
+  );
+}
+
+export default function LettersPage() {
+  return (
+    <Suspense fallback={
+      <PageContainer>
+        <PageHeader title="Formal Letter Generator" description="Loading letters generator..." />
+      </PageContainer>
+    }>
+      <LettersClient />
+    </Suspense>
   );
 }

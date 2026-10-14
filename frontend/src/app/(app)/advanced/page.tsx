@@ -57,12 +57,15 @@ function AdvancedContent() {
     router.replace(query ? `?${query}` : '/advanced', { scroll: false });
   };
 
+  const showSalaryTab = state.profile.workMode === 'salary';
   const tabOptions = [
     { id: 'hub', label: 'Feature Hub', icon: <Icon name="home" size={15} /> },
     ...(hasBusiness
       ? [{ id: 'businesses', label: 'Businesses & Branches', icon: <Icon name="bank" size={15} /> }]
       : []),
-    { id: 'salary', label: 'Salary & Payday', icon: <Icon name="wallet" size={15} /> },
+    ...(showSalaryTab
+      ? [{ id: 'salary', label: 'Salary & Payday', icon: <Icon name="wallet" size={15} /> }]
+      : []),
     ...(hasBusiness
       ? [
           { id: 'agreements', label: 'Agreements', icon: <Icon name="documents" size={15} /> },

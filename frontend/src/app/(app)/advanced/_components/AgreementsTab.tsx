@@ -31,11 +31,11 @@ function daysUntil(dateStr: string): number {
   return Math.round((new Date(dateStr).getTime() - Date.now()) / 86400000);
 }
 
-export function AgreementsTab() {
+export function AgreementsTab({ companyId }: { companyId?: string } = {}) {
   const { state, dispatch, showToast } = useApp();
   const confirm = useConfirm();
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ ...BLANK_FORM });
+  const [form, setForm] = useState({ ...BLANK_FORM, companyId: companyId || '' });
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | Agreement['status']>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -43,13 +43,18 @@ export function AgreementsTab() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
+  React.useEffect(() => {
+    setForm(f => ({ ...f, companyId: companyId || '' }));
+  }, [companyId]);
+
   const filtered = state.agreements.filter(a => {
+    const matchCompany = !companyId || a.companyId === companyId;
     const matchSearch =
       !search ||
       a.title.toLowerCase().includes(search.toLowerCase()) ||
       a.otherParty.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || a.status === statusFilter;
-    return matchSearch && matchStatus;
+    return matchCompany && matchSearch && matchStatus;
   });
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>, target: 'new' | 'edit') => {
@@ -68,9 +73,9 @@ export function AgreementsTab() {
     }
     dispatch({
       type: 'ADD_AGREEMENT',
-      entry: { id: 'ag_' + Date.now(), ...form, value: Number(form.value) || 0 },
+      entry: { id: 'ag_' + Date.now(), ...form, value: Number(form.value) || 0, companyId: form.companyId || companyId || undefined },
     });
-    setForm({ ...BLANK_FORM });
+    setForm({ ...BLANK_FORM, companyId: companyId || '' });
     setShowForm(false);
     showToast('Agreement saved successfully.', 'success');
   };

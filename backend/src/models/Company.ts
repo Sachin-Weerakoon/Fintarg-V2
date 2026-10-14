@@ -13,6 +13,8 @@ export interface ICompany extends Document {
   entityType?: string;
   sector?: string;
   email?: string;
+  monthlyRevenueTargetCents?: number;
+  annualRevenueTargetCents?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +32,8 @@ const CompanySchema = new Schema<ICompany>({
   entityType: { type: String, default: '' },
   sector: { type: String, default: '' },
   email: { type: String, default: '' },
+  monthlyRevenueTargetCents: { type: Number, default: 0, min: 0 },
+  annualRevenueTargetCents: { type: Number, default: 0, min: 0 },
 }, { timestamps: true });
 
 export const CompanyModel = mongoose.models.Company || mongoose.model<ICompany>('Company', CompanySchema);

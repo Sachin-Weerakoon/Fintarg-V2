@@ -66,6 +66,15 @@ function mapCompanies(companies: RawRecord[] = []) {
     address: row.address,
     contact: row.contact,
     logo: row.logo,
+    businessType: row.businessType,
+    openingDate: row.openingDate,
+    brNumber: row.brNumber,
+    tinNumber: row.tinNumber,
+    entityType: row.entityType,
+    sector: row.sector,
+    email: row.email,
+    monthlyRevenueTarget: row.monthlyRevenueTargetCents ? row.monthlyRevenueTargetCents / 100 : (row.monthlyRevenueTarget || undefined),
+    annualRevenueTarget: row.annualRevenueTargetCents ? row.annualRevenueTargetCents / 100 : (row.annualRevenueTarget || undefined),
   }));
 }
 
@@ -182,6 +191,9 @@ export async function loadPersistedData(plan: UserPlan = 'basic'): Promise<Parti
       paymentMethod: row.paymentMethod,
       bankAccountId: row.bankAccountId,
       cardId: row.cardId,
+      sourceType: row.sourceType,
+      companyId: row.companyId ? String(row.companyId) : undefined,
+      branchId: row.branchId ? String(row.branchId) : undefined,
     })),
     financePayments: financePayments.map(row => ({
       id: row._id,
@@ -310,6 +322,10 @@ export async function loadPersistedData(plan: UserPlan = 'basic'): Promise<Parti
       savedAmount: (row.savedAmountCents || 0) / 100,
       targetAmount: row.targetAmountCents ? row.targetAmountCents / 100 : undefined,
       targetDate: row.targetDate,
+      scope: (row.scope as any) || 'personal',
+      companyId: row.companyId ? String(row.companyId) : undefined,
+      branchId: row.branchId ? String(row.branchId) : undefined,
+      targetType: (row.targetType as any) || 'savings',
       contributions: (row.contributions || []).map((item: RawRecord) => ({
         id: item._id,
         _id: item._id,
@@ -624,11 +640,17 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
         endDate: action.entry.endDate,
         targetAmount: action.entry.targetAmount,
         targetDate: action.entry.targetDate,
+        scope: action.entry.scope || 'personal',
+        companyId: action.entry.companyId || undefined,
+        branchId: action.entry.branchId || undefined,
+        targetType: action.entry.targetType || 'savings',
       });
     case 'UPDATE_GOAL':
       return void (await send(`/api/backend/records/goals/${id}`, 'PATCH', {
         dailyAmount: action.dailyAmount,
         monthlyTarget: action.monthlyTarget,
+        targetAmount: action.targetAmount,
+        targetDate: action.targetDate,
       }));
     case 'DELETE_GOAL':
       return void (await send(`/api/backend/records/goals/${id}`, 'DELETE'));

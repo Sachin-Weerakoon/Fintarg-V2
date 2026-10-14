@@ -175,6 +175,39 @@ export function deriveBrand(baseHex: string, isDark = false): Record<string, str
   };
 }
 
+export const SIDEBAR_PRESETS = [
+  { id: 'default', label: 'Midnight Slate', color: '#0B1220' },
+  { id: 'brand', label: 'Brand Match', color: 'brand' },
+  { id: 'emerald', label: 'Emerald Deep', color: '#06281E' },
+  { id: 'indigo', label: 'Royal Indigo', color: '#18123A' },
+  { id: 'charcoal', label: 'Charcoal Dark', color: '#161922' },
+] as const;
+
+export function deriveSidebarStyles(sidebarColor?: string, primaryColor = '#0FA3B1'): Record<string, string> {
+  const chosen = (sidebarColor || '').trim();
+  if (!chosen || chosen === 'default') {
+    return {
+      '--color-sidebar-bg': '#0B1220',
+      '--color-sidebar-to': '#070D18',
+      '--color-sidebar-border': 'rgba(255, 255, 255, 0.08)',
+    };
+  }
+  if (chosen === 'brand') {
+    return {
+      '--color-sidebar-bg': primaryColor,
+      '--color-sidebar-to': '#080E1A',
+      '--color-sidebar-border': 'rgba(255, 255, 255, 0.12)',
+    };
+  }
+  const rgb = parseHex(chosen);
+  const darkened = toHex(Math.max(0, rgb[0] - 25), Math.max(0, rgb[1] - 25), Math.max(0, rgb[2] - 25));
+  return {
+    '--color-sidebar-bg': chosen,
+    '--color-sidebar-to': darkened,
+    '--color-sidebar-border': 'rgba(255, 255, 255, 0.1)',
+  };
+}
+
 /**
  * Validates custom color overrides in light mode.
  * Returns only overrides meeting WCAG 4.5:1 contrast, plus warnings for failing ones.

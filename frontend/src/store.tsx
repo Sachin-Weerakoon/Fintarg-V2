@@ -225,9 +225,58 @@ function reducer(state: AppState, action: Action): AppState {
     case 'ADD_INCOME': return { ...state, income: [...state.income, action.entry] };
     case 'UPDATE_INCOME': return { ...state, income: state.income.map(i => i.id === action.entry.id ? action.entry : i) };
     case 'DELETE_INCOME': return { ...state, income: state.income.filter(i => i.id !== action.id) };
-    case 'ADD_EXPENSE': return { ...state, expenses: [...state.expenses, action.entry] };
-    case 'UPDATE_EXPENSE': return { ...state, expenses: state.expenses.map(e => e.id === action.entry.id ? action.entry : e) };
-    case 'DELETE_EXPENSE': return { ...state, expenses: state.expenses.filter(e => e.id !== action.id) };
+    case 'ADD_EXPENSE': {
+      let updatedBranches = state.businessBranches;
+      if (action.entry.sourceType === 'business' && action.entry.branchId) {
+        updatedBranches = state.businessBranches.map(b => {
+          if (b.id !== action.entry.branchId) return b;
+          const costEntry = {
+            id: 'be_exp_' + action.entry.id,
+            date: action.entry.date,
+            type: (['Electricity', 'Water', 'Internet', 'Phone'].includes(action.entry.category) ? 'utility' : 'other-cost') as 'utility' | 'other-cost',
+            category: action.entry.category,
+            amount: action.entry.amount,
+            note: action.entry.note || action.entry.category,
+          };
+          return {
+            ...b,
+            entries: [costEntry, ...(b.entries || [])],
+          };
+        });
+      }
+      return {
+        ...state,
+        expenses: [...state.expenses, action.entry],
+        businessBranches: updatedBranches,
+      };
+    };
+    case 'UPDATE_EXPENSE': {
+      return {
+        ...state,
+        expenses: state.expenses.map(e => e.id === action.entry.id ? action.entry : e),
+      };
+    };
+    case 'DELETE_EXPENSE': {
+      const exp = state.expenses.find(e => e.id === action.id);
+      let updatedBranches = state.businessBranches;
+      if (exp?.branchId) {
+        updatedBranches = state.businessBranches.map(b => {
+          if (b.id !== exp.branchId) return b;
+          return {
+            ...b,
+            entries: (b.entries || []).filter(be => be.id !== 'be_exp_' + exp.id),
+          };
+        });
+      }
+      return {
+        ...state,
+        expenses: state.expenses.filter(e => e.id !== action.id),
+        medicalExpenses: exp?.sourceType === 'medical'
+          ? state.medicalExpenses.filter(m => m.id !== exp.sourceId && m.expenseId !== action.id)
+          : state.medicalExpenses,
+        businessBranches: updatedBranches,
+      };
+    };
     case 'ADD_FINANCE_PAYMENT': return { ...state, financePayments: [...state.financePayments, action.entry] };
     case 'UPDATE_FINANCE_PAYMENT': return { ...state, financePayments: state.financePayments.map(f => f.id === action.entry.id ? action.entry : f) };
     case 'DELETE_FINANCE_PAYMENT': return { ...state, financePayments: state.financePayments.filter(f => f.id !== action.id) };
@@ -538,10 +587,52 @@ function reducer(state: AppState, action: Action): AppState {
     case 'DELETE_BRANCH': return { ...state, businessBranches: state.businessBranches.filter(b => b.id !== action.id) };
     case 'ADD_EMPLOYMENT': return { ...state, employmentProfiles: [...state.employmentProfiles, action.entry] };
     case 'UPDATE_EMPLOYMENT': return { ...state, employmentProfiles: state.employmentProfiles.map(e => e.id === action.entry.id ? action.entry : e) };
-    case 'DELETE_EMPLOYMENT': return { ...state, employmentProfiles: state.employmentProfiles.filter(e => e.id !== action.id) };
-    case 'ADD_OWNER_DRAW': return { ...state, ownerDraws: [...state.ownerDraws, action.entry] };
-    case 'ADD_MEDICAL_EXPENSE': return { ...state, medicalExpenses: [...state.medicalExpenses, action.entry] };
-    case 'DELETE_MEDICAL_EXPENSE': return { ...state, medicalExpenses: state.medicalExpenses.filter(m => m.id !== action.id) };
+    case 'ADD_OWNER_DRAW': {
+      const linkedIncId = 'inc_draw_' + action.entry.id;
+      const comp = state.companies.find(c => c.id === action.entry.companyId);
+      const linkedIncome: IncomeEntry = {
+        id: linkedIncId,
+        source: comp?.name ? `${comp.name} (Draw)` : 'Company Owner Draw',
+        type: 'business',
+        amount: action.entry.amount,
+        frequency: 'one-time',
+        date: action.entry.date,
+      };
+      const alreadyHasIncome = state.income.some(i => i.id === linkedIncId);
+      return {
+        ...state,
+        ownerDraws: [...state.ownerDraws, action.entry],
+        income: alreadyHasIncome ? state.income : [...state.income, linkedIncome],
+      };
+    }
+    case 'ADD_MEDICAL_EXPENSE': {
+      const medExpenseId = action.entry.expenseId || ('exp_med_' + action.entry.id);
+      const alreadyHasExpense = state.expenses.some(e => e.id === medExpenseId || (e.sourceType === 'medical' && e.sourceId === action.entry.id));
+      const linkedExpense: ExpenseEntry = {
+        id: medExpenseId,
+        date: action.entry.date,
+        amount: action.entry.amount,
+        category: 'Medical',
+        note: action.entry.note ? `Medical: ${action.entry.type} · ${action.entry.note}` : `Medical: ${action.entry.type}`,
+        recurring: false,
+        sourceType: 'medical',
+        sourceId: action.entry.id,
+      };
+      return {
+        ...state,
+        medicalExpenses: [...state.medicalExpenses, { ...action.entry, expenseId: medExpenseId }],
+        expenses: alreadyHasExpense ? state.expenses : [...state.expenses, linkedExpense],
+      };
+    }
+    case 'DELETE_MEDICAL_EXPENSE': {
+      const target = state.medicalExpenses.find(m => m.id === action.id);
+      const linkedExpId = target?.expenseId;
+      return {
+        ...state,
+        medicalExpenses: state.medicalExpenses.filter(m => m.id !== action.id),
+        expenses: state.expenses.filter(e => e.id !== linkedExpId && !(e.sourceType === 'medical' && e.sourceId === action.id)),
+      };
+    }
     case 'ADD_DOCUMENT': return { ...state, documents: [...state.documents, action.entry] };
     case 'DELETE_DOCUMENT': return { ...state, documents: state.documents.filter(d => d.id !== action.id) };
     case 'ADD_REMINDER': return { ...state, reminders: [...state.reminders, action.entry] };

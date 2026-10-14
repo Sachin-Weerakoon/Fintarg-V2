@@ -180,6 +180,9 @@ const expenseBaseSchema = z.object({
   paymentMethod: paymentMethodEnum.default('cash'),
   bankAccountId: z.string().optional().nullable(),
   cardId: z.string().optional().nullable(),
+  sourceType: z.enum(['salary', 'business']).optional().default('salary'),
+  companyId: z.string().optional().nullable(),
+  branchId: z.string().optional().nullable(),
 });
 
 const expenseSchema = expenseBaseSchema.superRefine((data, ctx) => {
