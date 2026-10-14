@@ -1,5 +1,6 @@
 'use client';
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useApp, formatRs } from '@/store';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { Card } from '@/components/ui/Card';
@@ -280,6 +281,13 @@ export function BusinessWorkspace() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-shrink-0">
+            {companyId && (
+              <Link href={`/analysis?scope=company&companyId=${companyId}`}>
+                <Button variant="ghost" size="md" iconLeft={<Icon name="analysis" size={14} />}>
+                  Analyze Business
+                </Button>
+              </Link>
+            )}
             <Button
               variant="secondary"
               size="md"
@@ -411,6 +419,28 @@ export function BusinessWorkspace() {
 
       {branch ? (
         <>
+          {/* Branch Analytics Deep-Link Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-surface border border-border shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="w-9 h-9 rounded-xl bg-primary-tint text-primary-text flex items-center justify-center">
+                <Icon name="bank" size={18} />
+              </span>
+              <div>
+                <div className="font-bold text-sm text-text flex items-center gap-2">
+                  <span>{branch.name}</span>
+                  <Badge tone="primary">{branch.branchType || 'Outlet'}</Badge>
+                </div>
+                <div className="text-xs text-muted">{branch.location || 'Headquarters'}</div>
+              </div>
+            </div>
+
+            <Link href={`/analysis?scope=branch&companyId=${companyId}&branchId=${branch.id}`}>
+              <Button variant="secondary" size="sm" iconLeft={<Icon name="analysis" size={14} />} iconRight={<Icon name="chevron-right" size={13} />}>
+                Detailed Branch Analytics & Pacing
+              </Button>
+            </Link>
+          </div>
+
           {/* Key Branch Metrics */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard

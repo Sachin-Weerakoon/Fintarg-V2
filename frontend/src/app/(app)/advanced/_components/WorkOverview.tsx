@@ -1,8 +1,10 @@
 'use client';
 import React from 'react';
+import Link from 'next/link';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
 import { StatCard } from '@/components/ui/StatCard';
+import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 
 export interface WorkOverviewProps {
@@ -44,6 +46,13 @@ export function WorkOverview({ onOpen }: WorkOverviewProps) {
             Combined monthly net position across salary and enterprise branches for {state.selectedMonth}
           </p>
         </div>
+        {hasBusiness && (
+          <Link href="/analysis?scope=company">
+            <Button variant="secondary" size="sm" iconLeft={<Icon name="analysis" size={13} />}>
+              Enterprise Analytics
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

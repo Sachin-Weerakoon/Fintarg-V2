@@ -243,6 +243,7 @@ export interface Agreement {
   summary: string;
   status: 'draft' | 'active' | 'expired';
   fileName: string;
+  companyId?: string;
 }
 
 export interface Company {

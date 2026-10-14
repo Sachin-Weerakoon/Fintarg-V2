@@ -27,6 +27,9 @@ import {
   type TrendPoint,
   type WaterfallStep,
 } from '@/components/charts/Charts';
+import { AnalysisScopeSelector, type AnalysisScope } from './_components/AnalysisScopeSelector';
+import { CompanyAnalysisView } from './_components/CompanyAnalysisView';
+import { BranchAnalysisView } from './_components/BranchAnalysisView';
 import {
   addMonths,
   buildPlan,
@@ -156,11 +159,53 @@ function AnalysisContent() {
   const [trim, setTrim] = useState(10);
   const [extraSave, setExtraSave] = useState(5000);
 
+  // Business & Branch Scope State
+  const rawScope = searchParams.get('scope') as AnalysisScope;
+  const initialScope: AnalysisScope = (['consolidated', 'company', 'branch'] as AnalysisScope[]).includes(rawScope) ? rawScope : 'consolidated';
+  const [scope, setScope] = useState<AnalysisScope>(initialScope);
+
+  const rawCompanyId = searchParams.get('companyId') || '';
+  const [companyId, setCompanyId] = useState(rawCompanyId);
+
+  const rawBranchId = searchParams.get('branchId') || '';
+  const [branchId, setBranchId] = useState(rawBranchId);
+
+  const isBusinessUser =
+    state.profile.plan === 'business' ||
+    state.profile.workMode !== 'salary' ||
+    (state.companies && state.companies.length > 0) ||
+    (state.businessBranches && state.businessBranches.length > 0);
+
+  const selectedCompany = state.companies.find(c => c.id === (companyId || state.companies[0]?.id)) || state.companies[0];
+  const companyBranches = state.businessBranches.filter(b => b.companyId === (selectedCompany?.id || ''));
+  const selectedBranch =
+    state.businessBranches.find(b => b.id === branchId) ||
+    companyBranches[0] ||
+    state.businessBranches[0];
+
   useEffect(() => {
     if (rawTab && (['overview', 'spending', 'forecast', 'goals'] as Tab[]).includes(rawTab) && rawTab !== tab) {
       setTab(rawTab);
     }
   }, [rawTab, tab]);
+
+  useEffect(() => {
+    if (rawScope && (['consolidated', 'company', 'branch'] as AnalysisScope[]).includes(rawScope) && rawScope !== scope) {
+      setScope(rawScope);
+    }
+  }, [rawScope, scope]);
+
+  useEffect(() => {
+    if (rawCompanyId && rawCompanyId !== companyId) {
+      setCompanyId(rawCompanyId);
+    }
+  }, [rawCompanyId, companyId]);
+
+  useEffect(() => {
+    if (rawBranchId && rawBranchId !== branchId) {
+      setBranchId(rawBranchId);
+    }
+  }, [rawBranchId, branchId]);
 
   useEffect(() => {
     if (urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) && urlMonth !== state.selectedMonth) {
@@ -172,6 +217,37 @@ function AnalysisContent() {
     setTab(newTab);
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', newTab);
+    router.replace(`/analysis?${params.toString()}`, { scroll: false });
+  };
+
+  const handleScopeChange = (newScope: AnalysisScope, newCompanyId?: string, newBranchId?: string) => {
+    setScope(newScope);
+    const params = new URLSearchParams(searchParams.toString());
+    if (newScope === 'consolidated') {
+      params.delete('scope');
+      params.delete('companyId');
+      params.delete('branchId');
+    } else if (newScope === 'company') {
+      const coId = newCompanyId || companyId || state.companies[0]?.id || '';
+      params.set('scope', 'company');
+      if (coId) {
+        params.set('companyId', coId);
+        setCompanyId(coId);
+      }
+      params.delete('branchId');
+    } else if (newScope === 'branch') {
+      const coId = newCompanyId || companyId || selectedBranch?.companyId || state.companies[0]?.id || '';
+      const brId = newBranchId || branchId || companyBranches[0]?.id || state.businessBranches[0]?.id || '';
+      params.set('scope', 'branch');
+      if (coId) {
+        params.set('companyId', coId);
+        setCompanyId(coId);
+      }
+      if (brId) {
+        params.set('branchId', brId);
+        setBranchId(brId);
+      }
+    }
     router.replace(`/analysis?${params.toString()}`, { scroll: false });
   };
 
@@ -261,12 +337,26 @@ function AnalysisContent() {
     { id: 'goals', label: 'Goals & Debt', icon: <Icon name="target" size={13} /> },
   ];
 
+  const pageTitle =
+    scope === 'company' && selectedCompany
+      ? `${selectedCompany.name} Intelligence`
+      : scope === 'branch' && selectedBranch
+      ? `${selectedBranch.name} Analytics`
+      : 'Financial Analysis';
+
+  const pageDescription =
+    scope === 'company' && selectedCompany
+      ? 'Consolidated enterprise performance, cross-branch comparison, cash flow waterfall, and forward projections.'
+      : scope === 'branch' && selectedBranch
+      ? `Unit economics, sales rhythm, target pacing, and utility cost drivers for ${selectedBranch.location || 'this operating outlet'}.`
+      : 'Live health score, spending patterns, forecasts and a personalised plan — all computed from your own records.';
+
   return (
     <PageContainer>
       <PageHeader
-        eyebrow="Intelligence"
-        title="Financial Analysis"
-        description="Live health score, spending patterns, forecasts and a personalised plan — all computed from your own records."
+        eyebrow={scope === 'company' ? 'Enterprise' : scope === 'branch' ? 'Branch Unit' : 'Intelligence'}
+        title={pageTitle}
+        description={pageDescription}
         actions={
           <>
             <div className="flex items-center gap-1.5 p-1 rounded-xl bg-surface-hover border border-border no-print">
@@ -278,16 +368,84 @@ function AnalysisContent() {
                 <Icon name="chevron-right" size={16} />
               </Button>
             </div>
-            <Link href="/print/analysis" target="_blank" className="no-print">
-              <Button variant="secondary" size="sm" iconLeft={<Icon name="download" size={14} />}>
-                Export PDF
+            {scope === 'consolidated' ? (
+              <Link href="/print/analysis" target="_blank" className="no-print">
+                <Button variant="secondary" size="sm" iconLeft={<Icon name="download" size={14} />}>
+                  Export PDF
+                </Button>
+              </Link>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => window.print()}
+                iconLeft={<Icon name="download" size={14} />}
+                className="no-print"
+              >
+                Export Report
               </Button>
-            </Link>
+            )}
           </>
         }
       />
 
-      {!hasData ? (
+      {isBusinessUser && (
+        <AnalysisScopeSelector
+          scope={scope}
+          companyId={selectedCompany?.id || ''}
+          branchId={selectedBranch?.id || ''}
+          onScopeChange={handleScopeChange}
+        />
+      )}
+
+      {scope === 'company' ? (
+        selectedCompany ? (
+          <CompanyAnalysisView
+            company={selectedCompany}
+            month={month}
+            today={today}
+            onSelectBranch={bId => handleScopeChange('branch', selectedCompany.id, bId)}
+          />
+        ) : (
+          <Card className="p-8 text-center">
+            <EmptyState
+              title="No Companies Registered"
+              helper="Register your enterprise corporate entity to unlock multi-branch intelligence and company waterfalls."
+              action={
+                <Link href="/advanced?tab=businesses">
+                  <Button variant="primary" size="sm">
+                    Add Company
+                  </Button>
+                </Link>
+              }
+            />
+          </Card>
+        )
+      ) : scope === 'branch' ? (
+        selectedBranch ? (
+          <BranchAnalysisView
+            branch={selectedBranch}
+            company={state.companies.find(c => c.id === selectedBranch.companyId)}
+            month={month}
+            today={today}
+            onBackToCompany={() => handleScopeChange('company', selectedBranch.companyId)}
+          />
+        ) : (
+          <Card className="p-8 text-center">
+            <EmptyState
+              title="No Branches Registered"
+              helper="Register an operating outlet to track unit economics, daily sales rhythm, and target pacing."
+              action={
+                <Link href="/advanced?tab=businesses">
+                  <Button variant="primary" size="sm">
+                    Add Branch
+                  </Button>
+                </Link>
+              }
+            />
+          </Card>
+        )
+      ) : !hasData ? (
         <Card>
           <EmptyState
             title="Nothing to analyse yet"
