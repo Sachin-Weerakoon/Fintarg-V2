@@ -223,7 +223,7 @@ function GoalsContent() {
   };
 
   return (
-    <PageContainer width="narrow">
+    <PageContainer>
       {/* Header row */}
       <PageHeader
         title="Savings & Goals"
@@ -324,12 +324,12 @@ function GoalsContent() {
           <div className="font-semibold text-sm text-text">Personal / Enjoyment spending plan</div>
           <Badge tone="neutral" size="sm">Auto-tracked from expenses</Badge>
         </div>
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-3 sm:gap-6 mb-3">
-          <div className="col-span-2 sm:col-span-1">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 items-end">
+          <div className="col-span-2 lg:col-span-1">
             <Field id="personal-budget" label="Monthly budget (Rs.)">
               <Input
                 id="personal-budget"
-                className="w-full sm:!w-36"
+                className="w-full"
                 type="number"
                 min="0"
                 value={budgetInput}
@@ -337,17 +337,17 @@ function GoalsContent() {
               />
             </Field>
           </div>
-          <div className="bg-surface-hover/40 p-2.5 rounded-xl border border-border/60 sm:bg-transparent sm:p-0 sm:border-0">
+          <div className="p-3 rounded-xl border border-border bg-surface-hover/50">
             <div className="text-[11px] text-muted mb-0.5">Actual spent</div>
             <div className="text-base sm:text-lg font-bold text-text num">{formatRs(personalSpent)}</div>
           </div>
-          <div className="bg-surface-hover/40 p-2.5 rounded-xl border border-border/60 sm:bg-transparent sm:p-0 sm:border-0">
+          <div className="p-3 rounded-xl border border-border bg-surface-hover/50">
             <div className="text-[11px] text-muted mb-0.5">Remaining</div>
             <div className={`text-base sm:text-lg font-bold num ${personalRemaining < 0 ? 'text-danger-text' : 'text-success-text'}`}>
               {formatRs(personalRemaining)}
             </div>
           </div>
-          <div className="col-span-2 sm:col-span-1 bg-surface-hover/40 p-2.5 rounded-xl border border-border/60 sm:bg-transparent sm:p-0 sm:border-0">
+          <div className="p-3 rounded-xl border border-border bg-surface-hover/50">
             <div className="text-[11px] text-muted mb-0.5">Daily allowance</div>
             <div className="text-base sm:text-lg font-bold text-text num">{formatRs(personalAllowance.dailyAllowance)} / day</div>
           </div>

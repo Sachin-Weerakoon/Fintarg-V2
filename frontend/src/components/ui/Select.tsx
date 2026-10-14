@@ -21,14 +21,14 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function 
     <div className="group relative flex items-center w-full">
       <select
         ref={ref}
-        className={`form-input w-full appearance-none !pr-9.5 !pl-3.5 cursor-pointer select-none ${errorStyles} ${className}`.trim()}
+        className={`form-input w-full appearance-none !pr-10 !pl-3.5 cursor-pointer select-none ${errorStyles} ${className}`.trim()}
         {...props}
       >
         {children}
       </select>
-      <div className="pointer-events-none absolute right-3 flex items-center text-muted transition-colors duration-200 group-focus-within:text-primary-600 dark:group-focus-within:text-primary-400">
+      <div className="pointer-events-none absolute inset-y-0 right-3.5 flex items-center text-muted transition-colors duration-200 group-hover:text-text group-focus-within:text-primary-600 dark:group-focus-within:text-primary-400">
         <svg
-          className="w-4 h-4 transition-transform duration-200"
+          className="w-4 h-4 transition-transform duration-200 group-focus-within:rotate-180"
           viewBox="0 0 20 20"
           fill="none"
           stroke="currentColor"

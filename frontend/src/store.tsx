@@ -19,7 +19,7 @@ const initialState: AppState = {
   selectedMonth: SEP_2026,
   profile: {
     name: 'Kasun', address: '', dateOfBirth: '', nicNumber: '', portfolioLink: '',
-    email: '', mobile: '', plan: 'basic', workMode: 'salary', themeColor: '#0FA3B1', darkMode: false,
+    email: '', mobile: '', plan: 'basic', workMode: 'salary', themeColor: '#0FA3B1', darkMode: true,
     textSize: 'medium', colorText: '', colorMuted: '', colorBg: '', colorSurface: '',
     contacts: [], bankName: '', bankBranch: '', accountName: '', accountNumber: '',
   },
@@ -588,7 +588,11 @@ const AppContext = createContext<{
 export function AppProvider({ children, initialProfile = {} }: { children: ReactNode; initialProfile?: Partial<AppState['profile']> }) {
   const [state, reduce] = useReducer(reducer, {
     ...emptyInitialState,
-    profile: { ...emptyInitialState.profile, ...initialProfile },
+    profile: {
+      ...emptyInitialState.profile,
+      ...initialProfile,
+      darkMode: initialProfile?.darkMode !== undefined ? initialProfile.darkMode : true,
+    },
   });
   const stateRef = useRef(state);
   stateRef.current = state;

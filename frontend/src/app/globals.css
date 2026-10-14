@@ -71,12 +71,12 @@
   --color-surface: #FFFFFF;
   --color-surface-hover: #F1F5F9;
   --color-border: #E2E8F0;
-  --color-border-input: #8091A7;
+  --color-border-input: #CBD5E1;
   --color-card-border: #E2E8F0;
   --color-text: #0F172A;
   --color-text-2: #334155;
   --color-muted: #5B6B80;
-  --color-placeholder: #66758A;
+  --color-placeholder: #94A3B8;
 
   /* Brand - Calm Teal (#0FA3B1 default) */
   --color-primary: #0FA3B1;
@@ -129,12 +129,12 @@
   --color-surface: #111A2B;
   --color-surface-hover: #172338;
   --color-border: #223049;
-  --color-border-input: #66788F;
+  --color-border-input: #26354A;
   --color-card-border: #223049;
   --color-text: #E8EEF7;
   --color-text-2: #C3CCD9;
   --color-muted: #9AA9BF;
-  --color-placeholder: #8091A7;
+  --color-placeholder: #64748B;
 
   /* Brand */
   --color-primary: #35C2D0;
@@ -383,6 +383,7 @@ body:has(.dark-mode) {
 }
 
 /* Form inputs: modern 10px radius, smooth transitions, min 16px font on mobile to prevent iOS auto-zoom */
+/* Form inputs: modern 11px radius, smooth transitions, min 16px font on mobile to prevent iOS auto-zoom */
 .form-label {
   display: flex;
   align-items: center;
@@ -396,48 +397,89 @@ body:has(.dark-mode) {
 
 .form-input {
   width: 100%;
-  border: 1.5px solid var(--color-border-input);
-  border-radius: 10px;
-  padding: 8px 13px;
+  border: 1px solid var(--color-border-input);
+  border-radius: 11px;
+  padding: 9px 14px;
   font-size: 16px; /* 16px on mobile prevents iOS auto-zoom */
   font-family: inherit;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   color: var(--color-text);
   background: var(--color-surface);
+  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
   transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
   outline: none;
   min-height: 44px;
 }
 @media (min-width: 640px) {
   .form-input {
-    min-height: 40px;
+    min-height: 42px;
     font-size: 14px;
   }
 }
 .form-input:hover {
-  border-color: var(--color-primary-600);
+  border-color: #94A3B8;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.08);
 }
 .form-input:focus {
   border-color: var(--color-primary-600);
-  box-shadow: 0 0 0 3px rgba(15, 163, 177, 0.18), 0 1px 2px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 0 0 3.5px rgba(15, 163, 177, 0.16), 0 1px 2px rgba(15, 23, 42, 0.05);
+  background-color: var(--color-surface);
 }
 .dark-mode .form-input {
   background-color: #0E1626;
   border-color: #24344D;
-  color: var(--color-text);
+  color: #F1F5F9;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.02);
 }
 .dark-mode .form-input:hover {
-  border-color: var(--color-primary-400);
+  border-color: #3B5170;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.35);
 }
 .dark-mode .form-input:focus {
   border-color: var(--color-primary-400);
   background-color: #0B1322;
-  box-shadow: 0 0 0 3px rgba(53, 194, 208, 0.22), 0 2px 4px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 3.5px rgba(53, 194, 208, 0.22), 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 .form-input::placeholder {
   color: var(--color-placeholder);
+  font-weight: 400;
 }
 .dark-mode .form-input::placeholder {
   color: #64748B;
+  font-weight: 400;
+}
+.form-input:disabled {
+  background-color: var(--color-surface-hover);
+  color: var(--color-muted);
+  border-color: var(--color-border);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+.dark-mode .form-input:disabled {
+  background-color: #0B1220;
+  border-color: #1A273C;
+  color: #64748B;
+}
+
+/* Chrome autofill overrides to preserve theme aesthetics */
+.form-input:-webkit-autofill,
+.form-input:-webkit-autofill:hover,
+.form-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-text);
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-surface) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.dark-mode .form-input:-webkit-autofill,
+.dark-mode .form-input:-webkit-autofill:hover,
+.dark-mode .form-input:-webkit-autofill:focus,
+.form-input-dark:-webkit-autofill,
+.form-input-dark:-webkit-autofill:hover,
+.form-input-dark:-webkit-autofill:focus {
+  -webkit-text-fill-color: #F1F5F9 !important;
+  -webkit-box-shadow: 0 0 0px 1000px #0E1626 inset !important;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 /* Luxury SaaS Form Card */
@@ -469,20 +511,24 @@ body:has(.dark-mode) {
 
 /* Explicit dark input utility to match theme */
 .form-input-dark {
-  background-color: #0E1626 !important;
-  border: 1.5px solid #24344D !important;
-  color: #E8EEF7 !important;
+  background-color: rgba(13, 21, 37, 0.85) !important;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #F1F5F9 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.03) !important;
 }
 .form-input-dark:hover {
-  border-color: #35C2D0 !important;
+  border-color: rgba(53, 194, 208, 0.5) !important;
+  box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.3) !important;
 }
 .form-input-dark:focus {
   border-color: #35C2D0 !important;
-  background-color: #0B1322 !important;
-  box-shadow: 0 0 0 3px rgba(53, 194, 208, 0.25) !important;
+  background-color: #0A1220 !important;
+  box-shadow: 0 0 0 3.5px rgba(53, 194, 208, 0.25), 0 2px 8px rgba(0, 0, 0, 0.4) !important;
 }
 .form-input-dark::placeholder {
-  color: #64748B !important;
+  color: #7D8FA9 !important;
+  font-weight: 400 !important;
 }
 
 /* Onboarding & Auth Card */
@@ -499,11 +545,65 @@ body:has(.dark-mode) {
 select option {
   background-color: var(--color-surface);
   color: var(--color-text);
+  padding: 8px 12px;
 }
 
-.dark-mode select option {
-  background-color: #111A2B;
+.dark-mode select option,
+.form-input-dark option {
+  background-color: #0E1626;
   color: #E8EEF7;
+}
+
+/* Clean date picker native webkit calendar indicator */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.65;
+  padding: 2px;
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+.dark-mode input[type="date"]::-webkit-calendar-picker-indicator,
+.form-input-dark::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+}
+
+/* Modern Range Slider */
+input[type="range"] {
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--color-border);
+  outline: none;
+  transition: background 0.2s ease;
+}
+.dark-mode input[type="range"] {
+  background: #24344D;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-primary-500);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 0 0 2px var(--color-surface);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 0 0 2px var(--color-surface), 0 0 0 4px rgba(15, 163, 177, 0.2);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-primary-500);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
 }
 
 /* Badges: chips fully rounded per spec */

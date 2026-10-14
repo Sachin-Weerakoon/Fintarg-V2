@@ -18,6 +18,8 @@ import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import { EmptyState } from '@/components/ui/EmptyState';
 
+import { FormalLetterSheet } from '@/components/ui/FormalLetterSheet';
+
 type Template = 'bank' | 'offer' | 'general';
 
 function generateBody(
@@ -153,15 +155,26 @@ export default function LettersClient() {
     setEditBody(body);
     setEditing(false);
     setSaved(false);
+    try {
+      sessionStorage.setItem('fintarg_current_letter', JSON.stringify({
+        body,
+        mode,
+        date: new Date().toLocaleDateString('en-LK', { day: 'numeric', month: 'long', year: 'numeric' }),
+        companyId: mode === 'business' ? selectedCompanyId : undefined,
+      }));
+    } catch {
+      // ignore
+    }
   };
 
   const save = () => {
     const finalBody = editing ? editBody : generated;
     if (!finalBody) return;
+    const newId = 'lt_' + Date.now();
     dispatch({
       type: 'ADD_LETTER',
       entry: {
-        id: 'lt_' + Date.now(),
+        id: newId,
         type: template,
         mode,
         date: new Date().toISOString().slice(0, 10),
@@ -172,12 +185,23 @@ export default function LettersClient() {
       },
     });
     setSaved(true);
+    toast.success('Letter saved to history');
+    try {
+      sessionStorage.setItem('fintarg_current_letter', JSON.stringify({
+        body: finalBody,
+        mode,
+        date: new Date().toLocaleDateString('en-LK', { day: 'numeric', month: 'long', year: 'numeric' }),
+        companyId: mode === 'business' ? selectedCompanyId : undefined,
+      }));
+    } catch {
+      // ignore
+    }
   };
 
   const latestId = state.letters.length > 0 ? state.letters[state.letters.length - 1].id : null;
 
   return (
-    <PageContainer width="narrow">
+    <PageContainer>
       <PageHeader
         title="Formal Letter Generator"
         description="Draft, customize, and export Sri Lankan legal and banking correspondence."
@@ -334,20 +358,20 @@ export default function LettersClient() {
         {/* Preview panel */}
         <div className="md:col-span-3">
           {generated ? (
-            <Card className="p-5 flex flex-col min-h-[400px]">
-              <div className="flex items-center justify-between mb-4 flex-wrap gap-2 no-print">
-                <div className="font-semibold text-sm text-text flex items-center gap-2">
+            <div className="flex flex-col gap-3">
+              <div className="p-3 rounded-2xl bg-surface border border-border flex items-center justify-between flex-wrap gap-2 no-print shadow-xs">
+                <div className="font-semibold text-xs sm:text-sm text-text flex items-center gap-2 pl-1">
                   <span>Letter Preview</span>
                   {saved && <Badge tone="success" size="sm">Saved</Badge>}
                 </div>
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setEditing(v => !v)}
                     iconLeft={<Icon name={editing ? 'check' : 'edit'} size={14} />}
                   >
-                    {editing ? 'Preview' : 'Edit text'}
+                    {editing ? 'View Letterhead' : 'Edit Text'}
                   </Button>
                   <Button
                     variant="secondary"
@@ -366,19 +390,35 @@ export default function LettersClient() {
               </div>
 
               {editing ? (
-                <Textarea
-                  className="font-mono text-xs flex-1 !min-h-[360px]"
-                  value={editBody}
-                  onChange={e => setEditBody(e.target.value)}
-                />
+                <Card className="p-4">
+                  <Textarea
+                    className="font-mono text-xs flex-1 !min-h-[420px]"
+                    value={editBody}
+                    onChange={e => {
+                      setEditBody(e.target.value);
+                      try {
+                        sessionStorage.setItem('fintarg_current_letter', JSON.stringify({
+                          body: e.target.value,
+                          mode,
+                          date: new Date().toLocaleDateString('en-LK', { day: 'numeric', month: 'long', year: 'numeric' }),
+                          companyId: mode === 'business' ? selectedCompanyId : undefined,
+                        }));
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                  />
+                </Card>
               ) : (
-                <div
-                  className="flex-1 rounded-xl p-6 text-xs whitespace-pre-wrap leading-relaxed border border-border bg-surface text-text font-mono min-h-[360px]"
-                >
-                  {editing ? editBody : generated}
-                </div>
+                <FormalLetterSheet
+                  body={editing ? editBody : generated}
+                  date={new Date().toLocaleDateString('en-LK', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  mode={mode}
+                  companyName={selectedCompany?.name}
+                  className="shadow-sm"
+                />
               )}
-            </Card>
+            </div>
           ) : (
             <EmptyState
               icon={<Icon name="documents" size={28} />}

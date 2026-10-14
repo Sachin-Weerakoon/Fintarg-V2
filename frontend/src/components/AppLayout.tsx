@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { logout } from '@/actions/logout';
-import { AppProvider } from '@/store';
+import { AppProvider, useApp } from '@/store';
 import { deriveBrand, validateCustomOverrides, THEME_COLORS } from '@/lib/theme';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Avatar } from '@/components/ui/Avatar';
@@ -63,26 +63,29 @@ function pageTitleOf(pathname: string, tab?: string): string {
   return 'Fintarg';
 }
 
-export default function AppLayout({
+function AppLayoutInner({
   user,
   children,
 }: {
   user: { name: string; email: string; plan: string; workMode: string; profile: any };
   children: React.ReactNode;
 }) {
+  const { state } = useApp();
+  const profile = state?.profile || user.profile || {};
   const pathname = usePathname() || '/';
   const router = useRouter();
   const searchParams = useSearchParams();
   const [moreOpen, setMoreOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  const primary = user.profile?.themeColor || THEME_COLORS[0];
+  const primary = profile?.themeColor || user.profile?.themeColor || THEME_COLORS[0];
   const modeLabel = user.workMode === 'both' ? 'Job + Business' : user.workMode === 'business' ? 'Business' : 'Salary';
-  const textSizeClass = `text-size-${user.profile?.textSize || 'medium'}`;
-  const isDark = Boolean(user.profile?.darkMode);
+  const textSizeClass = `text-size-${profile?.textSize || user.profile?.textSize || 'medium'}`;
+  const isDark = profile?.darkMode !== undefined ? Boolean(profile.darkMode) : (user.profile?.darkMode !== undefined ? Boolean(user.profile.darkMode) : true);
   const darkClass = isDark ? 'dark-mode' : '';
 
   const brandVars = deriveBrand(primary, isDark);
-  const { validOverrides } = !isDark && user.profile ? validateCustomOverrides(user.profile) : { validOverrides: {} };
+  const effectiveProfile = profile || user.profile;
+  const { validOverrides } = !isDark && effectiveProfile ? validateCustomOverrides(effectiveProfile) : { validOverrides: {} };
   const layoutStyle = {
     ...brandVars,
     ...validOverrides,
@@ -114,8 +117,7 @@ export default function AppLayout({
   };
 
   return (
-    <AppProvider initialProfile={{ ...(user.profile || {}), plan: (user.plan as any) || user.profile?.plan || 'basic', workMode: user.workMode as any }}>
-      <div className={`min-h-screen flex flex-col ${darkClass} ${textSizeClass}`} style={layoutStyle}>
+    <div className={`min-h-screen flex flex-col bg-bg text-text ${darkClass} ${textSizeClass}`} style={layoutStyle}>
         {/* Skip to main content accessibility link */}
         <a
           href="#main-content"
@@ -231,7 +233,7 @@ export default function AppLayout({
               </div>
             </header>
 
-            <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-8 focus:outline-none bg-background">
+            <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-8 focus:outline-none bg-bg">
               {children}
             </main>
           </div>
@@ -274,7 +276,7 @@ export default function AppLayout({
             </div>
           </header>
 
-          <main id="main-content" tabIndex={-1} className="mobile-main flex-1 overflow-y-auto p-4 pb-28 focus:outline-none bg-background">
+          <main id="main-content" tabIndex={-1} className="mobile-main flex-1 overflow-y-auto p-4 pb-28 focus:outline-none bg-bg">
             {children}
           </main>
 
@@ -352,6 +354,27 @@ export default function AppLayout({
           )}
         </div>
       </div>
+  );
+}
+
+export default function AppLayout({
+  user,
+  children,
+}: {
+  user: { name: string; email: string; plan: string; workMode: string; profile: any };
+  children: React.ReactNode;
+}) {
+  const initialDarkMode = user.profile?.darkMode !== undefined ? Boolean(user.profile.darkMode) : true;
+  return (
+    <AppProvider
+      initialProfile={{
+        ...(user.profile || {}),
+        darkMode: initialDarkMode,
+        plan: (user.plan as any) || user.profile?.plan || 'basic',
+        workMode: user.workMode as any,
+      }}
+    >
+      <AppLayoutInner user={user}>{children}</AppLayoutInner>
     </AppProvider>
   );
 }
