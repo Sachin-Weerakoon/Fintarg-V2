@@ -154,25 +154,25 @@ export function PaymentMethodField({
                   disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
                 } ${
                   isSelected
-                    ? 'border-primary-500 bg-primary-tint/20 ring-1 ring-primary-500/40 shadow-sm text-text'
-                    : 'border-border bg-surface hover:bg-surface-hover hover:border-border/80 text-muted'
+                    ? 'border-primary-500 bg-primary-tint/30 dark:bg-primary-tint/15 ring-1 ring-primary-500/50 shadow-sm text-text'
+                    : 'border-border bg-surface hover:bg-surface-hover hover:border-slate-300 dark:hover:border-slate-600 text-muted'
                 }`}
               >
                 <div className="flex items-center justify-between w-full">
                   <div
                     className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
                       isSelected
-                        ? 'bg-primary-500 text-white'
+                        ? 'bg-primary-500 text-white shadow-xs'
                         : 'bg-surface-hover text-muted'
                     }`}
                   >
                     {box.icon}
                   </div>
                   <div
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                    className={`w-4.5 h-4.5 rounded-full border-[1.5px] flex items-center justify-center transition-all ${
                       isSelected
-                        ? 'border-primary-500 bg-primary-500 text-white text-[10px] font-bold'
-                        : 'border-border'
+                        ? 'border-primary-500 bg-primary-500 text-white text-[10px] font-bold shadow-xs'
+                        : 'border-slate-300 dark:border-slate-600 bg-surface'
                     }`}
                   >
                     {isSelected && '✓'}

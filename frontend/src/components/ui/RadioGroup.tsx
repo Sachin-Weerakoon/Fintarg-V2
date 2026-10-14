@@ -72,14 +72,14 @@ export function RadioGroup<T extends string = string>({
                 <div className="flex items-center gap-2">
                   {opt.badge}
                   <div
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                    className={`w-4.5 h-4.5 rounded-full border-[1.5px] flex items-center justify-center transition-all shadow-xs ${
                       isSelected
-                        ? 'border-primary-600 bg-primary-600 text-on-primary font-bold text-[10px]'
-                        : 'border-border-input bg-surface'
+                        ? 'border-primary-600 bg-primary-600 text-white'
+                        : 'border-slate-300 dark:border-slate-600 bg-surface'
                     }`}
                   >
                     {isSelected && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-on-primary" />
+                      <span className="w-2 h-2 rounded-full bg-white shadow-xs" />
                     )}
                   </div>
                 </div>
@@ -111,7 +111,7 @@ export function RadioGroup<T extends string = string>({
             aria-checked={isSelected}
             tabIndex={isSelected ? 0 : -1}
             onKeyDown={e => handleKeyDown(e, idx)}
-            className={`flex items-start gap-2.5 select-none ${
+            className={`group flex items-start gap-2.5 select-none ${
               opt.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
             }`}
           >
@@ -123,16 +123,16 @@ export function RadioGroup<T extends string = string>({
               checked={isSelected}
               disabled={opt.disabled}
               onChange={() => onChange(opt.value)}
-              className="sr-only"
+              className="peer sr-only"
             />
             <div
-              className={`w-4 h-4 rounded-full border flex items-center justify-center mt-0.5 transition-colors ${
+              className={`w-4.5 h-4.5 rounded-full border-[1.5px] flex items-center justify-center mt-0.5 transition-all shadow-xs peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500/40 peer-focus-visible:ring-offset-2 ${
                 isSelected
                   ? 'border-primary-600 bg-primary-600'
-                  : 'border-border-input bg-surface hover:border-primary-600'
+                  : 'border-slate-300 dark:border-slate-600 bg-surface group-hover:border-primary-500'
               }`}
             >
-              {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-on-primary" />}
+              {isSelected && <span className="w-2 h-2 rounded-full bg-white shadow-xs" />}
             </div>
             <div>
               <div className="text-xs font-semibold text-text flex items-center gap-2">
@@ -140,7 +140,7 @@ export function RadioGroup<T extends string = string>({
                 {opt.badge}
               </div>
               {opt.description && (
-                <div className="text-[11px] text-muted mt-0.5">{opt.description}</div>
+                <div className="text-[11px] text-muted mt-0.5 leading-relaxed">{opt.description}</div>
               )}
             </div>
           </label>

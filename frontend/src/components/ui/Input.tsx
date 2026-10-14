@@ -24,7 +24,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
     return (
       <div className="group relative flex items-center w-full">
         {iconLeft && (
-          <div className="absolute left-3.5 flex items-center pointer-events-none text-muted transition-colors duration-200 group-focus-within:text-primary-600 dark:group-focus-within:text-primary-400">
+          <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-muted transition-colors duration-200 group-focus-within:text-primary-600 dark:group-focus-within:text-primary-400 select-none">
             {iconLeft}
           </div>
         )}
@@ -34,7 +34,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
           {...props}
         />
         {iconRight && (
-          <div className="absolute right-3.5 flex items-center pointer-events-none text-muted transition-colors duration-200 group-focus-within:text-primary-600 dark:group-focus-within:text-primary-400">
+          <div className="absolute inset-y-0 right-3.5 flex items-center pointer-events-none text-muted transition-colors duration-200 group-focus-within:text-primary-600 dark:group-focus-within:text-primary-400 select-none">
             {iconRight}
           </div>
         )}

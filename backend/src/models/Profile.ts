@@ -44,7 +44,7 @@ const ProfileSchema = new Schema<IProfile>({
   plan: { type: String, enum: ['basic', 'business'], required: true },
   workMode: { type: String, enum: ['salary', 'business', 'both'], required: true },
   themeColor: { type: String, default: '#0FA3B1' },
-  darkMode: { type: Boolean, default: false },
+  darkMode: { type: Boolean, default: true },
   textSize: { type: String, enum: ['small', 'medium', 'large'], default: 'medium' },
   colorText: { type: String, default: '' },
   colorMuted: { type: String, default: '' },

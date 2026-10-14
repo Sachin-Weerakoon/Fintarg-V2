@@ -162,10 +162,10 @@ function AppearanceTab() {
 
         <SettingRow
           label="Dark Mode Theme"
-          description="High-contrast dark navy palette optimized for low-light environments."
+          description="High-contrast dark navy palette optimized for low-light environments. Turn off to switch to light mode."
           control={
             <Switch
-              checked={Boolean(profile.darkMode)}
+              checked={profile.darkMode !== undefined ? Boolean(profile.darkMode) : true}
               onChange={val => update({ darkMode: val })}
               aria-label="Toggle dark mode"
             />

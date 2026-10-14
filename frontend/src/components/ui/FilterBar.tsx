@@ -38,8 +38,8 @@ export function FilterBar({
     >
       <div className="flex flex-1 flex-wrap items-center gap-2 min-w-0">
         {onSearchChange !== undefined && (
-          <div className="relative flex-1 sm:max-w-xs min-w-[180px]">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
+          <div className="group relative flex-1 sm:max-w-xs min-w-[180px]">
+            <div className="absolute inset-y-0 left-3 flex items-center text-muted group-focus-within:text-primary-600 dark:group-focus-within:text-primary-400 pointer-events-none transition-colors">
               <Icon name="search" size={14} />
             </div>
             <input
@@ -47,13 +47,13 @@ export function FilterBar({
               value={search || ''}
               onChange={e => onSearchChange(e.target.value)}
               placeholder={searchPlaceholder}
-              className="form-input !h-9 !py-1.5 !pl-8.5 !pr-3 text-xs w-full"
+              className="form-input !h-9.5 !py-1.5 !pl-8.5 !pr-7 text-xs w-full shadow-xs"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => onSearchChange('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-text text-xs p-0.5"
+                className="absolute inset-y-0 right-2 my-auto h-5 w-5 rounded-full bg-slate-200/80 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center justify-center text-muted hover:text-text text-[10px] transition-colors cursor-pointer"
                 aria-label="Clear search"
               >
                 ✕

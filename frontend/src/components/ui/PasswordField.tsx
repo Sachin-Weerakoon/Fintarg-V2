@@ -11,19 +11,21 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
   function PasswordField({ hasError = false, iconLeft, className = '', ...props }, ref) {
     const [visible, setVisible] = useState(false);
 
+    const errorStyles = hasError
+      ? '!border-danger-solid focus:!border-danger-solid focus:!ring-4 focus:!ring-danger-solid/15 !shadow-[0_0_0_1px_rgba(220,38,38,0.2)]'
+      : '';
+
     return (
-      <div className="relative flex items-center w-full">
+      <div className="group relative flex items-center w-full">
         {iconLeft && (
-          <div className="absolute left-3.5 flex items-center pointer-events-none text-muted">
+          <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-muted transition-colors duration-200 group-focus-within:text-primary-600 dark:group-focus-within:text-primary-400 select-none">
             {iconLeft}
           </div>
         )}
         <input
           ref={ref}
           type={visible ? 'text' : 'password'}
-          className={`form-input w-full ${iconLeft ? '!pl-10' : ''} !pr-10 ${
-            hasError ? '!border-danger-solid focus:!border-danger-solid' : ''
-          } ${className}`.trim()}
+          className={`form-input w-full ${iconLeft ? '!pl-10.5' : ''} !pr-11 ${errorStyles} ${className}`.trim()}
           {...props}
         />
         <button
@@ -32,9 +34,9 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
           onClick={() => setVisible(v => !v)}
           aria-label={visible ? 'Hide password' : 'Show password'}
           aria-pressed={visible}
-          className="absolute right-2.5 p-1 rounded-md text-muted hover:text-text hover:bg-surface-hover transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="absolute inset-y-0 right-2 my-auto flex items-center justify-center h-7 w-7 rounded-lg text-muted hover:text-text hover:bg-surface-hover/80 dark:hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/40 cursor-pointer"
         >
-          <Icon name={visible ? 'eye-off' : 'eye'} size={18} />
+          <Icon name={visible ? 'eye-off' : 'eye'} size={16} />
         </button>
       </div>
     );

@@ -95,8 +95,8 @@ export const MoneyField = React.forwardRef<HTMLInputElement, MoneyFieldProps>(fu
 
     return (
     <div className="group relative flex items-center w-full">
-      <div className="absolute left-2.5 flex items-center pointer-events-none select-none z-10">
-        <span className="px-2 py-0.5 rounded-md bg-primary-tint/70 dark:bg-primary-tint/25 text-primary-text font-bold text-[11px] uppercase tracking-wider border border-primary-500/25 transition-colors duration-200 group-focus-within:border-primary-500 group-focus-within:bg-primary-tint">
+      <div className="absolute inset-y-0 left-2.5 flex items-center pointer-events-none select-none z-10">
+        <span className="px-2.5 py-1 rounded-lg bg-primary-tint/80 dark:bg-primary-tint/30 text-primary-text font-bold text-[11px] uppercase tracking-wider border border-primary-500/30 transition-all duration-200 group-focus-within:border-primary-500 group-focus-within:bg-primary-tint shadow-xs">
           {currency}
         </span>
       </div>
