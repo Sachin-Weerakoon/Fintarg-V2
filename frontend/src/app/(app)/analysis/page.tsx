@@ -346,10 +346,10 @@ function AnalysisContent() {
 
   const pageDescription =
     scope === 'company' && selectedCompany
-      ? 'Consolidated enterprise performance, cross-branch comparison, cash flow waterfall, and forward projections.'
+      ? 'Consolidated enterprise performance, cross-branch comparison, and forward projections.'
       : scope === 'branch' && selectedBranch
-      ? `Unit economics, sales rhythm, target pacing, and utility cost drivers for ${selectedBranch.location || 'this operating outlet'}.`
-      : 'Live health score, spending patterns, forecasts and a personalised plan — all computed from your own records.';
+      ? `Unit economics, sales rhythm, and target pacing for ${selectedBranch.location || 'this operating outlet'}.`
+      : 'Health scores, spending patterns, forecasts, and financial milestones.';
 
   return (
     <PageContainer>
@@ -547,7 +547,7 @@ function AnalysisContent() {
                 <SectionTitle
                   icon="analysis"
                   title="Income vs outflow — history & forecast"
-                  hint="Solid lines are your actuals. Dashed lines project the next 3 months from your recent trend; the shaded band is the likely range of spending."
+                  hint="Solid lines represent actuals. Dashed lines project the next 3 months with expected variance."
                   right={
                     <div className="hidden sm:flex items-center gap-4 text-[11px] text-muted flex-shrink-0">
                       <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-success-solid" /> Income</span>
@@ -571,7 +571,7 @@ function AnalysisContent() {
 
               <div className="grid lg:grid-cols-2 gap-5">
                 <Card>
-                  <SectionTitle icon="target" title="Your path to financial success" hint="Ranked actions with the biggest impact on your situation right now." />
+                  <SectionTitle icon="target" title="Action plan" hint="Ranked actions with the highest financial impact." />
                   <ol className="space-y-3">
                     {plan.map((s, idx) => (
                       <li key={s.id}>
@@ -595,7 +595,7 @@ function AnalysisContent() {
                 </Card>
 
                 <Card>
-                  <SectionTitle icon="shield" title="Financial independence ladder" hint="Six milestones from stability to full resilience." />
+                  <SectionTitle icon="shield" title="Financial independence milestones" hint="Key milestones from emergency buffer to long-term resilience." />
                   <ul className="space-y-3.5">
                     {ladder.map(r => (
                       <li key={r.id}>
@@ -641,7 +641,7 @@ function AnalysisContent() {
                 </Card>
 
                 <Card className="lg:col-span-3">
-                  <SectionTitle icon="analysis" title="Category movement" hint="Compared with your 3‑month average — spikes are flagged so nothing creeps up unnoticed." />
+                  <SectionTitle icon="analysis" title="Category movement" hint="Compared with your 3-month trailing average with anomaly alerts." />
                   {cats.length === 0 ? (
                     <p className="text-xs text-muted">No category data yet.</p>
                   ) : (
@@ -782,7 +782,7 @@ function AnalysisContent() {
 
               <div className="grid lg:grid-cols-2 gap-5">
                 <Card>
-                  <SectionTitle icon="bolt" title="What if I trim discretionary spending?" hint="Drag to see the monthly and yearly effect on your forecast. Essentials like rent and utilities are left untouched." />
+                  <SectionTitle icon="bolt" title="Discretionary trim simulator" hint="Simulate savings without altering fixed obligations like rent and utilities." />
                   <div className="flex items-center gap-4 mb-5">
                     <input
                       type="range"
@@ -814,7 +814,7 @@ function AnalysisContent() {
                 </Card>
 
                 <Card>
-                  <SectionTitle icon="shield" title="How fast can I build a 3‑month cushion?" hint="Set aside an extra amount each month and see when your emergency fund is complete." />
+                  <SectionTitle icon="shield" title="Emergency cushion simulator" hint="Simulate target completion dates based on monthly contribution rate." />
                   <div className="flex items-center gap-4 mb-5">
                     <input
                       type="range"
@@ -899,7 +899,7 @@ function AnalysisContent() {
 
               <div className="grid lg:grid-cols-5 gap-5">
                 <Card className="lg:col-span-3">
-                  <SectionTitle icon="bank" title="Debt overview" hint="Pay the item with the highest cost per rupee owed first (avalanche method) to free cash fastest." />
+                  <SectionTitle icon="bank" title="Debt overview" hint="Prioritise highest-cost obligations first to minimise interest drag." />
                   {debt.items.length === 0 ? (
                     <div className="flex items-center gap-3 p-4 rounded-xl bg-success-tint/40 border border-success-solid/25 text-xs text-success-text">
                       <Icon name="check" size={18} /> You have no active debt. Brilliant.

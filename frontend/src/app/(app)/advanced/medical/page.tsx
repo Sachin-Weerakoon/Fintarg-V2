@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useApp, formatRs } from '@/store';
 import { PageContainer } from '@/components/ui/PageContainer';
@@ -17,38 +17,47 @@ import { Badge } from '@/components/ui/Badge';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
+import { DateRangeFilter, type DateRangeValue } from '@/components/ui/DateRangeFilter';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
+import { monthLabel } from '@/lib/insights';
 
 const MEDICAL_TYPES = ['Consultation', 'Pharmacy', 'Lab test', 'Hospital', 'Dental', 'Specialist', 'Other'];
-const MONTHS = ['2026-07', '2026-08', '2026-09'];
-const MONTH_LABELS: Record<string, string> = { '2026-07': 'Jul 2026', '2026-08': 'Aug 2026', '2026-09': 'Sep 2026' };
 
 export default function MedicalClient() {
   const { state, dispatch } = useApp();
   const confirm = useConfirm();
   const toast = useToast();
   const month = state.selectedMonth;
-  const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), type: 'Consultation', amount: '', note: '' });
+
+  const [dateFilter, setDateFilter] = useState<DateRangeValue>({
+    type: 'this-month',
+    month: state.selectedMonth,
+  });
+
+  const [form, setForm] = useState({
+    date: new Date().toISOString().slice(0, 10),
+    type: 'Consultation',
+    amount: '',
+    note: '',
+    paidFrom: (state.profile.workMode === 'business' ? 'business' : 'salary') as 'salary' | 'business',
+  });
   const [error, setError] = useState('');
   const [fileError, setFileError] = useState('');
   const [remForm, setRemForm] = useState({ label: '', dueDate: '', channel: 'email' as 'email' | 'in-app' });
   const [remError, setRemError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'expenses' | 'documents' | 'reminders'>('expenses');
+
   const handleDeleteExpense = async (id: string, type: string) => {
     const ok = await confirm({
       title: 'Delete Medical Expense',
-      message: `Are you sure you want to delete this ${type} expense record?`,
+      message: `Are you sure you want to delete this ${type} expense record? It will also be removed from the general expenses ledger.`,
       confirmLabel: 'Yes, Delete',
       cancelLabel: 'No, Keep',
       tone: 'danger',
     });
     if (ok) {
-      const target = state.medicalExpenses.find(m => m.id === id);
-      if (target?.expenseId) {
-        dispatch({ type: 'DELETE_EXPENSE', id: target.expenseId });
-      }
       dispatch({ type: 'DELETE_MEDICAL_EXPENSE', id });
       toast.success('Medical expense deleted');
     }
@@ -82,9 +91,38 @@ export default function MedicalClient() {
     }
   };
 
-  const monthExpenses = state.medicalExpenses.filter(m => m.date.startsWith(month));
-  const monthTotal = monthExpenses.reduce((s, m) => s + m.amount, 0);
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>();
+    state.medicalExpenses.forEach(m => {
+      if (m.date) set.add(m.date.slice(0, 7));
+    });
+    if (state.selectedMonth) set.add(state.selectedMonth);
+    return Array.from(set).sort();
+  }, [state.medicalExpenses, state.selectedMonth]);
+
+  const filteredExpenses = useMemo(() => {
+    return state.medicalExpenses
+      .filter(m => {
+        if (dateFilter.type === 'all') return true;
+        if (dateFilter.type === 'custom') {
+          if (dateFilter.startDate && m.date < dateFilter.startDate) return false;
+          if (dateFilter.endDate && m.date > dateFilter.endDate) return false;
+          return true;
+        }
+        const targetMonth = dateFilter.month || month;
+        return m.date.startsWith(targetMonth);
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [state.medicalExpenses, dateFilter, month]);
+
+  const filteredTotal = filteredExpenses.reduce((s, m) => s + m.amount, 0);
   const allTimeTotal = state.medicalExpenses.reduce((s, m) => s + m.amount, 0);
+
+  const periodLabel = dateFilter.type === 'all'
+    ? 'All time'
+    : dateFilter.type === 'custom'
+    ? 'Selected range'
+    : monthLabel(dateFilter.month || month);
 
   const submit = () => {
     if (!form.amount || Number(form.amount) <= 0) {
@@ -94,24 +132,26 @@ export default function MedicalClient() {
     const medId = 'm_' + Date.now();
     const expId = 'exp_med_' + Date.now();
     dispatch({
-      type: 'ADD_EXPENSE',
+      type: 'ADD_MEDICAL_EXPENSE',
       entry: {
-        id: expId,
+        id: medId,
         date: form.date,
+        type: form.type,
         amount: Number(form.amount),
-        category: 'Medical',
-        note: form.note ? `Medical: ${form.type} · ${form.note}` : `Medical: ${form.type}`,
-        recurring: false,
-        sourceType: 'medical',
-        sourceId: medId,
+        note: form.note,
+        sourceType: form.paidFrom,
+        paidFrom: form.paidFrom,
+        expenseId: expId,
       },
     });
-    dispatch({
-      type: 'ADD_MEDICAL_EXPENSE',
-      entry: { id: medId, date: form.date, type: form.type, amount: Number(form.amount), note: form.note, expenseId: expId },
+    toast.success('Medical expense recorded & synced to general expenses');
+    setForm({
+      date: new Date().toISOString().slice(0, 10),
+      type: 'Consultation',
+      amount: '',
+      note: '',
+      paidFrom: form.paidFrom,
     });
-    toast.success('Medical expense recorded & synced to financial ledger');
-    setForm({ date: new Date().toISOString().slice(0, 10), type: 'Consultation', amount: '', note: '' });
     setError('');
   };
 
@@ -169,8 +209,8 @@ export default function MedicalClient() {
   return (
     <PageContainer width="narrow">
       <PageHeader
-        title="Medical Ledger & Appointments"
-        description="Track medical costs, prescription documents, and clinic reminders."
+        title="Medical Vault"
+        description="Medical expenses, documents, and reminders."
         actions={
           <Link href="/advanced">
             <Button variant="secondary" size="sm" iconLeft={<Icon name="arrow-left" size={14} />}>
@@ -194,22 +234,32 @@ export default function MedicalClient() {
       {activeTab === 'expenses' && (
         <div className="grid md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-4">
-            {/* Month selector */}
-            <div className="flex items-center gap-2 no-print">
-              <span className="text-xs font-semibold text-muted">Month:</span>
-              <SegmentedTabs
-                size="sm"
-                options={MONTHS.map(m => ({ id: m, label: MONTH_LABELS[m] || m }))}
-                value={month}
-                onChange={m => dispatch({ type: 'SET_MONTH', month: m })}
+            {/* Friendly Date Range & Month Filter */}
+            <div className="no-print">
+              <DateRangeFilter
+                value={dateFilter}
+                onChange={val => {
+                  setDateFilter(val);
+                  if (val.month && val.month !== month) {
+                    dispatch({ type: 'SET_MONTH', month: val.month });
+                  }
+                }}
+                selectedMonth={dateFilter.month || month}
+                onMonthChange={m => {
+                  setDateFilter({ type: 'this-month', month: m });
+                  dispatch({ type: 'SET_MONTH', month: m });
+                }}
+                availableMonths={availableMonths}
+                showAllOption={true}
+                showCustomRange={true}
               />
             </div>
 
             {/* Totals */}
             <div className="grid grid-cols-2 gap-3">
               <Card className="text-center p-3">
-                <div className="text-xs text-muted mb-0.5">This month</div>
-                <div className="font-bold text-sm text-text num">{formatRs(monthTotal)}</div>
+                <div className="text-xs text-muted mb-0.5 capitalize">{periodLabel}</div>
+                <div className="font-bold text-sm text-text num">{formatRs(filteredTotal)}</div>
               </Card>
               <Card className="text-center p-3">
                 <div className="text-xs text-muted mb-0.5">All time</div>
@@ -218,7 +268,7 @@ export default function MedicalClient() {
             </div>
 
             {/* Expenses table */}
-            {state.medicalExpenses.length === 0 ? (
+            {filteredExpenses.length === 0 ? (
               <EmptyState
                 icon={<Icon name="heart" size={24} />}
                 title="No medical expenses recorded"
@@ -232,19 +282,24 @@ export default function MedicalClient() {
                       <tr>
                         <th>Date</th>
                         <th>Type</th>
+                        <th>Paid From</th>
                         <th>Note</th>
                         <th className="text-right">Amount</th>
                         <th className="w-16 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {state.medicalExpenses
-                        .slice()
-                        .sort((a, b) => b.date.localeCompare(a.date))
-                        .map(m => (
+                      {filteredExpenses.map(m => {
+                        const isBiz = m.sourceType === 'business' || m.paidFrom === 'business';
+                        return (
                           <tr key={m.id}>
                             <td className="text-muted num">{m.date}</td>
                             <td className="font-medium text-text">{m.type}</td>
+                            <td>
+                              <Badge tone={isBiz ? 'primary' : 'neutral'} size="sm">
+                                {isBiz ? 'Business Cash' : 'Salary Cash'}
+                              </Badge>
+                            </td>
                             <td className="text-muted">{m.note || '—'}</td>
                             <td className="text-right font-medium text-text num">{formatRs(m.amount)}</td>
                             <td className="text-center">
@@ -259,7 +314,8 @@ export default function MedicalClient() {
                               </Button>
                             </td>
                           </tr>
-                        ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -271,7 +327,6 @@ export default function MedicalClient() {
           <FormCard
             icon="heart"
             title="Add Medical Expense"
-            description="Track healthcare consultations, medicine, and hospital charges"
             className="h-fit sticky top-4"
           >
             <Field id="med-date" label="Date" required>
@@ -280,6 +335,7 @@ export default function MedicalClient() {
                 onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
               />
             </Field>
+
             <Field id="med-type" label="Type" required>
               <Select
                 value={form.type}
@@ -290,6 +346,19 @@ export default function MedicalClient() {
                 ))}
               </Select>
             </Field>
+
+            <Field id="med-paid-from" label="Paid From (Payment Source)" required>
+              <SegmentedTabs
+                size="sm"
+                options={[
+                  { id: 'salary', label: 'Salary Cash' },
+                  { id: 'business', label: 'Business Cash' },
+                ]}
+                value={form.paidFrom}
+                onChange={v => setForm(f => ({ ...f, paidFrom: v as 'salary' | 'business' }))}
+              />
+            </Field>
+
             <Field id="med-amount" label="Amount (Rs.)" required error={error}>
               <MoneyField
                 value={form.amount}
@@ -298,6 +367,7 @@ export default function MedicalClient() {
                 hasError={!!error}
               />
             </Field>
+
             <Field id="med-note" label="Clinical Note">
               <Input
                 value={form.note}
@@ -305,6 +375,7 @@ export default function MedicalClient() {
                 placeholder="e.g. GP visit, blood panel, pharmacy Rx"
               />
             </Field>
+
             <div className="pt-2">
               <Button
                 variant="primary"
@@ -322,8 +393,7 @@ export default function MedicalClient() {
       {activeTab === 'documents' && (
         <div className="max-w-2xl space-y-4">
           <Card className="p-5">
-            <h3 className="font-semibold text-sm mb-1 text-text">Upload medical document</h3>
-            <p className="text-xs text-muted mb-4">Store reports, prescriptions, and lab tests securely.</p>
+            <h3 className="font-semibold text-sm mb-3 text-text">Upload Document</h3>
             <Input
               ref={fileInputRef}
               type="file"
@@ -380,7 +450,7 @@ export default function MedicalClient() {
       {activeTab === 'reminders' && (
         <div className="max-w-2xl space-y-4">
           <Card className="p-5">
-            <h3 className="font-semibold text-sm mb-4 text-text">Set appointment reminder</h3>
+            <h3 className="font-semibold text-sm mb-3 text-text">Set Reminder</h3>
             {remError && <p className="text-xs text-danger-text mb-3">{remError}</p>}
             <div className="grid md:grid-cols-3 gap-3">
               <Field id="rem-label" label="Appointment / Note">

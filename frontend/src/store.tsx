@@ -214,9 +214,27 @@ function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'ROLLBACK': return action.previousState;
     case 'HYDRATE': return { ...state, ...action.data, profile: { ...state.profile, ...action.data.profile } };
-    case 'REPLACE_RECORD_ID': return {
-      ...state,
-      [action.collection]: (state[action.collection] as { id: string }[]).map(record => record.id === action.localId ? { ...record, id: action.serverId } : record),
+    case 'REPLACE_RECORD_ID': {
+      const updatedCollection = (state[action.collection] as { id: string }[]).map(record =>
+        record.id === action.localId ? { ...record, id: action.serverId } : record
+      );
+      let updatedMedical = state.medicalExpenses;
+      let updatedExpenses = state.expenses;
+      if (action.collection === 'expenses') {
+        updatedMedical = state.medicalExpenses.map(m =>
+          m.expenseId === action.localId ? { ...m, expenseId: action.serverId } : m
+        );
+      } else if (action.collection === 'medicalExpenses') {
+        updatedExpenses = state.expenses.map(e =>
+          e.sourceId === action.localId ? { ...e, sourceId: action.serverId } : e
+        );
+      }
+      return {
+        ...state,
+        [action.collection]: updatedCollection,
+        medicalExpenses: updatedMedical,
+        expenses: updatedExpenses,
+      };
     };
     case 'SET_PAGE': return { ...state, currentPage: action.page };
     case 'SET_PLAN': return { ...state, currentPage: 'dashboard', profile: { ...state.profile, plan: action.plan, workMode: action.workMode, name: action.name } };
@@ -271,7 +289,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         expenses: state.expenses.filter(e => e.id !== action.id),
-        medicalExpenses: exp?.sourceType === 'medical'
+        medicalExpenses: (exp?.sourceId || exp?.category === 'Medical')
           ? state.medicalExpenses.filter(m => m.id !== exp.sourceId && m.expenseId !== action.id)
           : state.medicalExpenses,
         businessBranches: updatedBranches,
@@ -607,7 +625,8 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case 'ADD_MEDICAL_EXPENSE': {
       const medExpenseId = action.entry.expenseId || ('exp_med_' + action.entry.id);
-      const alreadyHasExpense = state.expenses.some(e => e.id === medExpenseId || (e.sourceType === 'medical' && e.sourceId === action.entry.id));
+      const paymentSource = (action.entry.sourceType === 'business' || action.entry.paidFrom === 'business') ? 'business' : 'salary';
+      const alreadyHasExpense = state.expenses.some(e => e.id === medExpenseId || e.sourceId === action.entry.id);
       const linkedExpense: ExpenseEntry = {
         id: medExpenseId,
         date: action.entry.date,
@@ -615,12 +634,13 @@ function reducer(state: AppState, action: Action): AppState {
         category: 'Medical',
         note: action.entry.note ? `Medical: ${action.entry.type} · ${action.entry.note}` : `Medical: ${action.entry.type}`,
         recurring: false,
-        sourceType: 'medical',
+        paymentMethod: 'cash',
+        sourceType: paymentSource,
         sourceId: action.entry.id,
       };
       return {
         ...state,
-        medicalExpenses: [...state.medicalExpenses, { ...action.entry, expenseId: medExpenseId }],
+        medicalExpenses: [...state.medicalExpenses, { ...action.entry, sourceType: paymentSource, paidFrom: paymentSource, expenseId: medExpenseId }],
         expenses: alreadyHasExpense ? state.expenses : [...state.expenses, linkedExpense],
       };
     }
@@ -630,7 +650,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         medicalExpenses: state.medicalExpenses.filter(m => m.id !== action.id),
-        expenses: state.expenses.filter(e => e.id !== linkedExpId && !(e.sourceType === 'medical' && e.sourceId === action.id)),
+        expenses: state.expenses.filter(e => e.id !== linkedExpId && e.sourceId !== action.id),
       };
     }
     case 'ADD_DOCUMENT': return { ...state, documents: [...state.documents, action.entry] };

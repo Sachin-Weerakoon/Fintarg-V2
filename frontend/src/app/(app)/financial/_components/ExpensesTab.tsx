@@ -3,7 +3,6 @@ import { useState, useMemo } from 'react';
 import {
   useApp,
   formatRs,
-  calcMonthlyExpenses,
   calcMonthlyIncome,
   calcFinancePayments,
   calcDailyExpenseBudget,
