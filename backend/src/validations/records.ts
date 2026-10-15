@@ -183,6 +183,7 @@ const expenseBaseSchema = z.object({
   sourceType: z.enum(['salary', 'business']).optional().default('salary'),
   companyId: z.string().optional().nullable(),
   branchId: z.string().optional().nullable(),
+  sourceId: z.string().optional().nullable(),
 });
 
 const expenseSchema = expenseBaseSchema.superRefine((data, ctx) => {
@@ -257,6 +258,8 @@ const medicalExpenseSchema = z.object({
   type: z.string().trim().min(1).max(120),
   amount: money,
   note: optionalText,
+  sourceType: z.enum(['salary', 'business']).optional().default('salary'),
+  expenseId: z.string().optional().nullable(),
 });
 
 const reminderSchema = z.object({

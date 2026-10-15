@@ -320,6 +320,8 @@ export interface MedicalExpense {
   amount: number;
   note: string;
   expenseId?: string;
+  sourceType?: 'salary' | 'business';
+  paidFrom?: 'salary' | 'business';
 }
 
 export interface Document {

@@ -13,6 +13,7 @@ export interface IExpense extends Document {
   sourceType?: 'salary' | 'business';
   companyId?: string | null;
   branchId?: string | null;
+  sourceId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +31,7 @@ const ExpenseSchema = new Schema<IExpense>({
   sourceType: { type: String, enum: ['salary', 'business'], default: 'salary' },
   companyId: { type: String, default: null },
   branchId: { type: String, default: null },
+  sourceId: { type: String, default: null },
 }, { timestamps: true });
 
 export const ExpenseModel = mongoose.models.Expense || mongoose.model<IExpense>('Expense', ExpenseSchema);
