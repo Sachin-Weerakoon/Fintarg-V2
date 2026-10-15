@@ -78,28 +78,28 @@ function AdvancedContent() {
     switch (activeTab) {
       case 'businesses':
         return {
-          title: 'Enterprise & Branch Workspaces',
-          description: 'Manage shop outlets, daily sales revenue, operating overheads, and branch growth targets.',
+          title: 'Businesses & Branches',
+          description: 'Outlets, daily sales revenue, operating overheads, and growth targets.',
         };
       case 'salary':
         return {
-          title: 'Salary & Payday Planning',
-          description: 'Monitor gross pay, pay slip deductions, and automated payday savings allocation.',
+          title: 'Salary & Payday',
+          description: 'Gross pay, payslip deductions, and automated payday savings.',
         };
       case 'agreements':
         return {
-          title: 'Commercial Agreements & Contracts',
-          description: 'Track contracts, expiration dates, renewal timelines, and executed documents.',
+          title: 'Agreements',
+          description: 'Contracts, renewal timelines, and legal documents.',
         };
       case 'companies':
         return {
-          title: 'Enterprise Corporate Entities',
-          description: 'Register corporate legal entities with official Sri Lankan BR and TIN credentials.',
+          title: 'Companies',
+          description: 'Corporate entities, BR numbers, and TIN registration.',
         };
       default:
         return {
-          title: 'Advanced Features',
-          description: 'Specialized enterprise modules, legal letter generator, health records, and contract vaults.',
+          title: 'Advanced Hub',
+          description: 'Enterprise tools, legal letters, medical vault, and contracts.',
         };
     }
   };

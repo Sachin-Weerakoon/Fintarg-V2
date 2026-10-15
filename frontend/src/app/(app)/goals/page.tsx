@@ -394,19 +394,19 @@ function GoalsContent() {
   const domainTabs: TabOption<GoalDomain>[] = [
     {
       id: 'personal',
-      label: 'Personal Financial Goals',
+      label: 'Personal Goals',
       icon: <Icon name="user" size={14} />,
       badge: personalGoals.length > 0 ? `${personalGoals.length}` : undefined,
     },
     {
       id: 'business',
-      label: 'Business Goals (Company)',
+      label: 'Company Goals',
       icon: <Icon name="briefcase" size={14} />,
       badge: businessGoals.length > 0 ? `${businessGoals.length}` : undefined,
     },
     {
       id: 'branch',
-      label: 'Branch Goals (Outlet)',
+      label: 'Branch Goals',
       icon: <Icon name="bank" size={14} />,
       badge: branchGoals.length > 0 ? `${branchGoals.length}` : undefined,
     },
@@ -417,13 +417,13 @@ function GoalsContent() {
       {/* Header row */}
       <PageHeader
         eyebrow={domain === 'business' ? 'Enterprise' : domain === 'branch' ? 'Outlet' : 'Personal Finance'}
-        title={domain === 'business' ? 'Corporate Business Goals' : domain === 'branch' ? 'Branch Outlet Goals' : 'Savings & Goals'}
+        title={domain === 'business' ? 'Company Goals' : domain === 'branch' ? 'Branch Goals' : 'Savings & Goals'}
         description={
           domain === 'business'
-            ? 'Set enterprise revenue benchmarks, monitor monthly corporate run-rates, and allocate capital to strategic goals.'
+            ? 'Enterprise revenue benchmarks, monthly run-rate, and strategic funds.'
             : domain === 'branch'
-            ? 'Define outlet revenue benchmarks, monitor daily run-rate pacing, and track branch milestone funds.'
-            : 'Automate daily targets, track contributions, and ensure personal target feasibility.'
+            ? 'Outlet revenue benchmarks and milestone funds.'
+            : 'Daily savings targets, progress tracking, and milestones.'
         }
         actions={
           <div className="flex items-center gap-3">

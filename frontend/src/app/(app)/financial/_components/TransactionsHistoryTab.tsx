@@ -38,23 +38,32 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
   const initialType = (searchParams.get('type') || 'all') as 'all' | 'income' | 'expense' | 'transfer';
   const initialMethod = searchParams.get('method') || 'all';
   const initialAccount = searchParams.get('account') || 'all';
+  const initialStartDate = searchParams.get('startDate') || '';
+  const initialEndDate = searchParams.get('endDate') || '';
 
   const [search, setSearch] = useState(initialSearch);
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>(initialType);
   const [methodFilter, setMethodFilter] = useState(initialMethod);
   const [accountFilter, setAccountFilter] = useState(initialAccount);
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const [endDate, setEndDate] = useState(initialEndDate);
+  const [datePreset, setDatePreset] = useState<'all' | 'this-month' | 'last-30' | 'custom'>(
+    initialStartDate || initialEndDate ? 'custom' : 'all'
+  );
 
   // Sync to URL
   const updateUrlFilters = useCallback(
-    (newSearch: string, newType: string, newMethod: string, newAccount: string) => {
+    (newSearch: string, newType: string, newMethod: string, newAccount: string, sDate = startDate, eDate = endDate) => {
       const params = new URLSearchParams(searchParams.toString());
       if (newSearch) params.set('search', newSearch); else params.delete('search');
       if (newType !== 'all') params.set('type', newType); else params.delete('type');
       if (newMethod !== 'all') params.set('method', newMethod); else params.delete('method');
       if (newAccount !== 'all') params.set('account', newAccount); else params.delete('account');
+      if (sDate) params.set('startDate', sDate); else params.delete('startDate');
+      if (eDate) params.set('endDate', eDate); else params.delete('endDate');
       router.replace(`?${params.toString()}`, { scroll: false });
     },
-    [router, searchParams]
+    [router, searchParams, startDate, endDate]
   );
 
   const handleSearchChange = (val: string) => {
@@ -81,13 +90,40 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
     updateUrlFilters(search, typeFilter, methodFilter, val);
   };
 
+  const handleDatePreset = (preset: 'all' | 'this-month' | 'last-30' | 'custom') => {
+    setDatePreset(preset);
+    setPage(1);
+    const today = new Date().toISOString().slice(0, 10);
+    const monthPrefix = today.slice(0, 7);
+    let s = '';
+    let e = '';
+    if (preset === 'this-month') {
+      s = `${monthPrefix}-01`;
+      e = `${monthPrefix}-31`;
+    } else if (preset === 'last-30') {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      s = d.toISOString().slice(0, 10);
+      e = today;
+    } else if (preset === 'custom') {
+      s = startDate;
+      e = endDate;
+    }
+    setStartDate(s);
+    setEndDate(e);
+    updateUrlFilters(search, typeFilter, methodFilter, accountFilter, s, e);
+  };
+
   const handleClearFilters = () => {
     setSearch('');
     setTypeFilter('all');
     setMethodFilter('all');
     setAccountFilter('all');
+    setStartDate('');
+    setEndDate('');
+    setDatePreset('all');
     setPage(1);
-    updateUrlFilters('', 'all', 'all', 'all');
+    updateUrlFilters('', 'all', 'all', 'all', '', '');
   };
 
   const loadHistory = useCallback(async (targetPage: number) => {
@@ -102,6 +138,8 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
       if (methodFilter !== 'all') filters.paymentMethod = methodFilter;
       if (accountFilter !== 'all') filters.bankAccountId = accountFilter;
       if (search.trim()) filters.search = search.trim();
+      if (startDate) filters.startDate = startDate;
+      if (endDate) filters.endDate = endDate;
 
       const res = await fetchTransactionHistory(filters);
       setRemoteTransactions(res.transactions || res.data || []);
@@ -114,7 +152,7 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
     } finally {
       setLoading(false);
     }
-  }, [pageSize, typeFilter, methodFilter, accountFilter, search]);
+  }, [pageSize, typeFilter, methodFilter, accountFilter, search, startDate, endDate]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -124,7 +162,7 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
   }, [loadHistory, page]);
 
   const items = remoteTransactions;
-  const hasActiveFilters = Boolean(search || typeFilter !== 'all' || methodFilter !== 'all' || accountFilter !== 'all');
+  const hasActiveFilters = Boolean(search || typeFilter !== 'all' || methodFilter !== 'all' || accountFilter !== 'all' || startDate || endDate);
 
   const columns: Column<Transaction>[] = [
     {
@@ -314,6 +352,54 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
               </Button>
             )}
           </div>
+        </div>
+
+        {/* Date Filter Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 mt-2.5 border-t border-border/60">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-semibold text-muted mr-1">Date:</span>
+            {(['all', 'this-month', 'last-30', 'custom'] as const).map(p => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => handleDatePreset(p)}
+                className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                  datePreset === p
+                    ? 'bg-primary-solid text-on-primary font-semibold shadow-xs'
+                    : 'bg-surface-hover/80 text-muted hover:text-text border border-border'
+                }`}
+              >
+                {p === 'all' ? 'All Time' : p === 'this-month' ? 'This Month' : p === 'last-30' ? 'Last 30 Days' : 'Custom'}
+              </button>
+            ))}
+          </div>
+
+          {datePreset === 'custom' && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] text-muted font-medium">From:</span>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={e => {
+                  setStartDate(e.target.value);
+                  setPage(1);
+                  updateUrlFilters(search, typeFilter, methodFilter, accountFilter, e.target.value, endDate);
+                }}
+                className="!py-1 !text-xs w-32"
+              />
+              <span className="text-[11px] text-muted font-medium">To:</span>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={e => {
+                  setEndDate(e.target.value);
+                  setPage(1);
+                  updateUrlFilters(search, typeFilter, methodFilter, accountFilter, startDate, e.target.value);
+                }}
+                className="!py-1 !text-xs w-32"
+              />
+            </div>
+          )}
         </div>
       </Card>
 

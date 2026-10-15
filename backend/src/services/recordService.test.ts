@@ -1118,5 +1118,92 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
       );
     });
   });
+
+  describe('Medical Expense synchronization with Expenses and Ledger', () => {
+    it('creates medical expense, automatically links Expense and posts transaction', async () => {
+      const med = await createRecord('medicalExpenses', userId, {
+        date: '2026-10-15',
+        type: 'Hospital',
+        amount: 70000,
+        note: 'Emergency admission',
+        sourceType: 'business',
+      });
+
+      assert.ok(med._id);
+      assert.strictEqual(med.type, 'Hospital');
+      assert.strictEqual(med.amountCents, 7000000);
+      assert.strictEqual(med.sourceType, 'business');
+      assert.ok(med.expenseId, 'medicalExpense should have linked expenseId');
+
+      const exp = await getRecord('expenses', userId, med.expenseId.toString());
+      assert.strictEqual(exp.category, 'Medical');
+      assert.strictEqual(exp.amountCents, 7000000);
+      assert.strictEqual(exp.date, '2026-10-15');
+      assert.strictEqual(exp.sourceType, 'business');
+      assert.strictEqual(exp.paymentMethod, 'cash');
+      assert.strictEqual(exp.sourceId, med._id.toString());
+    });
+
+    it('updates medical expense and syncs linked Expense', async () => {
+      const med = await createRecord('medicalExpenses', userId, {
+        date: '2026-10-16',
+        type: 'Consultation',
+        amount: 5000,
+        note: 'Specialist checkup',
+        sourceType: 'salary',
+      });
+
+      await updateRecord('medicalExpenses', userId, med._id.toString(), {
+        amount: 6500,
+        note: 'Specialist checkup with tests',
+        sourceType: 'business',
+      });
+
+      const updatedExp = await getRecord('expenses', userId, med.expenseId.toString());
+      assert.strictEqual(updatedExp.amountCents, 650000);
+      assert.strictEqual(updatedExp.sourceType, 'business');
+      assert.ok(updatedExp.note.includes('Specialist checkup with tests'));
+    });
+
+    it('deleting medical expense deletes linked Expense and ledger transaction', async () => {
+      const med = await createRecord('medicalExpenses', userId, {
+        date: '2026-10-17',
+        type: 'Pharmacy',
+        amount: 3200,
+        note: 'Prescription antibiotics',
+        sourceType: 'salary',
+      });
+
+      const expenseId = med.expenseId.toString();
+      await deleteRecord('medicalExpenses', userId, med._id.toString());
+
+      await assert.rejects(
+        async () => {
+          await getRecord('expenses', userId, expenseId);
+        },
+        (err: any) => err.status === 404,
+      );
+    });
+
+    it('deleting linked Expense deletes corresponding medicalExpense', async () => {
+      const med = await createRecord('medicalExpenses', userId, {
+        date: '2026-10-18',
+        type: 'Lab test',
+        amount: 4500,
+        note: 'Blood test',
+        sourceType: 'salary',
+      });
+
+      const expenseId = med.expenseId.toString();
+      await deleteRecord('expenses', userId, expenseId);
+
+      await assert.rejects(
+        async () => {
+          await getRecord('medicalExpenses', userId, med._id.toString());
+        },
+        (err: any) => err.status === 404,
+      );
+    });
+  });
 });
 

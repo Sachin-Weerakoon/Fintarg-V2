@@ -194,6 +194,7 @@ export async function loadPersistedData(plan: UserPlan = 'basic'): Promise<Parti
       sourceType: row.sourceType,
       companyId: row.companyId ? String(row.companyId) : undefined,
       branchId: row.branchId ? String(row.branchId) : undefined,
+      sourceId: row.sourceId ? String(row.sourceId) : undefined,
     })),
     financePayments: financePayments.map(row => ({
       id: row._id,
@@ -367,6 +368,9 @@ export async function loadPersistedData(plan: UserPlan = 'basic'): Promise<Parti
       type: row.type,
       amount: (row.amountCents || 0) / 100,
       note: row.note,
+      sourceType: row.sourceType || 'salary',
+      expenseId: row.expenseId ? String(row.expenseId) : undefined,
+      paidFrom: row.sourceType || 'salary',
     })),
     documents: documents.map(row => ({
       id: row._id,

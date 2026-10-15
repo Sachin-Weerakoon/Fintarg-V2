@@ -494,6 +494,46 @@ export async function createRecord(kind: RecordKind, userId: string, input: Reco
       referenceId: record._id.toString(),
     });
   }
+  if (kind === 'medicalExpenses') {
+    let linkedExpense = null;
+    if (data.expenseId && mongoose.isValidObjectId(data.expenseId)) {
+      linkedExpense = await ExpenseModel.findOne({ _id: data.expenseId, userId });
+    }
+    if (!linkedExpense) {
+      const expSourceType = (data.sourceType === 'business' ? 'business' : 'salary');
+      const expNote = data.note ? `Medical: ${data.type} · ${data.note}` : `Medical: ${data.type}`;
+      linkedExpense = await ExpenseModel.create({
+        userId: new mongoose.Types.ObjectId(userId),
+        date: String(data.date),
+        amountCents: Number(data.amountCents || 0),
+        category: 'Medical',
+        note: expNote,
+        recurring: false,
+        paymentMethod: 'cash',
+        sourceType: expSourceType,
+        sourceId: record._id.toString(),
+      });
+      await postTransaction({
+        userId,
+        type: 'expense',
+        amountCents: Number(data.amountCents || 0),
+        date: String(data.date),
+        category: 'Medical',
+        description: expNote,
+        paymentMethod: 'cash',
+        bankAccountId: null,
+        cardId: null,
+        referenceId: linkedExpense._id.toString(),
+      });
+      record.expenseId = linkedExpense._id;
+      await record.save();
+    } else {
+      if (!linkedExpense.sourceId) {
+        linkedExpense.sourceId = record._id.toString();
+        await linkedExpense.save();
+      }
+    }
+  }
   if (kind === 'incomes') {
     await postTransaction({
       userId,
@@ -590,6 +630,34 @@ export async function updateRecord(kind: RecordKind, userId: string, id: string,
       referenceId: updated._id.toString(),
     });
   }
+  if (kind === 'medicalExpenses') {
+    const medDoc = updated as any;
+    let linkedExpense = medDoc.expenseId ? await ExpenseModel.findOne({ _id: medDoc.expenseId, userId }) : null;
+    if (!linkedExpense) {
+      linkedExpense = await ExpenseModel.findOne({ sourceId: medDoc._id.toString(), userId });
+    }
+    if (linkedExpense) {
+      const expSourceType = (medDoc.sourceType === 'business' ? 'business' : 'salary');
+      const expNote = medDoc.note ? `Medical: ${medDoc.type} · ${medDoc.note}` : `Medical: ${medDoc.type}`;
+      linkedExpense.date = medDoc.date;
+      linkedExpense.amountCents = medDoc.amountCents;
+      linkedExpense.note = expNote;
+      linkedExpense.sourceType = expSourceType;
+      await linkedExpense.save();
+      await replaceTransaction(userId, linkedExpense._id.toString(), {
+        userId,
+        type: 'expense',
+        amountCents: Number(linkedExpense.amountCents || 0),
+        date: String(linkedExpense.date),
+        category: 'Medical',
+        description: expNote,
+        paymentMethod: 'cash',
+        bankAccountId: null,
+        cardId: null,
+        referenceId: linkedExpense._id.toString(),
+      });
+    }
+  }
   if (kind === 'incomes') {
     await replaceTransaction(userId, updated._id.toString(), {
       userId,
@@ -635,8 +703,27 @@ export async function deleteRecord(kind: RecordKind, userId: string, id: string)
   }
   if (kind === 'businessBranches') await BranchEntryModel.deleteMany({ branchId: deleted._id, userId });
   if (kind === 'documents' && deleted.fileId) await FileModel.deleteOne({ _id: deleted.fileId, userId });
+  if (kind === 'medicalExpenses') {
+    if (deleted.expenseId) {
+      const linkedExp = await ExpenseModel.findOneAndDelete({ _id: deleted.expenseId, userId });
+      if (linkedExp) {
+        await reverseTransaction(userId, linkedExp._id.toString());
+      }
+    }
+    const orphanExps = await ExpenseModel.find({ sourceId: deleted._id.toString(), userId });
+    for (const exp of orphanExps) {
+      await ExpenseModel.deleteOne({ _id: exp._id });
+      await reverseTransaction(userId, exp._id.toString());
+    }
+  }
   if (kind === 'expenses' || kind === 'incomes') {
     await reverseTransaction(userId, deleted._id.toString());
+    if (kind === 'expenses') {
+      if (deleted.sourceId && mongoose.isValidObjectId(deleted.sourceId)) {
+        await MedicalExpenseModel.deleteOne({ _id: deleted.sourceId, userId });
+      }
+      await MedicalExpenseModel.deleteOne({ expenseId: deleted._id, userId });
+    }
   }
   if (kind === 'bankAccounts') {
     await CardModel.deleteMany({ bankAccountId: deleted._id, userId });

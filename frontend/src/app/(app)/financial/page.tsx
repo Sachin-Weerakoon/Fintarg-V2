@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Select } from '@/components/ui/Select';
+import { DateRangeFilter } from '@/components/ui/DateRangeFilter';
 import { AccountsTab } from './_components/AccountsTab';
 import { TransactionsHistoryTab } from './_components/TransactionsHistoryTab';
 import { ExpensesTab } from './_components/ExpensesTab';
@@ -88,10 +89,10 @@ function FinancialContent() {
     router.replace(`/financial?${params.toString()}`, { scroll: false });
   };
 
-  const months = useMemo(() => {
-    const list = Array.from(new Set(state.expenses.map(e => e.date.slice(0, 7)))).sort();
+  const availableMonths = useMemo(() => {
+    const list = Array.from(new Set(state.expenses.map(e => e.date.slice(0, 7))));
     if (!list.includes(state.selectedMonth)) list.push(state.selectedMonth);
-    return list.slice(-4);
+    return list.sort();
   }, [state.expenses, state.selectedMonth]);
 
   // Compute multi-stream financial KPI metrics
@@ -196,19 +197,15 @@ function FinancialContent() {
       {/* Top Header */}
       <PageHeader
         title="Financial Ledger"
-        description="Unified corporate & personal financial hub: manage bank accounts, multi-stream cash flows, operating expenses, and transactions."
+        description="Manage accounts, cash flow streams, operating expenses, and transactions."
         actions={
-          months.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-muted">Month:</span>
-              <SegmentedTabs
-                size="sm"
-                options={months.map(m => ({ id: m, label: m }))}
-                value={month}
-                onChange={handleMonthChange}
-              />
-            </div>
-          )
+          <DateRangeFilter
+            selectedMonth={month}
+            onMonthChange={handleMonthChange}
+            availableMonths={availableMonths}
+            showAllOption={false}
+            showCustomRange={false}
+          />
         }
       />
 
@@ -227,7 +224,7 @@ function FinancialContent() {
                 </Badge>
               </div>
               <p className="text-xs text-muted mt-0.5">
-                Switch stream views to isolate personal employment cash flow, business operating capital, or consolidated totals.
+                Switch between salary cash, business operations, or consolidated cash flow.
               </p>
             </div>
 
