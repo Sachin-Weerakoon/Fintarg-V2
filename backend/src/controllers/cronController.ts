@@ -43,6 +43,7 @@ export const reminders: RequestHandler = asyncHandler(async (request, response) 
   }
   const today = new Date().toISOString().slice(0, 10);
   const pending = await ReminderModel.find({ status: 'pending', dueDate: { $lte: today }, channel: 'email' })
+    .sort({ dueDate: 1})
     .limit(100)
     .lean();
 
@@ -56,21 +57,30 @@ export const reminders: RequestHandler = asyncHandler(async (request, response) 
   const userMap = new Map(users.map((u: any) => [u._id.toString(), u.email as string]));
 
   let sent = 0;
+  let failed = 0;
   for (const reminder of pending) {
     const email = userMap.get(reminder.userId.toString());
     if (!email) continue;
+
+    const claim = await ReminderModel.updateOne(
+      { _id: reminder._id, status: 'pending' },
+      { $set: { status: 'sent', sentAt: new Date() } },
+    );
+    if (claim.modifiedCount === 0) continue;
+
     const safeLabel = escapeHtml(reminder.label);
     const delivered = await sendMail(email, `Reminder: ${safeLabel}`, `<p>${safeLabel}</p>`);
+
     if (delivered) {
-      const updateResult = await ReminderModel.updateOne(
-        { _id: reminder._id, status: 'pending' },
-        { $set: { status: 'sent', sentAt: new Date() } }
+      sent++;
+    } else {
+      failed++;
+      await ReminderModel.updateOne(
+        { _id: reminder._id, status: 'sent' },
+        { $set: { status: 'pending', sentAt: null } },
       );
-      if (updateResult.modifiedCount > 0) {
-        sent++;
-      }
     }
   }
   if (pending.length && !sent) logger.warn({ count: pending.length }, 'No reminders delivered; configure email first');
-  response.json({ found: pending.length, sent });
+  response.json({ found: pending.length, sent, failed });
 });

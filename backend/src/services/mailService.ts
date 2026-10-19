@@ -7,11 +7,20 @@ export async function sendMail(to: string, subject: string, html: string): Promi
     return false;
   }
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${env.RESEND_API_KEY}` },
-    body: JSON.stringify({ from: env.MAIL_FROM, to, subject, html }),
-  });
-  if (!response.ok) logger.error({ status: response.status }, 'Email delivery failed');
-  return response.ok;
+
+  try{
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${env.RESEND_API_KEY}` },
+      body: JSON.stringify({ from: env.MAIL_FROM, to, subject, html }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) logger.error({ status: response.status, subject }, 'Email delivery failed');
+    return response.ok;
+  }catch (error){
+
+    logger.error({ err: error, subject }, 'Email delivery error');
+    return false;
+  }
+
 }

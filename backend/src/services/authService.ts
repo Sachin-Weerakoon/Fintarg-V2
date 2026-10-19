@@ -28,6 +28,7 @@ import { AuditLogModel } from '../models/AuditLog';
 import { SessionModel } from '../models/Session';
 import { HttpError } from '../middleware/errors';
 import { hashPassword, verifyPassword } from '../utils/password';
+import { withLedgerSession } from './ledgerService';
 
 export type RegisterInput = { name: string; email: string; password: string; workMode: 'salary' | 'business' | 'both' };
 
@@ -147,34 +148,21 @@ export async function deleteUserAccount(userId: string, password: string, confir
 
   const uid = new mongoose.Types.ObjectId(userId);
 
-  await Promise.all([
-    ProfileModel.deleteMany({ userId: uid }),
-    BankAccountModel.deleteMany({ userId: uid }),
-    CardModel.deleteMany({ userId: uid }),
-    TransactionModel.deleteMany({ userId: uid }),
-    ExpenseModel.deleteMany({ userId: uid }),
-    IncomeModel.deleteMany({ userId: uid }),
-    LoanModel.deleteMany({ userId: uid }),
-    PawnedItemModel.deleteMany({ userId: uid }),
-    FinancePaymentModel.deleteMany({ userId: uid }),
-    SavingsGoalModel.deleteMany({ userId: uid }),
-    ReminderModel.deleteMany({ userId: uid }),
-    DocumentModel.deleteMany({ userId: uid }),
-    FileModel.deleteMany({ userId: uid }),
-    CompanyModel.deleteMany({ userId: uid }),
-    BusinessBranchModel.deleteMany({ userId: uid }),
-    BranchEntryModel.deleteMany({ userId: uid }),
-    OwnerDrawModel.deleteMany({ userId: uid }),
-    AgreementModel.deleteMany({ userId: uid }),
-    LetterModel.deleteMany({ userId: uid }),
-    MedicalExpenseModel.deleteMany({ userId: uid }),
-    PersonalBudgetModel.deleteMany({ userId: uid }),
-    EmploymentProfileModel.deleteMany({ userId: uid }),
-    PasswordResetModel.deleteMany({ userId: uid }),
-    AuditLogModel.deleteMany({ userId: uid }),
-    SessionModel.deleteMany({ userId: uid }),
-    UserModel.deleteOne({ _id: uid }),
-  ]);
+    const userDataModels: mongoose.Model<any>[] = [
+    ProfileModel, BankAccountModel, CardModel, TransactionModel, ExpenseModel, IncomeModel,
+    LoanModel, PawnedItemModel, FinancePaymentModel, SavingsGoalModel, ReminderModel,
+    DocumentModel, FileModel, CompanyModel, BusinessBranchModel, BranchEntryModel,
+    OwnerDrawModel, AgreementModel, LetterModel, MedicalExpenseModel, PersonalBudgetModel,
+    EmploymentProfileModel, PasswordResetModel, AuditLogModel, SessionModel,
+  ];
+
+  await withLedgerSession(async (session) => {
+    const opts = session ? { session } : {};
+    for (const model of userDataModels) {
+      await model.deleteMany({ userId: uid }, opts);
+    }
+    await UserModel.deleteOne({ _id: uid }, opts);
+  });
 
   return { success: true };
 }
