@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PasswordField } from '@/components/ui/PasswordField';
 import { BrandLogo } from '@/components/ui/BrandLogo';
+import { Alert } from '@/components/ui/Alert';
 
 export type WorkMode = 'salary' | 'business' | 'both';
 
@@ -351,13 +352,9 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
             )}
 
             {error && (
-              <div
-                className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs mt-3 flex items-start gap-2.5"
-                role="alert"
-              >
-                <span className="text-rose-400 font-bold text-sm leading-none mt-0.5">⚠</span>
-                <span className="leading-snug">{error}</span>
-              </div>
+              <Alert tone="danger" onDismiss={() => setError('')}>
+                {error}
+              </Alert>
             )}
 
             <Button

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
@@ -19,11 +19,10 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [remoteTransactions, setRemoteTransactions] = useState<Transaction[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(1);
   const pageSize = 25;
   const [summary, setSummary] = useState<{
     totalIncome: number;
@@ -35,9 +34,14 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
 
   // Read initial filters from URL
   const initialSearch = searchParams.get('search') || '';
-  const initialType = (searchParams.get('type') || 'all') as 'all' | 'income' | 'expense' | 'transfer';
+  const requestedType = searchParams.get('type');
+  const initialType = requestedType && ['income', 'expense', 'transfer'].includes(requestedType)
+    ? requestedType as 'income' | 'expense' | 'transfer'
+    : 'all';
   const initialMethod = searchParams.get('method') || 'all';
   const initialAccount = searchParams.get('account') || 'all';
+  const requestedPage = Number(searchParams.get('page'));
+  const [page, setPage] = useState(Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
 
   const [search, setSearch] = useState(initialSearch);
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>(initialType);
@@ -46,12 +50,13 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
 
   // Sync to URL
   const updateUrlFilters = useCallback(
-    (newSearch: string, newType: string, newMethod: string, newAccount: string) => {
+    (newSearch: string, newType: string, newMethod: string, newAccount: string, newPage = 1) => {
       const params = new URLSearchParams(searchParams.toString());
       if (newSearch) params.set('search', newSearch); else params.delete('search');
       if (newType !== 'all') params.set('type', newType); else params.delete('type');
       if (newMethod !== 'all') params.set('method', newMethod); else params.delete('method');
       if (newAccount !== 'all') params.set('account', newAccount); else params.delete('account');
+      if (newPage > 1) params.set('page', String(newPage)); else params.delete('page');
       router.replace(`?${params.toString()}`, { scroll: false });
     },
     [router, searchParams]
@@ -90,7 +95,28 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
     updateUrlFilters('', 'all', 'all', 'all');
   };
 
+  const changePage = useCallback((targetPage: number) => {
+    setPage(targetPage);
+    updateUrlFilters(search, typeFilter, methodFilter, accountFilter, targetPage);
+  }, [search, typeFilter, methodFilter, accountFilter, updateUrlFilters]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const urlSearch = params.get('search') || '';
+    const urlType = params.get('type');
+    const urlPage = Number(params.get('page'));
+    setSearch(urlSearch);
+    setTypeFilter(urlType && ['income', 'expense', 'transfer'].includes(urlType)
+      ? urlType as 'income' | 'expense' | 'transfer'
+      : 'all');
+    setMethodFilter(params.get('method') || 'all');
+    setAccountFilter(params.get('account') || 'all');
+    setPage(Number.isInteger(urlPage) && urlPage > 0 ? urlPage : 1);
+  }, [searchParams]);
+
+  const historyRequestId = useRef(0);
   const loadHistory = useCallback(async (targetPage: number) => {
+    const requestId = ++historyRequestId.current;
     setLoading(true);
     setError(null);
     try {
@@ -104,23 +130,35 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
       if (search.trim()) filters.search = search.trim();
 
       const res = await fetchTransactionHistory(filters);
+      if (requestId !== historyRequestId.current) return;
       setRemoteTransactions(res.transactions || res.data || []);
-      setTotalCount(res.totalCount ?? res.summary?.count ?? 0);
-      setSummary(res.summary);
+      const nextTotalCount = res.totalCount ?? res.summary?.count ?? 0;
+      setTotalCount(nextTotalCount);
+      setSummary(res.summary || { totalIncome: 0, totalExpense: 0, netFlow: 0, count: nextTotalCount });
+      const lastPage = Math.max(1, Math.ceil(nextTotalCount / pageSize));
+      if (targetPage > lastPage) {
+        changePage(lastPage);
+      }
     } catch (err: any) {
+      if (requestId !== historyRequestId.current) return;
       setError(err?.message || 'Failed to load transaction history. Please retry.');
       setRemoteTransactions([]);
       setTotalCount(0);
+      setSummary({ totalIncome: 0, totalExpense: 0, netFlow: 0, count: 0 });
     } finally {
-      setLoading(false);
+      if (requestId === historyRequestId.current) setLoading(false);
     }
-  }, [pageSize, typeFilter, methodFilter, accountFilter, search]);
+  }, [pageSize, typeFilter, methodFilter, accountFilter, search, changePage]);
 
   useEffect(() => {
+    setLoading(true);
     const timer = setTimeout(() => {
       loadHistory(page);
     }, 200);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      historyRequestId.current += 1;
+    };
   }, [loadHistory, page]);
 
   const items = remoteTransactions;
@@ -356,7 +394,7 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
               variant="secondary"
               size="sm"
               disabled={page <= 1 || loading}
-              onClick={() => setPage(p => Math.max(1, p - 1))}
+              onClick={() => changePage(Math.max(1, page - 1))}
               className="!py-1 !px-2.5 text-xs"
             >
               Previous
@@ -368,7 +406,7 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
               variant="secondary"
               size="sm"
               disabled={page >= Math.ceil(totalCount / pageSize) || loading}
-              onClick={() => setPage(p => Math.min(Math.ceil(totalCount / pageSize), p + 1))}
+              onClick={() => changePage(Math.min(Math.ceil(totalCount / pageSize), page + 1))}
               className="!py-1 !px-2.5 text-xs"
             >
               Next

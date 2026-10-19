@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { PasswordField } from '@/components/ui/PasswordField';
 import { BrandLogo } from '@/components/ui/BrandLogo';
+import { Alert } from '@/components/ui/Alert';
 
 export default function ResetPassword({ params }: { params: Promise<{ token: string }> }) {
   const [password, setPassword] = useState('');
@@ -41,7 +42,7 @@ export default function ResetPassword({ params }: { params: Promise<{ token: str
       }
       router.push('/welcome?tab=signin');
     } catch {
-      setError('Network error. Please try again.');
+      setError('Connection error. The password service is temporarily unavailable. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -60,7 +61,12 @@ export default function ResetPassword({ params }: { params: Promise<{ token: str
         </p>
 
         <form onSubmit={submit} className="space-y-4">
-          <Field id="password" label={<span className="text-slate-200">New password</span>} error={error}>
+          {error && (
+            <Alert tone="danger" onDismiss={() => setError('')}>
+              {error}
+            </Alert>
+          )}
+          <Field id="password" label={<span className="text-slate-200">New password</span>}>
             <PasswordField
               value={password}
               onChange={e => setPassword(e.target.value)}

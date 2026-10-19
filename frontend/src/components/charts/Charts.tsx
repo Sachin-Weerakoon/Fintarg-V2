@@ -6,6 +6,7 @@
  * (light, dark and custom brand colours) automatically.
  */
 import React, { useId, useState } from 'react';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 export const CHART_COLORS = {
   income: 'var(--color-success-solid)',
@@ -146,7 +147,7 @@ export interface DonutSlice {
 }
 
 export function DonutChart({
-  data,
+  data: inputData,
   size = 190,
   stroke = 26,
   centerLabel,
@@ -161,7 +162,11 @@ export function DonutChart({
   onHover?: (index: number | null) => void;
 }) {
   const [active, setActive] = useState<number | null>(null);
+  const data = inputData.filter(slice => Number.isFinite(slice.value) && slice.value > 0);
   const total = data.reduce((s, d) => s + d.value, 0);
+  if (!data.length || total <= 0) {
+    return <EmptyState title="No chart data" helper="Record financial activity to see this breakdown." />;
+  }
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   let offset = 0;
@@ -221,7 +226,7 @@ export interface TrendPoint {
 }
 
 export function TrendChart({
-  data,
+  data: inputData,
   height = 260,
   formatValue = (n: number) => compact(n),
 }: {
@@ -231,6 +236,16 @@ export function TrendChart({
 }) {
   const id = useId();
   const [hover, setHover] = useState<number | null>(null);
+  const data = inputData.filter(point =>
+    Number.isFinite(point.income) &&
+    Number.isFinite(point.outflow) &&
+    Number.isFinite(point.net) &&
+    Number.isFinite(point.outflowLow ?? 0) &&
+    Number.isFinite(point.outflowHigh ?? 0)
+  );
+  if (!data.length || !data.some(point => point.income !== 0 || point.outflow !== 0)) {
+    return <EmptyState title="No trend data" helper="Record activity in this period to populate the trend chart." />;
+  }
   const W = 720;
   const H = height;
   const m = { t: 18, r: 18, b: 34, l: 46 };
@@ -350,7 +365,11 @@ export interface WaterfallStep {
   kind: 'start' | 'delta' | 'end';
 }
 
-export function WaterfallChart({ steps, height = 240, formatValue = compact }: { steps: WaterfallStep[]; height?: number; formatValue?: (n: number) => string }) {
+export function WaterfallChart({ steps: inputSteps, height = 240, formatValue = compact }: { steps: WaterfallStep[]; height?: number; formatValue?: (n: number) => string }) {
+  const steps = inputSteps.filter(step => Number.isFinite(step.value));
+  if (!steps.length || !steps.some(step => step.value !== 0)) {
+    return <EmptyState title="No cash-flow data" helper="Record income and expenses to build the cash-flow waterfall." />;
+  }
   const W = 720;
   const H = height;
   const m = { t: 22, r: 14, b: 44, l: 14 };
@@ -461,11 +480,15 @@ export function HeatCalendar({ cells, formatValue = compact }: { cells: HeatCell
 
 export function WeekdayBars({ values, formatValue = compact }: { values: number[]; formatValue?: (n: number) => string }) {
   const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const max = Math.max(1, ...values);
-  const peak = values.indexOf(Math.max(...values));
+  const chartValues = values.map(value => Number.isFinite(value) ? value : 0);
+  if (!chartValues.some(value => value > 0)) {
+    return <EmptyState title="No weekday data" helper="Record sales to see activity by day of the week." />;
+  }
+  const max = Math.max(1, ...chartValues);
+  const peak = chartValues.indexOf(Math.max(...chartValues));
   return (
     <div className="flex items-end gap-2 h-[120px]">
-      {values.map((v, i) => (
+      {chartValues.map((v, i) => (
         <div key={labels[i]} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group">
           <div className="text-[10px] font-semibold text-muted opacity-0 group-hover:opacity-100 transition-opacity num">{formatValue(v)}</div>
           <div

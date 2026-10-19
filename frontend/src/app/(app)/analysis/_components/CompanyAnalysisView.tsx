@@ -474,7 +474,7 @@ export function CompanyAnalysisView({
                   centerValue={formatRs(metrics.totalOperatingCosts)}
                 />
               ) : (
-                <div className="text-xs text-muted py-8">No recorded overhead expenses</div>
+                <EmptyState title="No recorded overhead expenses" helper="Add company operating costs to see the expense distribution." />
               )}
             </div>
           </Card>

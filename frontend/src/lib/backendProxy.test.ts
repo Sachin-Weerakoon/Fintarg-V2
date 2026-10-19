@@ -65,6 +65,18 @@ describe('Frontend Backend Proxy Integration', () => {
     expect(response.headers.get('set-cookie')).toBe('fintarg_token=jwt_sample_token; Path=/; HttpOnly; SameSite=Strict');
   });
 
+  it('returns a graceful 503 when proxyBackend cannot reach the upstream', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Connection refused'));
+    const request = new NextRequest('http://localhost:3000/api/auth/login', { method: 'POST' });
+
+    const response = await proxyBackend(request, '/api/auth/login', { mode: 'signin' });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Backend service temporarily unavailable',
+    });
+  });
+
   it('handles invalid non-JSON upstream response gracefully in proxyBackend', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response('Internal Server Error HTML', {

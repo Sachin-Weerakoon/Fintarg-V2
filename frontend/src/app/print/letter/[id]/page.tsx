@@ -30,9 +30,20 @@ export default function PrintLetterPage() {
   const body = letter?.body || 'No letter content available.';
   const mode = letter?.mode || 'personal';
   const company = state.companies?.find(c => c.id === letter?.companyId);
+  const bankAccount = state.bankAccounts?.find(account =>
+    account.accountNumber && body.includes(account.accountNumber)
+  );
+  const letterDate = letter?.date && /^\d{4}-\d{2}-\d{2}$/.test(letter.date)
+    ? new Date(`${letter.date}T00:00:00Z`).toLocaleDateString('en-LK', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'UTC',
+      })
+    : letter?.date;
 
   return (
-    <div className="min-h-screen bg-slate-100/70 p-4 sm:p-8 print:p-0 print:bg-white text-slate-900">
+    <div className="min-h-screen bg-slate-100/70 p-4 sm:p-8 print:min-h-0 print:p-0 print:bg-white text-slate-900">
       {/* Top action bar - hidden during print */}
       <div className="no-print max-w-4xl mx-auto mb-6 p-4 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-sm font-sans">
         <Link
@@ -58,14 +69,19 @@ export default function PrintLetterPage() {
       <FormalLetterSheet
         body={body}
         refNumber={savedLetter?.id ? `FNT-LTR-${savedLetter.id.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()}` : undefined}
-        date={letter?.date}
+        date={letterDate}
         mode={mode}
         companyName={company?.name}
         companyBr={company?.brNumber}
         companyTin={company?.tinNumber}
         companyAddress={company?.address}
         companyContact={company?.contact}
-        className="max-w-4xl mx-auto"
+        bankAccountDetails={bankAccount ? {
+          bankName: bankAccount.bankName,
+          accountNumber: bankAccount.accountNumber,
+          branch: bankAccount.branch,
+        } : undefined}
+        className="max-w-4xl mx-auto print:max-w-none"
       />
     </div>
   );
