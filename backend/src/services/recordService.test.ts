@@ -7,6 +7,7 @@ import { BankAccountModel } from '../models/BankAccount';
 import { BranchEntryModel } from '../models/BranchEntry';
 import { CardModel } from '../models/Card';
 import { ExpenseModel } from '../models/Expense';
+import { MedicalExpenseModel } from '../models/MedicalExpense';
 import { FinancePaymentModel } from '../models/FinancePayment';
 import { PawnedItemModel } from '../models/PawnedItem';
 import { SavingsGoalModel } from '../models/SavingsGoal';
@@ -1381,6 +1382,26 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
       const cash = await BankAccountModel.findOne({ userId: uid, accountType: 'cash' });
       assert.strictEqual(cash.balanceCents, -2000000);
       assert.strictEqual((await recomputeBalance(uid, String(cash._id))).driftCents, 0);
+    });
+  });
+  describe('medical expenses are linked to the financial ledger', () => {
+    it('creates a Medical ledger expense, and deleting either side removes both', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const medical: any = await createRecord('medicalExpenses', uid, { date: '2026-10-20', type: 'Lab test', amount: 300, note: 'gp visit' });
+      assert.ok(medical.expenseId, 'medical record stores its ledger expense id');
+      const expense: any = await ExpenseModel.findById(medical.expenseId).lean();
+      assert.strictEqual(expense.amountCents, 30000);
+      assert.strictEqual(expense.category, 'Medical');
+      assert.strictEqual(expense.sourceType, 'medical');
+      assert.strictEqual(expense.note, 'Medical: Lab test · gp visit');
+      assert.ok(await TransactionModel.exists({ userId: uid, referenceId: String(expense._id) }), 'ledger transaction posted');
+
+      await deleteRecord('medicalExpenses', uid, String(medical._id));
+      assert.strictEqual(await ExpenseModel.countDocuments({ userId: uid }), 0);
+
+      const second: any = await createRecord('medicalExpenses', uid, { date: '2026-10-21', type: 'Medicine', amount: 1200, note: '' });
+      await deleteRecord('expenses', uid, String(second.expenseId));
+      assert.strictEqual(await MedicalExpenseModel.countDocuments({ userId: uid }), 0);
     });
   });
 });

@@ -368,6 +368,7 @@ export async function loadPersistedData(plan: UserPlan = 'basic'): Promise<Parti
       type: row.type,
       amount: (row.amountCents || 0) / 100,
       note: row.note,
+      expenseId: row.expenseId ? String(row.expenseId) : undefined,
     })),
     documents: documents.map(row => ({
       id: row._id,

@@ -560,6 +560,25 @@ export async function createRecord(kind: RecordKind, userId: string, input: Reco
     throw error;
   }
 
+  if (kind === 'medicalExpenses') {
+    // Every medical cost is also a real expense, so it shows in the financial ledger and balances.
+    try {
+      const expense: any = await createRecord('expenses', userId, {
+        date: data.date,
+        amount: Number(data.amountCents || 0) / 100,
+        category: 'Medical',
+        note: data.note ? `Medical: ${data.type} · ${data.note}` : `Medical: ${data.type}`,
+        recurring: false,
+        sourceType: 'medical',
+      });
+      record.set('expenseId', expense._id);
+      await record.save();
+    } catch (error) {
+      await models[kind].deleteOne({ _id: record._id, userId });
+      throw error;
+    }
+  }
+
   await AuditLogModel.create({ userId, action: 'create', resourceType: kind, resourceId: record._id });
   return record.toObject();
 }
@@ -759,6 +778,11 @@ export async function deleteRecord(kind: RecordKind, userId: string, id: string)
   if (kind === 'documents' && deleted.fileId) await FileModel.deleteOne({ _id: deleted.fileId, userId });
   if (kind === 'expenses' || kind === 'incomes') {
     await reverseTransaction(userId, deleted._id.toString());
+  }
+  // Medical record <-> ledger expense: deleting either side removes the other.
+  if (kind === 'expenses') await MedicalExpenseModel.deleteMany({ expenseId: deleted._id, userId });
+  if (kind === 'medicalExpenses' && deleted.expenseId && await ExpenseModel.exists({ _id: deleted.expenseId, userId })) {
+    await deleteRecord('expenses', userId, deleted.expenseId.toString());
   }
   await AuditLogModel.create({ userId, action: 'delete', resourceType: kind, resourceId: deleted._id });
 }

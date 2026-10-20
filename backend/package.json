@@ -10,7 +10,8 @@
     "test": "tsx --import ./src/test/setup.ts --test src/**/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "db:drop-locked-until-ttl": "tsx src/scripts/dropLockedUntilTtlIndex.ts",
-    "db:drop-profile-ttl": "tsx src/scripts/dropProfileTtlIndex.ts"
+    "db:drop-profile-ttl": "tsx src/scripts/dropProfileTtlIndex.ts",
+    "db:backfill-medical-expenses": "tsx src/scripts/backfillMedicalExpenses.ts"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
