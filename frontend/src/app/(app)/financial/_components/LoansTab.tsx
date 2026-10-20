@@ -21,6 +21,7 @@ import {
   calculateAmortizationSchedule,
   AmortizationRow,
 } from '@/utils/loanMath';
+import { fetchLoanPayoff } from '@/services/storeApi';
 import type { Loan } from '@/types';
 
 export function LoansTab() {
@@ -276,11 +277,19 @@ export function LoansTab() {
                           <Button
                             variant="secondary"
                             size="sm"
-                            onClick={() => {
+                            onClick={async () => {
+                              const today = new Date().toISOString().slice(0, 10);
+                              // Settlement includes interest accrued since the last installment, which only the server knows exactly.
+                              let settlementAmount = ln.balance;
+                              try {
+                                settlementAmount = (await fetchLoanPayoff(ln.id, today)).payoffAmount;
+                              } catch {
+                                toast.error('Could not fetch the exact settlement amount; using the outstanding balance instead');
+                              }
                               setRepayingLoan(ln);
                               setRepaymentForm({
-                                amount: String(ln.balance),
-                                date: new Date().toISOString().slice(0, 10),
+                                amount: String(settlementAmount),
+                                date: today,
                                 note: 'Full payoff / Early settlement',
                                 paymentMethod: 'cash',
                                 bankAccountId: '',
@@ -539,7 +548,7 @@ export function LoansTab() {
                 onChange={e => setRepaymentForm(f => ({ ...f, bankAccountId: e.target.value }))}
               >
                 <option value="">Select Account...</option>
-                {state.bankAccounts.map(b => (
+                {state.bankAccounts.filter(b => !b.isArchived).map(b => (
                   <option key={b.id} value={b.id}>
                     {b.bankName} - {b.accountNumber} ({formatRs(b.currentBalance)})
                   </option>
