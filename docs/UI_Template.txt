@@ -1,0 +1,814 @@
+UI DESIGN TEMPLATE - WEB AND MOBILE
+Personal Finance &
+Life Management
+Web Platform
+Poppins design system with web and mobile
+screens for Basic and Business editions.
+DOCUMENT ID
+UIX-001
+VERSION
+2.0 (Draft for review)
+DATE
+29 September 2026
+BASED ON
+SRS-001 and FRS-001
+TYPEFACE
+Poppins (Google Fonts, OFL licence)
+Confidential - prepared from the translated requirements discussion. Draft for stakeholder review.
+
+UI Design Template - Web and Mobile
+UIX-001  |  v2.0
+Confidential - Draft for review
+Page 2
+Contents
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 3
+1. Design Principles
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 3
+2. Colour System
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 4
+3. Typography, Spacing and Shape
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 5
+4. Core Components
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 6
+5. Navigation and Layout
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 7
+6. Web UI Screens (Desktop)
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 11
+7. Mobile UI Screens
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 13
+8. Key Interaction Rules
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 13
+9. Accessibility Checklist
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 13
+10. Handoff Notes
+
+UI Design Template - Web and Mobile
+UIX-001  |  v2.0
+Confidential - Draft for review
+Page 3
+1. Design Principles
+The target users are ordinary people managing a tight monthly budget, often on a phone. The design
+therefore favours clarity and calm over decoration.
+Principle
+What it means on screen
+Answer the main question first
+The dashboard opens with one number: net position for this month, with a clear
+warning if it is negative.
+Plain language
+Labels such as "Remaining money" and "Shortfall", not accounting jargon.
+Mobile first
+Designed for a 360 px screen, then widened for tablet and desktop.
+Colour carries meaning, never
+alone
+Green = on track, amber = attention, red = problem. Always paired with text or an
+icon.
+Personal but consistent
+The user picks the theme colour; layout, spacing and behaviour never change.
+Two editions, one system
+Basic shows fewer menu items; Business adds Advanced and company features.
+2. Colour System
+Colours are defined as tokens so the user's chosen theme colour (FR-8.2) replaces only the Primary
+tokens.
+Brand and interface
+ Primary (theme)
+#0FA3B1
+Buttons, links, active navigation, progress bars. User can
+change this.
+Primary dark
+#14284B
+Headers, key numbers, sidebar. Also user-themeable.
+Primary tint
+#EAF5F7
+Selected states, tracks, subtle panels.
+Background
+#F4F8FA
+Page background.
+Surface
+#FFFFFF
+Cards, inputs, dialogs.
+Text
+#222B38
+Body text. Contrast 13:1 on white.
+Muted text
+#5B6573
+Secondary text. Contrast 5.9:1 on white.
+Status colours (fixed, not themeable)
+ Success
+#2E9E6B
+On track, saved, active, paid.
+Warning
+#F2A900
+Due soon, shortfall warning, expiring agreement.
+Danger
+#D64545
+Negative balance, overdue, delete actions.
+Warning tint
+#FFF3D1
+Background of warning banners.
+NOTE  Custom theme colours must be checked automatically for at least 4.5:1 contrast against white text; if a
+chosen colour fails, the system darkens it (NFR-9).
+
+UI Design Template - Web and Mobile
+UIX-001  |  v2.0
+Confidential - Draft for review
+Page 4
+3. Typography, Spacing and Shape
+ Style
+Size / weight
+Use
+Display number
+32 px SemiBold
+Net position, target amount
+Heading 1
+24 px SemiBold
+Page titles
+Heading 2
+18 px Medium
+Section titles, card titles
+Body
+16 px Regular (min. 14 px)
+All text, forms
+Caption
+12 px Regular
+Hints, dates, units
+Typeface: Poppins (Google Fonts, open licence) on web and mobile. Weights used: Regular 400 for
+body, Medium 500 for labels, SemiBold 600 for headings and numbers, Bold 700 sparingly. CSS stack:
+Poppins, 'Noto Sans Sinhala', 'Noto Sans Tamil', system-ui, sans-serif - the fallbacks cover Sinhala and
+Tamil, which Poppins does not include. Host the font files with the site (no third-party request) and
+load only the four weights above. Amounts are always formatted as Rs. 50,000.
+Token
+Value
+Spacing scale
+4, 8, 12, 16, 24, 32, 48 px
+Corner radius
+Cards 12 px, buttons and chips fully rounded, inputs 8 px
+Shadow
+One soft shadow for cards: 0 2px 8px rgba(20,40,75,0.08)
+Touch target
+At least 44 x 44 px
+Icons
+Outline style, 24 px, one icon set throughout
+Motion
+150-250 ms fades and slides; respects the reduced-motion setting
+
+UI Design Template - Web and Mobile
+UIX-001  |  v2.0
+Confidential - Draft for review
+Page 5
+4. Core Components
+ BUTTONS
+STATUS BADGES
+FORM FIELD
+TOGGLE AND PROGRESS
+Primary
+Secondary
+Danger
+Active
+Due soon
+Overdue
+Draft
+Monthly salary (Rs.)
+50,000
+Amount must be greater than zero
+ 40%  -  Rs. 12,000 of Rs. 30,000
+Component
+Behaviour
+Summary card
+Large number, label and one supporting line. Turns amber or red border on warning.
+Alert banner
+Warning tint with icon, one sentence and one action (e.g. "Record as loan").
+Progress bar
+Shows saved amount, target and percentage together; never percentage only.
+Form field
+Label above, hint below, error text in red with icon; numeric keypad for amounts.
+Empty state
+Friendly line and one button, e.g. "Add your salary to get started".
+Confirm dialog
+Used before deleting any financial record, goal, document or agreement.
+
+UI Design Template - Web and Mobile
+UIX-001  |  v2.0
+Confidential - Draft for review
+Page 6
+5. Navigation and Layout
+Mobile uses a bottom bar with four items; desktop uses a left sidebar. Items differ by edition (FRS
+section 4).
+Menu item
+Contains
+Basic
+Business
+Home
+Dashboard: net position, alerts, goal, upcoming payments
+Yes
+Yes
+Financial
+Income, expenses, finance payments, loans, pawned items
+Yes
+Yes
+Analysis
+Monthly analysis, charts, next-month preview
+Yes
+Yes
+Goals
+Savings goals and personal spending plan
+Yes
+Yes
+Letters
+Bank, offer and general letters
+Personal
+Personal +
+Business
+Medical
+Medical expenses, documents, reminders
+Yes
+Yes
+Advanced
+Business agreements, company profiles
+Hidden
+Yes
+Settings
+Theme, profile, contacts, document vault, reminders
+Yes
+Yes
+On mobile the bottom bar shows Home, Analysis, Goals and More; the remaining items sit under More.
+Desktop layout (Business edition shown)
+Full web screens are shown in section 6 and mobile screens in section 7.
+Breakpoint
+Layout
+Under 600 px (phone)
+Single column, bottom navigation, cards stacked
+600-1024 px (tablet)
+Two-column cards, collapsible sidebar
+Over 1024 px (desktop)
+Fixed sidebar, up to 4 summary cards per row, content max width 1200 px
+
+UI Design Template - Web and Mobile
+UIX-001  |  v2.0
+Confidential - Draft for review
+Page 7
+6. Web UI Screens (Desktop)
+Full-width browser layouts at 1280 px, shown scaled. The left sidebar carries the main navigation; a
+top bar shows the page title, the user's edition and profile. Figures use the worked example from the
+conversation.
+6.1 Choose your plan (onboarding)
+ https://app.yourdomain.lk
+Take control
+of your month
+Track income and expenses, plan
+savings and keep your papers in
+one safe place.
+See if you can make it through the month
+Plan daily and monthly savings
+Generate letters in seconds
+Choose how you will use the app
+You can upgrade later without losing data.
+Basic
+Salary, expenses, savings
+Rs. ___ / month
++  Income and expenses
++  Loans and pawn interest
++  Monthly analysis
++  Savings goals
++  Personal letters
+Continue as Basic
+Business
+Everything in Basic, plus
+Rs. ___ / month
++  Business income
++  Company profiles
++  Business letters
++  Agreements (Advanced)
++  Priority support
+Continue as Business
+Already registered?  Sign in
+First screen after registration. The user picks Basic or Business (FR-1.2). Pricing is a placeholder until the business model is
+decided.
+6.2 Dashboard
+ https://app.yourdomain.lk
+Finance App
+Dashboard
+Financial
+Analysis
+Goals
+Letters
+Medical
+Advanced
+Settings
+Dashboard  -  September 2026
+Business
+Shortfall of Rs. 5,000 this month. Borrowing adds interest.
+Record as loan >
+Net position
+Rs. -5,000
+Income
+50,000
+Total outflow
+55,000
+Saved this month
+12,000
+Expenses by category
+12,000
+Rent
+9,000
+Food
+5,000
+Transport
+4,000
+Personal
+Savings goal
+40%
+Rs. 12,000 of Rs. 30,000
+Rs. 1,000 per day
+Upcoming
+5 Oct
+Pawn interest  4,500
+10 Oct
+Finance payment  25,000
+15 Oct
+Loan interest  250
+Net position, shortfall warning with a one-click loan action, category chart, savings goal and upcoming payments (FR-5,
+FR-4.8, FR-6).
+
+UI Design Template - Web and Mobile
+UIX-001  |  v2.0
+Confidential - Draft for review
+Page 8
+6.3 Financial - Expenses
+ https://app.yourdomain.lk
+Finance App
+Dashboard
+Financial
+Analysis
+Goals
+Letters
+Medical
+Advanced
+Settings
+Financial
+Business
+Income
+Expenses
+Finance payments
+Loans
+Pawned items
+Date
+Category
+Note
+Amount (Rs.)
+28 Sep
+Food
+Groceries
+3,200
+28 Sep
+Transport
+Bus fare
+400
+27 Sep
+Rent
+Monthly rent
+12,000
+27 Sep
+Personal
+Cinema
+1,500
+26 Sep
+Food
+Lunch
+850
+25 Sep
+Medical
+Pharmacy
+1,200
+Showing 6 of 41 entries
+Month total  30,000
+Add expense
+Date
+29 Sep 2026
+Category
+Food
+Amount (Rs.)
+1,000
+Note
+Dinner
+Save expense
+Tabs group the money features (FR-13). Add-expense form stays visible beside the list for fast daily entry (FR-3).
+6.4 Analysis
+ https://app.yourdomain.lk
+Finance App
+Dashboard
+Financial
+Analysis
+Goals
+Letters
+Medical
+Advanced
+Settings
+Analysis
+Business
+<   September 2026   >
+Monthly summary
+Total income
+50,000
+Living expenses
+30,000
+Finance payments
+25,000
+Loan interest
+0
+Total outflow
+55,000
+Shortfall
+5,000
+Where the money goes
+Rent
+Food
+Transport
+Personal
+Shortfall warning
+You are Rs. 5,000 short this month.
+Borrowing creates a loan with interest.
+Record as loan >
+Next month preview
+Pawn interest due 5 Oct
+4,500
+Finance payment
+25,000
+Projected balance
+-3,500
+Export analysis as PDF
+Separate analysis section: monthly totals, shortfall alert, next-month preview and PDF export (FR-5).
+
+UI Design Template - Web and Mobile
+UIX-001  |  v2.0
+Confidential - Draft for review
+Page 9
+6.5 Savings goals
+ https://app.yourdomain.lk
+Finance App
+Dashboard
+Financial
+Analysis
+Goals
+Letters
+Medical
+Advanced
+Settings
+Savings goals
+Business
+TARGET BY END OF MONTH
+Rs. 30,000
+Rs. 12,000 saved   -   Rs. 18,000 to go
+Daily amount
+Rs. 1,000
+Days
+30
+Add saving
+Amount (Rs.)
+1,000
+Date
+29 Sep
+Add
+Feasibility check
+Free cash this month is Rs. -5,000.
+This target may not be achievable.
+Adjust goal
+Recent savings
+28 Sep
++1,000
+27 Sep
++1,000
+26 Sep
++1,000
+25 Sep
++1,000
+24 Sep
++1,000
+Target, progress, daily amount, feasibility check and saving log (FR-6).
+6.6 Letters
+ https://app.yourdomain.lk
+Finance App
+Dashboard
+Financial
+Analysis
+Goals
+Letters
+Medical
+Advanced
+Settings
+Letters
+Business
+Personal
+Business
+Template
+Bank letter
+Addressed to
+The Manager, Bank
+Account number
+0012 3456 789
+Purpose
+Loan settlement request
+Details are filled from your profile.
+Generate letter
+Your Name
+Address line, City
+29 September 2026
+The Manager, Bank
+Yours faithfully,
+Edit text
+Download PDF
+Personal or Business toggle, template, pre-filled fields and live paper preview (FR-10).
+
+UI Design Template - Web and Mobile
+UIX-001  |  v2.0
+Confidential - Draft for review
+Page 10
+6.7 Advanced - Agreements (Business)
+ https://app.yourdomain.lk
+Finance App
+Dashboard
+Financial
+Analysis
+Goals
+Letters
+Medical
+Advanced
+Settings
+Advanced  -  Agreements
+Business
+Agreements
+Companies
++ Add agreement
+Title
+Other party
+Ends
+Status
+Supply agreement
+ABC Traders
+31 Dec 2026
+Active
+Signed copy attached
+Office lease
+Mr. Perera
+18 Oct 2026
+Ends in 20 days
+Signed copy attached
+Service contract
+XYZ Pvt Ltd
+01 Sep 2026
+Expired
+Signed copy attached
+Partnership draft
+Silva & Co
+-
+Draft
+Signed copy attached
+Agreements list with status badges and expiry warnings (FR-11).
+6.8 Settings - Appearance
+ https://app.yourdomain.lk
+Finance App
+Dashboard
+Financial
+Analysis
+Goals
+Letters
+Medical
+Advanced
+Settings
+Settings
+Business
+Appearance
+Profile
+Contacts
+Documents
+Reminders
+Plan
+Appearance
+Theme colour
+Dark mode
+Text size
+Small
+Medium
+Large
+Preview
+Net position
+Rs. -5,000
+ Primary button
+On track
+Theme colour, dark mode and text size with a live preview (FR-8). Other tabs hold profile, contacts and documents (FR-8,
+FR-9).
+
+UI Design Template - Web and Mobile
+UIX-001  |  v2.0
+Confidential - Draft for review
+Page 11
+7. Mobile UI Screens
+The same features at 360 px. The bottom bar replaces the sidebar; tables become cards; side forms
+open as full-screen sheets.
+7.1 Money and planning screens (Basic and Business)
+Good morning
+September 2026
+NET POSITION THIS MONTH
+Rs. -5,000
+Income 50,000  |  Outflow 55,000
+Shortfall of Rs. 5,000
+Borrowing adds interest. Record as loan?
+Income
+50,000
+Expenses
+30,000
+Finance
+25,000
+Savings goal
+40%
+Rs. 12,000 of Rs. 30,000
+Rs. 1,000 per day
+Upcoming: Pawn interest
+Due 5 October  -  Rs. 4,500
+Home
+Analysis
+Goals
+More
+Analysis
+Monthly view
+<  September 2026  >
+Expenses by category
+Rent
+Food
+Transport
+Personal
+Total income
+50,000
+Living expenses
+30,000
+Finance payments
+25,000
+Total outflow
+55,000
+Shortfall
+5,000
+Next month preview
+Pawn interest 4,500 due - plan ahead
+Home
+Analysis
+Goals
+More
+Savings goal
+End of month target
+TARGET
+Rs. 30,000
+Rs. 12,000 saved  -  Rs. 18,000 to go
+Daily amount
+Rs. 1,000
+Days
+30
+Feasibility check
+Free cash this month is Rs. -5,000.
+This target may not be achievable.
++ Add today's saving
+Adjust goal
+Home
+Analysis
+Goals
+More
+Dashboard
+First screen. Shows the shortfall
+warning and upcoming pawn
+interest (FR-5, FR-4.8).
+Analysis
+Category bars, monthly totals and
+next-month preview (FR-5).
+Savings goal
+Target clearly shown, with feasibility
+warning (FR-6).
+
+UI Design Template - Web and Mobile
+UIX-001  |  v2.0
+Confidential - Draft for review
+Page 12
+7.2 Personal and business screens
+Letters
+Generate a document
+Personal
+Business
+Bank letter
+Offer letter
+General
+Date
+To: The Manager, Bank
+Sincerely, [Your name]
+Edit
+Download PDF
+Details auto-filled from your profile
+Home
+Analysis
+Goals
+More
+Settings
+Make it yours
+Theme colour
+Dark mode
+Profile and address
+Name, NIC, portfolio link
+>
+Contact numbers
+Up to 3 + family contacts
+>
+Document vault
+CV, NIC, bank documents
+>
+Reminders
+Email and in-app
+>
+Home
+Analysis
+Goals
+More
+Advanced
+Business edition
+Agreements
+Companies
+Supply agreement
+With ABC Traders
+Active
+View
+Office lease
+With Mr. Perera
+Ends in 20 days
+View
+Service contract
+With XYZ Pvt Ltd
+Expired
+View
++
+Home
+Analysis
+Goals
+More
+Letter generator
+Personal or Business toggle,
+template chips, pre-filled preview
+(FR-10).
+Settings
+Theme colour picker, profile,
+contacts, documents (FR-8, FR-9).
+Advanced (Business)
+Agreements with status badges and
+add button (FR-11).
+7.3 How web screens adapt to mobile
+ Web element
+Mobile behaviour
+Left sidebar
+Bottom bar with Home, Analysis, Goals, More; other items under More
+Row of four summary cards
+Hero card for net position, other figures in a 3-up strip below
+Data tables (expenses, agreements)
+Stacked cards with the amount or status on the right
+Side form (add expense)
+Floating + button opens a full-screen form sheet
+Two-column layouts (letters, settings)
+Single column; preview opens on a separate step
+Hover details and tooltips
+Tap to reveal; no information only on hover
+
+UI Design Template - Web and Mobile
+UIX-001  |  v2.0
+Confidential - Draft for review
+Page 13
+8. Key Interaction Rules
+ Situation
+Design behaviour
+Shortfall detected
+Dashboard number turns amber/red, warning banner appears, one action offers
+to record a loan (FR-5.3, FR-4.4).
+Savings goal not feasible
+Amber feasibility box explains why in one sentence and offers "Adjust goal"
+(FR-6.5).
+Theme change
+Preview updates instantly; Save applies to all screens and devices (FR-8.2, FR-8.8).
+Letter generation
+Missing profile fields are listed with a link to fix them before the letter is produced.
+Upload error
+States the reason (type or size) and how to fix it; never a generic failure message.
+Basic user meets a Business
+feature
+Feature is hidden, not greyed out, unless a plan upgrade is being promoted.
+Reminders
+In-app badge on Home; email on the due date and 3 days before.
+9. Accessibility Checklist
+  Text contrast at least 4.5:1, including on user-chosen themes.
+ All controls reachable and usable by keyboard; visible focus ring.
+ Every icon has a text label or accessible name.
+ Status is never shown by colour alone.
+ Form errors are announced to screen readers and shown next to the field.
+ Supports browser text zoom up to 200% without breaking layout.
+10. Handoff Notes
+  These wireframes fix layout, hierarchy and behaviour; final visual polish (illustrations, icons, logo)
+comes after the product name and branding are confirmed.
+ Build the colour, spacing and Poppins type values in sections 2 and 3 as design tokens (CSS
+variables) so themes work from day one.
+ A Figma file can be produced from these pages; the components in section 4 are the starting
+library.
+ Screens still to design: add income/expense forms (mobile), loan and pawn forms, documents list,
+medical section, admin panel.
+TO CONFIRM  Product name, logo and final brand colours are not yet decided. The teal and navy palette is a working
+proposal that the theme setting can override.

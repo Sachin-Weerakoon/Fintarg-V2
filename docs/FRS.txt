@@ -1,0 +1,964 @@
+FUNCTIONAL REQUIREMENTS SPECIFICATION
+Personal Finance &
+Life Management
+Web Platform
+What the system must do, module by module,
+traced back to the stakeholder discussion.
+DOCUMENT ID
+FRS-001
+VERSION
+1.0 (Draft for review)
+DATE
+29 September 2026
+COMPANION DOC
+SRS-001 Software Requirements Specification
+PLATFORM
+Responsive web application
+Confidential - prepared from the translated requirements discussion. Draft for stakeholder review.
+
+Functional Requirements Specification
+FRS-001  |  v1.0
+Confidential - Draft for review
+Page 2
+Contents
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 3
+1. Introduction
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 3
+1.1 Purpose
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 3
+1.2 Product summary
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 3
+1.3 How requirements are written
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 3
+1.4 Source sections
+ .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 4
+2. Functional Requirements by Module
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 4
+FR-1 Accounts and User Categories
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 4
+FR-2 Income Management
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 4
+FR-3 Daily Expense Management
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 5
+FR-4 Finance Payments, Loans and Pawned Items
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 5
+FR-5 Monthly Analysis
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 6
+FR-6 Savings Goals
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 6
+FR-7 Planned Personal Spending
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 6
+FR-8 Settings and Personalisation
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 7
+FR-9 Document Vault
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 7
+FR-10 Letter Generator
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 8
+FR-11 Advanced Section (Business Agreements)
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 8
+FR-12 Medical Section
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 8
+FR-13 Financial Section
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 9
+FR-14 User Interface and Navigation
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 9
+FR-15 Plans and Packaging
+ .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 10
+3. Calculation Rules and Worked Example
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 10
+4. Feature Access by User Category
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 11
+5. Key Use Cases
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 12
+6. Validation and Error Handling
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 12
+7. Acceptance Criteria (summary)
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 12
+8. Traceability to the Conversation
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 12
+9. Open Questions for the Stakeholder
+
+Functional Requirements Specification
+FRS-001  |  v1.0
+Confidential - Draft for review
+Page 3
+1. Introduction
+1.1 Purpose
+This Functional Requirements Specification (FRS) defines what the system must do: each function, its inputs,
+outputs and rules. It is the detailed companion to the Software Requirements Specification (SRS-001), which
+covers scope, users, quality attributes and constraints.
+1.2 Product summary
+A web platform that helps ordinary people (salaried employees, government workers, business owners) track daily
+income and expenses, understand whether they can make it through the month, plan savings, and keep their
+personal and business paperwork (documents, letters, agreements) in one place. It is offered in two categories: a
+simple Basic version and a fuller Business version.
+1.3 How requirements are written
+ Field
+Meaning
+ID
+Unique reference, e.g. FR-4.7. Group number = module.
+Priority
+Must = required for the release; Should = important, include if possible; Could = nice to have.
+Tier
+Basic = Basic users; Business = Business users only; Both = all users.
+Source
+S1-S7 = the numbered section of the translated conversation the requirement comes from (see 1.4).
+Proposed = not said by the speaker; added by the analyst to make the requirement complete and testable.
+Needs stakeholder approval.
+1.4 Source sections
+ Ref
+Section of translated conversation
+S1
+Basic concept of the system (target users, daily income and expenses, monthly management)
+S2
+Financial analysis and expense management (shortfall, loan and interest, savings goal, personal spending,
+pawn interest)
+S3
+Settings and personalisation (UI colours, profile, contacts, documents)
+S4
+Generating letters and documents (bank letter, offer letter, personal or business)
+S5
+Business agreements and advanced features
+S6
+Medical and financial sections
+S7
+User-friendly interface and customer categories (Basic / Business)
+NOTE  About 60% of the requirements below come directly from the conversation. Anything marked Proposed is my
+recommendation and can be removed or changed without affecting the stated requirements.
+
+Functional Requirements Specification
+FRS-001  |  v1.0
+Confidential - Draft for review
+Page 4
+2. Functional Requirements by Module
+FR-1 Accounts and User Categories
+Registration, sign-in and the Basic / Business split that lets the product be sold to two customer groups.
+ID
+Requirement
+Priority
+Tier
+Source
+FR-1.1
+A visitor can register with mobile number or email and a password.
+Must
+Both
+Proposed
+FR-1.2
+During onboarding the user chooses a category: Basic (salaried,
+government or ordinary income) or Business.
+Must
+Both
+S7
+FR-1.3
+Users can sign in, sign out and reset a forgotten password through a
+verified link or code.
+Must
+Both
+Proposed
+FR-1.4
+Visible modules and features depend on the user's category (see
+matrix in section 4).
+Must
+Both
+S7
+FR-1.5
+A Basic user can upgrade to Business without losing existing data.
+Should
+Both
+Proposed
+FR-1.6
+An Administrator role can view users, change a user's category or plan,
+and deactivate accounts.
+Should
+Both
+Proposed
+FR-2 Income Management
+Recording what the user earns. Example from S1: a government employee with a basic salary of Rs. 50,000.
+ID
+Requirement
+Priority
+Tier
+Source
+FR-2.1
+The user can add an income source with name, type (salary, business,
+other), amount, frequency and date received.
+Must
+Both
+S1
+FR-2.2
+A fixed monthly salary can be entered once and is counted every month
+automatically.
+Must
+Both
+S1
+FR-2.3
+A user can hold several income sources at once.
+Should
+Both
+Proposed
+FR-2.4
+Business users can record business income per day, week or month.
+Should
+Business
+S1
+FR-2.5
+Income entries can be edited or deleted; changes are kept in an audit
+history.
+Should
+Both
+Proposed
+FR-3 Daily Expense Management
+Recording day-to-day spending so the month can be managed.
+ID
+Requirement
+Priority
+Tier
+Source
+FR-3.1
+The user can add an expense with date, amount, category and optional
+note.
+Must
+Both
+S1
+FR-3.2
+Default categories include rent, food, transport, utilities, medical and
+other; users can add custom categories.
+Must
+Both
+S1
+FR-3.3
+Recurring expenses (e.g. rent) can be set once and are added
+automatically each month.
+Should
+Both
+Proposed
+FR-3.4
+The system shows daily, weekly and monthly expense totals.
+Must
+Both
+S2
+FR-3.5
+A dedicated Personal / Enjoyment category exists for the user's own
+leisure spending.
+Must
+Both
+S2
+FR-3.6
+Expenses can be edited or deleted; totals update immediately.
+Must
+Both
+Proposed
+
+Functional Requirements Specification
+FRS-001  |  v1.0
+Confidential - Draft for review
+Page 5
+FR-4 Finance Payments, Loans and Pawned Items
+Fixed obligations, borrowing and interest. Examples from S1/S2: finance payments of Rs. 25,000 a month;
+borrowing to cover a Rs. 5,000 shortfall; interest due on pawned jewellery or gold.
+TO CONFIRM  Interest rules (simple vs compound, monthly vs annual, pawn interest as fixed amount vs rate) were not
+specified. The system will support a per-record choice; confirm defaults.
+ID
+Requirement
+Priority
+Tier
+Source
+FR-4.1
+The user can record a finance payment (instalment, lease or loan
+repayment) with lender, monthly amount, due day and remaining
+months.
+Must
+Both
+S1
+FR-4.2
+All active finance payments are included automatically in the month's
+total obligations.
+Must
+Both
+S2
+FR-4.3
+The user can record borrowed money with lender, principal, interest
+rate, interest method, start date and due date.
+Must
+Both
+S2
+FR-4.4
+When a shortfall is detected, the system offers to record the missing
+amount as a loan (pre-filled with the shortfall).
+Should
+Both
+S2
+FR-4.5
+Interest on loans is calculated and added to future obligations, and its
+effect on remaining money is shown.
+Must
+Both
+S2
+FR-4.6
+The user can record loan repayments; outstanding balance is updated.
+Should
+Both
+Proposed
+FR-4.7
+The user can record a pawned item (gold or jewellery) with description,
+amount received, interest amount or rate, next interest due date and
+redemption date.
+Must
+Both
+S2
+FR-4.8
+The system sends reminders (in-app, plus email or SMS if enabled)
+before finance payments, loan interest and pawn interest fall due.
+Must
+Both
+S2
+FR-5 Monthly Analysis
+A separate Analysis section (S2) that answers: can I make it through this month, and what is left?
+ID
+Requirement
+Priority
+Tier
+Source
+FR-5.1
+A separate Analysis page is available from the main navigation.
+Must
+Both
+S2
+FR-5.2
+For the selected month it shows total income, living expenses, finance
+payments, planned personal spending, savings set aside, total outflow
+and net position.
+Must
+Both
+S2
+FR-5.3
+If total outflow exceeds income, the system shows the shortfall amount
+with a clear warning (e.g. Rs. 55,000 outflow vs Rs. 50,000 income =
+Rs. 5,000 short).
+Must
+Both
+S2
+FR-5.4
+On a shortfall, the system explains that borrowing creates a loan with
+interest and shows the projected effect on remaining money.
+Must
+Both
+S2
+FR-5.5
+The remaining money figure (income minus expenses, obligations,
+interest and savings) is shown prominently.
+Must
+Both
+S2
+FR-5.6
+Next-month preview lists known upcoming obligations (e.g. pawn
+interest) and the projected balance after them.
+Should
+Both
+S2
+FR-5.7
+Charts: expenses by category, income vs expenses over months.
+Should
+Both
+Proposed
+FR-5.8
+A month selector lets the user review previous months.
+Should
+Both
+Proposed
+FR-5.9
+The analysis can be exported as a PDF.
+Could
+Both
+Proposed
+
+Functional Requirements Specification
+FRS-001  |  v1.0
+Confidential - Draft for review
+Page 6
+FR-6 Savings Goals
+Daily and monthly savings targets. Example from S2: save Rs. 1,000 per day, giving a Rs. 30,000 target by month
+end.
+TO CONFIRM  The speaker said the system "should show Rs. 20,000" after the Rs. 30,000 goal. The most likely meaning is
+the amount left to spend after setting aside Rs. 30,000 from Rs. 50,000. Please confirm (see SRS Appendix A).
+ID
+Requirement
+Priority
+Tier
+Source
+FR-6.1
+The user can create a goal with name, target amount and end date.
+Must
+Both
+S2
+FR-6.2
+The user can define the goal by daily amount (Rs. 1,000 x 30 days =
+Rs. 30,000) or by monthly target; the system derives the other.
+Must
+Both
+S2
+FR-6.3
+The goal card clearly displays the target (e.g. "Target: Rs. 30,000"),
+amount saved so far, amount remaining and a progress bar.
+Must
+Both
+S2
+FR-6.4
+The user can log savings contributions (daily or lump sum).
+Must
+Both
+S2
+FR-6.5
+Feasibility check: the system compares the goal with free cash
+(income minus expenses and obligations) and warns when the goal
+cannot be met.
+Must
+Both
+Proposed
+FR-6.6
+Multiple goals can exist at once.
+Could
+Both
+Proposed
+FR-7 Planned Personal Spending
+A monthly allowance for the user's own enjoyment (S2 example: Rs. 5,000).
+ID
+Requirement
+Priority
+Tier
+Source
+FR-7.1
+The user can set a planned personal spending amount for a month.
+Must
+Both
+S2
+FR-7.2
+Actual personal spending is tracked against the plan, with a warning
+when 80% and 100% are reached.
+Should
+Both
+Proposed
+FR-7.3
+The planned amount is included in the monthly analysis and
+next-month projection.
+Must
+Both
+S2
+FR-8 Settings and Personalisation
+Everything the user can configure about the interface and their own details (S3).
+ID
+Requirement
+Priority
+Tier
+Source
+FR-8.1
+A Settings section is available from the main navigation.
+Must
+Both
+S3
+FR-8.2
+The user can change UI colours using preset palettes and a custom
+accent colour; the change applies across the whole system.
+Must
+Both
+S3
+FR-8.3
+Light and dark mode.
+Should
+Both
+Proposed
+FR-8.4
+Further UI options: font size and layout density.
+Could
+Both
+S3
+FR-8.5
+The user can store full personal details: name, address, date of birth,
+NIC number, portfolio link and similar.
+Must
+Both
+S3
+FR-8.6
+The user can save two or three personal contact numbers.
+Must
+Both
+S3
+FR-8.7
+The user can save contacts for a parent or other person (name,
+relationship, number).
+Must
+Both
+S3
+FR-8.8
+Settings are stored against the account and follow the user across
+devices.
+Must
+Both
+Proposed
+
+Functional Requirements Specification
+FRS-001  |  v1.0
+Confidential - Draft for review
+Page 7
+FR-9 Document Vault
+Secure storage for the user's personal files (S3).
+ID
+Requirement
+Priority
+Tier
+Source
+FR-9.1
+Upload and change a profile picture.
+Must
+Both
+S3
+FR-9.2
+Upload a CV and CV-related documents.
+Must
+Both
+S3
+FR-9.3
+Upload NIC images or scans (front and back).
+Must
+Both
+S3
+FR-9.4
+Upload bank documents.
+Must
+Both
+S3
+FR-9.5
+Upload other documents with a type label and optional note.
+Should
+Both
+S3
+FR-9.6
+Accepted formats: PDF, JPG, PNG, DOCX; maximum 10 MB per file
+(adjustable).
+Must
+Both
+Proposed
+FR-9.7
+The user can view, download, replace and delete each document.
+Must
+Both
+Proposed
+FR-9.8
+Documents are private to the owner and encrypted at rest.
+Must
+Both
+Proposed
+FR-10 Letter Generator
+Creating ready-to-send letters from the user's stored details (S4).
+TO CONFIRM  The speaker said the system "currently has a company-wise structure". I read this as: letters can be issued on
+behalf of a specific company. Please confirm.
+ID
+Requirement
+Priority
+Tier
+Source
+FR-10.1
+The user can generate a letter addressed to a bank.
+Must
+Both
+S4
+FR-10.2
+Templates: bank letter, offer letter and general letter.
+Must
+Both
+S4
+FR-10.3
+Letters are pre-filled from profile data (name, address, NIC, contact
+numbers, bank details).
+Must
+Both
+Proposed
+FR-10.4
+The user selects whether the letter is Personal or Business; the layout
+and sender details change accordingly.
+Must
+Both
+S4
+FR-10.5
+Business letters use the details of the chosen company (name,
+address, contact, logo).
+Should
+Business
+S4
+FR-10.6
+The user can edit the text before finalising and download the letter as
+PDF.
+Must
+Both
+Proposed
+FR-10.7
+Generated letters are saved in a history list for reuse.
+Should
+Both
+Proposed
+FR-10.8
+Business users can maintain more than one company profile.
+Should
+Business
+S4
+
+Functional Requirements Specification
+FRS-001  |  v1.0
+Confidential - Draft for review
+Page 8
+FR-11 Advanced Section (Business Agreements)
+Features grouped under a section named Advanced (S5).
+ID
+Requirement
+Priority
+Tier
+Source
+FR-11.1
+An Advanced section appears in navigation and holds advanced or
+business-oriented features.
+Must
+Business
+S5
+FR-11.2
+The user can add a business agreement: title, other party, start and end
+date, value, summary of terms and an uploaded copy.
+Must
+Business
+S5
+FR-11.3
+Agreements have a status (draft, active, expired) and the user is
+reminded before the end date.
+Should
+Business
+Proposed
+FR-11.4
+Agreements can be searched, filtered and edited.
+Should
+Business
+Proposed
+FR-11.5
+Advanced features are hidden from Basic users unless enabled by their
+plan.
+Should
+Both
+Proposed
+FR-12 Medical Section
+A section for medical-related features (S6). The speaker did not list what it contains, so the content below is a
+minimal proposal.
+TO CONFIRM  Medical scope needs a decision: expense tracking only, or a health record? This decides effort and legal
+obligations.
+ID
+Requirement
+Priority
+Tier
+Source
+FR-12.1
+A separate Medical section appears in navigation.
+Must
+Both
+S6
+FR-12.2
+The user can record medical expenses, which also count in the monthly
+analysis.
+Should
+Both
+Proposed
+FR-12.3
+The user can store medical documents (reports, prescriptions)
+privately.
+Should
+Both
+Proposed
+FR-12.4
+The user can set appointment or medication reminders.
+Could
+Both
+Proposed
+FR-12.5
+Medical data receives the strongest privacy protection in the system.
+Must
+Both
+Proposed
+FR-13 Financial Section
+A section grouping the money features (S6).
+ID
+Requirement
+Priority
+Tier
+Source
+FR-13.1
+A separate Financial section groups income, expenses, finance
+payments, loans, pawned items, savings goals and analysis.
+Must
+Both
+S6
+FR-13.2
+The user can store bank account details (bank, branch, account name
+and number) for use in letters.
+Should
+Both
+Proposed
+
+Functional Requirements Specification
+FRS-001  |  v1.0
+Confidential - Draft for review
+Page 9
+FR-14 User Interface and Navigation
+Friendliness and the Basic-versus-Business experience (S7).
+ID
+Requirement
+Priority
+Tier
+Source
+FR-14.1
+The interface is simple and friendly, usable by non-technical people.
+Must
+Both
+S7
+FR-14.2
+The Basic version launches first and shows only essential modules.
+Must
+Basic
+S7
+FR-14.3
+The Business version adds business income, company profiles,
+business letters and the Advanced section.
+Must
+Business
+S7
+FR-14.4
+The layout adapts to mobile, tablet and desktop screens.
+Must
+Both
+Proposed
+FR-14.5
+Default currency is Sri Lankan Rupees (Rs.), shown with thousands
+separators.
+Must
+Both
+S1
+FR-14.6
+A short guided setup walks new users through income, obligations and
+first goal.
+Should
+Both
+Proposed
+FR-14.7
+Interface languages: English first; Sinhala and Tamil later.
+Could
+Both
+Proposed
+FR-15 Plans and Packaging
+Selling the product to different customer categories (S7).
+TO CONFIRM  The conversation says the product will be marketed and sold by category but does not say how it is charged
+(one-time, monthly, free tier). Payments are therefore Could-have until decided.
+ID
+Requirement
+Priority
+Tier
+Source
+FR-15.1
+Features can be switched on or off per category or plan by an
+administrator without code changes.
+Should
+Both
+S7
+FR-15.2
+Paid subscriptions with an online payment gateway.
+Could
+Both
+Proposed
+
+Functional Requirements Specification
+FRS-001  |  v1.0
+Confidential - Draft for review
+Page 10
+3. Calculation Rules and Worked Example
+These rules make the analysis testable. The example uses the figures from the conversation.
+Rule
+Formula
+Total outflow
+Living expenses + finance payments + loan interest + planned personal spending + savings set
+aside
+Net position
+Total income - total outflow
+Shortfall
+If net position is below zero, shortfall = the negative amount
+Daily-to-monthly goal
+Daily amount x days in month (Rs. 1,000 x 30 = Rs. 30,000)
+Free cash
+Income - living expenses - finance payments - loan interest
+Goal feasible?
+Yes if free cash is at least the savings target; otherwise warn
+Loan interest
+Principal x rate x period (simple) or compounding per record setting
+Worked example (from the conversation)
+ Item
+Amount (Rs.)
+Comment
+Basic salary (income)
+50,000
+Government employee
+Finance payments
+25,000
+Fixed monthly obligation
+Living expenses (rent, food, other)
+30,000
+See note below
+Total outflow
+55,000
+25,000 + 30,000
+Shortfall
+5,000
+55,000 - 50,000; must be borrowed, so a loan with
+interest is created
+Savings goal
+1,000/day = 30,000
+Free cash is -5,000, so FR-6.5 warns that the goal is
+not achievable this month
+TO CONFIRM  The speaker said expenses were Rs. 10,000 per day and Rs. 30,000 in total. These do not match (10,000 x 30
+= 300,000). The total of 30,000 is used because it is consistent with the Rs. 55,000 and Rs. 5,000 figures that follow. Please
+confirm.
+4. Feature Access by User Category
+ Module
+Basic
+Business
+Accounts, Settings, Document Vault
+Yes
+Yes
+Income and Expenses
+Yes
+Yes (plus business income)
+Finance payments, Loans, Pawned items
+Yes
+Yes
+Monthly Analysis, Savings Goals, Personal Spending
+Yes
+Yes
+Letter Generator - personal letters
+Yes
+Yes
+Letter Generator - business letters, company profiles
+No
+Yes
+Advanced section (agreements)
+No
+Yes
+Medical section
+Yes (scope to be confirmed)
+Yes
+Administrator tools
+No
+No (admin role only)
+
+Functional Requirements Specification
+FRS-001  |  v1.0
+Confidential - Draft for review
+Page 11
+TO CONFIRM  The speaker did not say which features belong to which category. The matrix above is a proposal built from S5
+and S7. Confirm before design starts.
+5. Key Use Cases
+UC-1 Check whether I can manage this month
+Actor: Basic user
+  Opens Analysis for the current month.
+ System totals income, expenses and finance payments.
+ System shows net position and remaining money.
+Alternative: If outflow exceeds income, system shows the shortfall, warns about borrowing and interest, and offers
+to record a loan (FR-5.3, 5.4, 4.4).
+UC-2 Set a savings goal
+Actor: Basic user
+  Creates a goal and enters Rs. 1,000 per day.
+ System shows monthly target Rs. 30,000 and progress bar.
+ System runs the feasibility check.
+Alternative: If free cash is lower than the target, system shows the maximum achievable amount and suggests
+adjusting the goal.
+UC-3 Generate a letter to a bank
+Actor: Basic or Business user
+  Chooses Letters, then template and Personal or Business.
+ System pre-fills details from profile.
+ User edits text and downloads PDF.
+Alternative: If required profile data is missing, system lists missing fields and links to Settings.
+UC-4 Record a business agreement
+Actor: Business user
+  Opens Advanced, then Agreements, then Add.
+ Enters details and uploads the signed copy.
+ Sets an end-date reminder.
+Alternative: Basic users do not see this option.
+
+Functional Requirements Specification
+FRS-001  |  v1.0
+Confidential - Draft for review
+Page 12
+6. Validation and Error Handling
+ Area
+Rule
+Amounts
+Numeric, greater than zero, at most two decimals, Rs. only in release 1.
+Dates
+Valid calendar dates; loan or pawn due date cannot be before its start date.
+Contact numbers
+Valid Sri Lankan mobile or landline format; up to 3 personal numbers.
+NIC
+Accepts old (9 digits + V/X) and new (12 digits) formats.
+Uploads
+Type and size checked before upload; virus scan on the server; clear error message on failure.
+Deletion
+Confirmation required for deleting any financial record, goal, document or agreement.
+Data loss
+Unsaved-changes warning when leaving a form.
+7. Acceptance Criteria (summary)
+ Module
+The module is accepted when...
+FR-2 / FR-3
+A user can add salary and daily expenses and see correct daily, weekly and monthly totals.
+FR-4
+A finance payment of Rs. 25,000 is counted automatically every month; a pawn interest reminder fires on
+the due date.
+FR-5
+With the worked example data the system shows a Rs. 5,000 shortfall and a warning.
+FR-6
+Entering Rs. 1,000 per day shows Rs. 30,000 for a 30-day month; feasibility warning appears when free
+cash is lower.
+FR-8 / FR-9
+Changing the theme colour updates every screen; all listed documents upload, download and delete
+correctly.
+FR-10
+A bank letter is generated with pre-filled details in both Personal and Business modes and downloads as
+PDF.
+FR-11
+A Business user can save an agreement with attachment; a Basic user cannot see the Advanced section.
+FR-14
+All screens are usable at 360 px width and on desktop.
+8. Traceability to the Conversation
+ Source
+Requirement IDs
+S1 Basic concept
+FR-2.1, 2.2, 2.4, 3.1, 3.2, 4.1, 14.5
+S2 Financial analysis
+FR-3.4, 3.5, 4.2-4.5, 4.7, 4.8, 5.1-5.6, 6.1-6.4, 7.1, 7.3
+S3 Settings and personalisation
+FR-8.1, 8.2, 8.4-8.7, 9.1-9.5
+S4 Letters and documents
+FR-10.1, 10.2, 10.4, 10.5, 10.8
+S5 Business agreements /
+Advanced
+FR-11.1, 11.2
+S6 Medical and Financial
+sections
+FR-12.1, 13.1
+S7 UI and customer categories
+FR-1.2, 1.4, 14.1-14.3, 15.1
+9. Open Questions for the Stakeholder
+  Expense figure: Rs. 30,000 per month or Rs. 10,000 per day? (Section 3)
+
+Functional Requirements Specification
+FRS-001  |  v1.0
+Confidential - Draft for review
+Page 13
+ Meaning of "show Rs. 20,000" after a Rs. 30,000 savings goal (FR-6).
+ What exactly belongs in the Medical section (FR-12)?
+ What does "company-wise structure" mean for letters (FR-10.5)?
+ Which features belong to Basic and which to Business (section 4)?
+ How will the product be charged: free, one-time, subscription (FR-15)?
+ Are reminders by SMS required, given SMS costs (FR-4.8)?
+ Should the system be in Sinhala and Tamil at launch (FR-14.7)?

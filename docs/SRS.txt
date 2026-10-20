@@ -1,0 +1,635 @@
+SOFTWARE REQUIREMENTS SPECIFICATION
+Personal Finance &
+Life Management
+Web Platform
+Scope, users, constraints and quality requirements
+for the Basic and Business editions.
+DOCUMENT ID
+SRS-001
+VERSION
+1.0 (Draft for review)
+DATE
+29 September 2026
+COMPANION DOC
+FRS-001 Functional Requirements Specification
+PLATFORM
+Responsive web application
+Confidential - prepared from the translated requirements discussion. Draft for stakeholder review.
+
+Software Requirements Specification
+SRS-001  |  v1.0
+Confidential - Draft for review
+Page 2
+Contents
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 3
+1. Introduction
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 3
+1.1 Purpose
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 3
+1.2 Scope
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 3
+1.3 Definitions
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 3
+1.4 References
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 3
+1.5 Basis of this document
+ .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 4
+2. Overall Description
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 4
+2.1 Product perspective
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 4
+2.2 Product functions (summary)
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 4
+2.3 User classes
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 4
+2.4 Operating environment
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 4
+2.5 Design and implementation constraints
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 5
+2.6 Assumptions and dependencies
+ .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 6
+3. System Features (overview)
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 6
+4. External Interface Requirements
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 7
+5. Non-Functional Requirements
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 8
+6. Data Requirements
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 8
+7. Business Rules
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 9
+8. Release Plan and Technology
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 9
+8.1 Phased delivery
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 9
+8.2 Out of scope (release 1)
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 9
+8.3 Suggested architecture (non-binding)
+ .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 9
+9. Risks
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 10
+10. Open Questions
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 11
+Appendix A - Translation Review Notes
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 11
+Appendix B - Approval
+
+Software Requirements Specification
+SRS-001  |  v1.0
+Confidential - Draft for review
+Page 3
+1. Introduction
+1.1 Purpose
+This SRS describes the overall software system: who it is for, what is in and out of scope, the environment it runs
+in, the quality standards it must meet and the constraints on its design. Detailed function-by-function behaviour is in
+the FRS (FRS-001); the two documents are meant to be read together.
+1.2 Scope
+The product is a website (responsive web application) that lets individuals and small business owners:
+  record daily income and expenses and see whether they can make it through the month;
+ manage fixed finance payments, loans with interest, and pawned gold or jewellery;
+ set savings goals and a personal spending allowance;
+ store personal documents and details, and generate letters (e.g. to a bank);
+ (Business edition) keep business agreements and company-based letters under an Advanced section;
+ customise the look of the interface, with dedicated Medical and Financial sections.
+The product will be sold in two categories: Basic (released first) and Business.
+1.3 Definitions
+ Term
+Meaning
+Basic user
+Salaried person, government employee or anyone with an ordinary income
+Business user
+Person who runs a business and needs company letters and agreements
+Finance payment
+Fixed periodic repayment such as a lease or instalment (e.g. Rs. 25,000 per month)
+Shortfall
+Amount by which total monthly outflow exceeds income
+Remaining money
+Money left after expenses, obligations, interest and savings
+Pawned item
+Gold or jewellery given as security for cash, with interest payable
+Advanced
+Navigation section for business-oriented features such as agreements
+MVP
+Minimum viable product: the first release
+1.4 References
+  Translated English transcript of the two Sinhala voice notes (7 sections, S1-S7).
+ FRS-001 Functional Requirements Specification.
+ Personal Data Protection Act, No. 9 of 2022 (Sri Lanka) - to be reviewed by legal counsel.
+1.5 Basis of this document
+ NOTE  Requirements taken directly from the conversation are marked with a source (S1-S7) in the FRS. Anything not said by
+the speaker but needed for a complete, buildable specification is marked Proposed. Nothing marked Proposed should be
+treated as agreed until the stakeholder approves it.
+
+Software Requirements Specification
+SRS-001  |  v1.0
+Confidential - Draft for review
+Page 4
+2. Overall Description
+2.1 Product perspective
+A new, self-contained web application with its own database. It integrates only with standard services (email or
+SMS for reminders, file storage, and later a payment gateway). It does not connect to banks or fetch account data
+automatically; all financial data is entered by the user.
+2.2 Product functions (summary)
+ Group
+Modules
+Basic
+Business
+Money
+Income, Daily Expenses, Finance Payments and Loans, Pawned
+Items
+Yes
+Yes
+Insight
+Monthly Analysis, Savings Goals, Planned Personal Spending,
+Reminders
+Yes
+Yes
+Identity
+Profile, Contacts, Document Vault
+Yes
+Yes
+Letters
+Personal letters / Business and company letters
+Personal
+Both
+Advanced
+Business Agreements
+No
+Yes
+Sections
+Medical, Financial
+Yes
+Yes
+Personalisation
+Theme colours and UI options
+Yes
+Yes
+Administration
+User, plan and feature management
+-
+Admin only
+2.3 User classes
+ User
+Description
+Needs
+Basic user
+Employed or government worker with a fixed salary
+and monthly commitments such as finance payments
+and rent
+Simple screens, monthly survival view, savings
+goal, reminders, personal letters
+Business user
+Runs a business; same needs as Basic plus
+company matters
+Business income, company profiles, business
+letters, agreements
+Administrator
+Product owner or support staff
+Manage users, plans and feature access; no
+access to private financial content
+2.4 Operating environment
+  Modern browsers: current and previous two versions of Chrome, Edge, Firefox and Safari.
+ Devices: smartphones (from 360 px wide), tablets and desktops. Mobile-first because the target users are
+ordinary individuals.
+ Hosted in a cloud environment with HTTPS, automated backups and a separate staging site.
+2.5 Design and implementation constraints
+  Currency is Sri Lankan Rupees in release 1.
+ Personal data (NIC, bank documents, medical files) requires strong protection and compliance with Sri Lankan
+data protection law.
+ The Basic edition must be usable on its own so it can be sold separately.
+ Feature access per category must be configurable, not hard-coded, to support future plans.
+ Technology stack is not specified by the stakeholder; the choice is left to the development team (see 8.3 for a
+suggestion).
+
+Software Requirements Specification
+SRS-001  |  v1.0
+Confidential - Draft for review
+Page 5
+2.6 Assumptions and dependencies
+  The system is a website, not a native mobile app, in release 1.
+ Users enter their own data; there is no automatic bank connection.
+ Email is the default reminder channel; SMS depends on a provider and adds cost.
+ Letter templates and wording will be supplied or approved by the stakeholder.
+ Sinhala and Tamil interfaces are not required at launch unless the stakeholder confirms.
+
+Software Requirements Specification
+SRS-001  |  v1.0
+Confidential - Draft for review
+Page 6
+3. System Features (overview)
+Each feature below is specified in detail in the FRS under the module number shown.
+Feature
+Description
+FRS
+Priority
+Accounts and categories
+Registration, sign-in and the Basic / Business choice
+FR-1
+Must
+Income
+Salary and other income sources
+FR-2
+Must
+Daily expenses
+Categorised daily spending with totals
+FR-3
+Must
+Finance payments, loans,
+pawned items
+Fixed obligations, borrowing with interest, pawn interest
+reminders
+FR-4
+Must
+Monthly analysis
+Shortfall detection, remaining money, next-month preview
+FR-5
+Must
+Savings goals
+Daily and monthly target with progress and feasibility check
+FR-6
+Must
+Planned personal spending
+Monthly enjoyment allowance
+FR-7
+Must
+Settings
+UI colours, profile, contact numbers, family contacts
+FR-8
+Must
+Document vault
+Profile picture, CV, NIC, bank documents
+FR-9
+Must
+Letter generator
+Bank, offer and general letters; personal or business
+FR-10
+Must
+Advanced
+Business agreements
+FR-11
+Must (Business)
+Medical section
+Medical expenses, documents, reminders (scope to confirm)
+FR-12
+Should
+Financial section
+Grouped money features and bank details
+FR-13
+Must
+UI and navigation
+Friendly, responsive, category-based experience
+FR-14
+Must
+Plans and packaging
+Per-category feature switching; later payments
+FR-15
+Should
+4. External Interface Requirements
+ ID
+Interface
+Requirement
+EI-1
+User interface
+Clean, colour-themeable, consistent navigation; large touch targets on mobile; plain
+language and simple labels; clear warnings for shortfalls (amber/red) and progress
+(green).
+EI-2
+Hardware
+No special hardware. Camera or gallery access for uploading documents from a phone.
+EI-3
+Email / SMS
+Sends verification, password reset and reminder messages through a third-party provider.
+EI-4
+File storage
+Encrypted object storage for uploaded documents and generated PDFs.
+EI-5
+PDF generation
+Server-side generation of letters and analysis reports as PDF.
+EI-6
+Payment gateway
+Optional later phase for subscriptions (undecided).
+EI-7
+Communications
+All traffic over HTTPS (TLS 1.2 or higher).
+
+Software Requirements Specification
+SRS-001  |  v1.0
+Confidential - Draft for review
+Page 7
+5. Non-Functional Requirements
+Targets are proposals sized for a first release; they should be reviewed once expected user numbers are known.
+ID
+Area
+Requirement
+NFR-1
+Performance
+Pages load in under 3 seconds on a typical mobile connection; monthly analysis calculates
+in under 2 seconds for 12 months of data.
+NFR-2
+Capacity
+Supports at least 5,000 registered users and 500 concurrent users in release 1, scalable
+without redesign.
+NFR-3
+Availability
+99.5% monthly uptime excluding planned maintenance; maintenance announced in
+advance.
+NFR-4
+Backup and recovery
+Daily automated backups kept 30 days; recovery within 4 hours; recovery point no more
+than 24 hours.
+NFR-5
+Authentication
+Passwords stored hashed and salted; lock-out after repeated failed sign-ins; optional
+two-step verification for later.
+NFR-6
+Data protection
+Encryption in transit and at rest; NIC, bank and medical documents accessible only by their
+owner; access logged.
+NFR-7
+Privacy and
+compliance
+Consent captured at sign-up; user can export or delete their data; compliance reviewed
+against Sri Lanka's Personal Data Protection Act No. 9 of 2022 by legal counsel.
+NFR-8
+Application security
+Protection against common web attacks (OWASP Top 10): injection, XSS, CSRF, insecure
+uploads; file scanning; role-based access.
+NFR-9
+Usability
+A new user records income and a first expense within 5 minutes without help; consistent
+icons and labels; meets WCAG 2.1 AA colour contrast, including custom themes.
+NFR-10
+Accuracy
+All money calculations use fixed-point decimal arithmetic (never floating point); results are
+reproducible and unit tested against the worked example.
+NFR-11
+Compatibility
+Works on supported browsers and screen sizes listed in 2.4.
+NFR-12
+Maintainability
+Modular code, automated tests for calculations, version control and documented
+deployment.
+NFR-13
+Extensibility
+Feature flags per category and plan; ready for later Sinhala and Tamil translation (text kept
+outside code).
+NFR-14
+Auditability
+Changes to financial records keep who, what and when.
+
+Software Requirements Specification
+SRS-001  |  v1.0
+Confidential - Draft for review
+Page 8
+6. Data Requirements
+Main data entities and key fields. Every record belongs to one user and is never shared with other users.
+Entity
+Key fields
+Notes
+User
+id, name, mobile, email, category, plan, status
+Category = Basic or Business
+Profile
+address, date of birth, NIC number, portfolio link, theme
+settings
+Personal details from S3
+Contact
+name, relationship, number, type (own / family)
+2-3 own numbers plus family contacts
+Document
+type, file reference, upload date, note
+Profile picture, CV, NIC, bank and other
+files
+Income
+source, type, amount, frequency, date
+Expense
+date, amount, category, note, recurring flag
+Includes Personal / Enjoyment category
+Finance payment
+lender, amount, due day, months remaining
+e.g. Rs. 25,000 per month
+Loan
+lender, principal, rate, method, start, due, balance
+Created from shortfall or manually
+Pawned item
+description, amount, interest, next due, redemption date
+Gold and jewellery
+Savings goal
+name, daily amount, monthly target, end date, saved amount
+Contributions stored separately
+Company
+name, address, contact, logo
+Business users; several allowed
+Letter
+type, personal/business, company, body, date
+Generated PDF stored
+Agreement
+title, other party, dates, value, summary, file, status
+Advanced section
+Medical record
+type, date, amount, file
+Scope to confirm
+Reminder
+type, related record, due date, channel, status
+Finance, loan, pawn, agreement
+Retention: user data is kept while the account is active and deleted within 30 days of a verified deletion request,
+subject to legal obligations.
+7. Business Rules
+ ID
+Rule
+BR-1
+Total outflow = living expenses + finance payments + loan interest + planned personal spending + savings.
+BR-2
+If total outflow exceeds income the difference is a shortfall and must be shown with a warning.
+BR-3
+Money borrowed to cover a shortfall is a loan; its interest reduces future remaining money.
+BR-4
+Daily savings target x days in month = monthly target (Rs. 1,000 x 30 = Rs. 30,000).
+BR-5
+A savings goal is flagged unachievable when free cash is less than the target.
+BR-6
+Known obligations due next month (finance payment, pawn interest) are counted in the next-month projection.
+BR-7
+Basic users cannot access Business-only features; Business users can access all Basic features.
+BR-8
+A user can only see and edit their own data.
+Worked example (from the conversation): income Rs. 50,000; finance payments Rs. 25,000; living expenses
+Rs. 30,000; total outflow Rs. 55,000; shortfall Rs. 5,000. A savings target of Rs. 30,000 cannot be met because
+free cash is already Rs. -5,000. The FRS (section 3) contains the full table.
+
+Software Requirements Specification
+SRS-001  |  v1.0
+Confidential - Draft for review
+Page 9
+8. Release Plan and Technology
+8.1 Phased delivery
+ Phase
+Contents
+Outcome
+1 - MVP (Basic edition)
+Accounts, income, expenses, finance payments, loans and pawned
+items, analysis, savings goals, personal spending, reminders, settings
+and theme colours, document vault, personal letters, Financial section
+Sellable Basic product
+2 - Business edition
+Business income, company profiles, business letters, Advanced section
+with agreements, category-based access, admin tools
+Second customer
+category unlocked
+3 - Growth
+Medical section, Sinhala / Tamil, SMS reminders, charts and PDF
+exports, subscription payments
+Broader market and
+revenue
+Effort and calendar estimates should be prepared after the open questions in section 10 are answered and the
+technology is chosen.
+8.2 Out of scope (release 1)
+  Native Android / iOS apps.
+ Automatic bank or card integration.
+ Tax filing or investment advice.
+ Multi-currency.
+ Lending or payments handled by the platform itself.
+ Shared or family accounts.
+8.3 Suggested architecture (non-binding)
+ Layer
+Suggestion
+Front end
+Responsive single-page app (React or similar) with a themeable design system
+Back end
+REST API (Node.js, Python or Laravel) with role-based access
+Database
+Relational database (PostgreSQL or MySQL) for exact money arithmetic
+Storage / PDF
+Encrypted object storage; server-side PDF library
+Hosting
+Cloud VPS or managed platform with automated backups and HTTPS
+9. Risks
+ Risk
+Impact
+Mitigation
+Requirements come from one
+informal voice conversation
+Missed or misheard needs
+Stakeholder review of this SRS/FRS; resolve open
+questions before build
+Medical section undefined
+Scope and legal exposure
+grow
+Limit release 1 to expenses and documents; decide
+scope explicitly
+Sensitive documents (NIC, bank,
+medical)
+Data breach harms users and
+reputation
+Encryption, access logging, security testing, legal
+review
+Wrong interest or money calculations
+Users lose trust
+Decimal arithmetic, worked-example tests,
+configurable interest method
+Feature creep between Basic and
+Business
+Delays the first sale
+Ship Basic first; keep Business behind feature flags
+SMS and payment costs unplanned
+Budget overrun
+Email first; decide monetisation model early
+
+Software Requirements Specification
+SRS-001  |  v1.0
+Confidential - Draft for review
+Page 10
+10. Open Questions
+  Confirm expenses: Rs. 30,000 per month or Rs. 10,000 per day.
+ Confirm meaning of "show Rs. 20,000" in the savings example.
+ Define what the Medical section contains.
+ Explain "company-wise structure" for letters.
+ Confirm which features belong to Basic and which to Business.
+ Decide the pricing model and whether a free tier exists.
+ Decide launch languages (English only, or Sinhala and Tamil too).
+ Name of the product, branding and colour palette.
+
+Software Requirements Specification
+SRS-001  |  v1.0
+Confidential - Draft for review
+Page 11
+Appendix A - Translation Review Notes
+The translated text was reviewed line by line for accuracy and internal consistency. The points below are places
+where the wording was unclear, contradictory or garbled, and how each was handled in this specification.
+#
+Where
+Issue
+Treatment in specification
+1
+S2 expenses
+"Rs. 10,000 per day" and "total expenses Rs.
+30,000" cannot both be true over a month.
+Used Rs. 30,000 total (matches the 55,000 and
+5,000 figures). Marked for confirmation.
+2
+S2 savings
+"Show Rs. 20,000" after saving Rs. 30,000 is
+unclear.
+Read as amount left to spend from a Rs. 50,000
+salary. Marked for confirmation.
+3
+S2 savings
+Rs. 30,000 savings is not possible on the
+example finances (free cash is -5,000).
+Added a feasibility warning (FR-6.5) rather than
+hiding the conflict.
+4
+S2 personal
+spend
+Rs. 5,000 for enjoyment is stated, but the
+sentence about next month's pawn interest is
+unfinished.
+Modelled as planned spending plus next-month
+obligations preview (FR-5.6, FR-7).
+5
+S2 text
+Words appear duplicated or fused in the
+transcript ("remainingmoneyremaining money",
+"possiblypawned...").
+Read as "remaining money" and "possibly
+pawned jewellery/gold".
+6
+S4 letters
+"The system currently has a company-wise
+structure" is unclear.
+Interpreted as letters issued per company
+(FR-10.5). Marked for confirmation.
+7
+S5 Advanced
+Only agreements are named as Advanced
+features.
+Advanced holds agreements now; other business
+features can be added later.
+8
+S6 Medical /
+Financial
+No detail given for either section.
+Financial defined as a grouping of money
+features; Medical given a minimal proposed
+scope.
+9
+S7 categories
+Which features belong to Basic vs Business is not
+stated.
+Proposed access matrix in FRS section 4.
+10
+Overall
+No product name, pricing, platform or language
+decisions.
+Listed under Open Questions.
+TO CONFIRM  Because the translation was supplied as text and not from the audio itself, this review checks internal
+consistency only. It cannot confirm the translation against the original Sinhala recordings. Have a Sinhala-speaking person
+skim the seven sections against the voice notes before sign-off.
+Appendix B - Approval
+ Role
+Name
+Signature
+Date
+Stakeholder / Product owner
+Business analyst
+Development lead
