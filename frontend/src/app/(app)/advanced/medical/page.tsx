@@ -15,21 +15,22 @@ import { MoneyField } from '@/components/ui/MoneyField';
 import { DateField } from '@/components/ui/DateField';
 import { Badge } from '@/components/ui/Badge';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
+import { MonthPicker } from '@/components/ui/MonthPicker';
+import { useSelectedMonth } from '@/hooks/useSelectedMonth';
+import { formatMonth, getLocalDate, getLocalMonth } from '@/utils/date';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 
 const MEDICAL_TYPES = ['Consultation', 'Pharmacy', 'Lab test', 'Hospital', 'Dental', 'Specialist', 'Other'];
-const MONTHS = ['2026-07', '2026-08', '2026-09'];
-const MONTH_LABELS: Record<string, string> = { '2026-07': 'Jul 2026', '2026-08': 'Aug 2026', '2026-09': 'Sep 2026' };
 
 export default function MedicalClient() {
   const { state, dispatch } = useApp();
   const confirm = useConfirm();
   const toast = useToast();
-  const month = state.selectedMonth;
-  const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), type: 'Consultation', amount: '', note: '' });
+  const [month, setMonth] = useSelectedMonth();
+  const [form, setForm] = useState({ date: getLocalDate(), type: 'Consultation', amount: '', note: '' });
   const [error, setError] = useState('');
   const [fileError, setFileError] = useState('');
   const [remForm, setRemForm] = useState({ label: '', dueDate: '', channel: 'email' as 'email' | 'in-app' });
@@ -94,7 +95,7 @@ export default function MedicalClient() {
       entry: { id: 'm_' + Date.now(), date: form.date, type: form.type, amount: Number(form.amount), note: form.note },
     });
     toast.success('Medical expense recorded & synced to financial ledger');
-    setForm({ date: new Date().toISOString().slice(0, 10), type: 'Consultation', amount: '', note: '' });
+    setForm({ date: getLocalDate(), type: 'Consultation', amount: '', note: '' });
     setError('');
   };
 
@@ -117,7 +118,7 @@ export default function MedicalClient() {
         id: 'med_' + Date.now(),
         type: 'other',
         label: file.name.replace(/\.[^.]+$/, ''),
-        uploadDate: new Date().toISOString().slice(0, 10),
+        uploadDate: getLocalDate(),
         note: 'Medical document',
         fileName: file.name,
       },
@@ -152,7 +153,7 @@ export default function MedicalClient() {
   return (
     <PageContainer width="narrow">
       <PageHeader
-        title="Medical Ledger & Appointments"
+        title="Medical Vault"
         description="Track medical costs, prescription documents, and clinic reminders."
         actions={
           <Link href="/advanced">
@@ -180,18 +181,13 @@ export default function MedicalClient() {
             {/* Month selector */}
             <div className="flex items-center gap-2 no-print">
               <span className="text-xs font-semibold text-muted">Month:</span>
-              <SegmentedTabs
-                size="sm"
-                options={MONTHS.map(m => ({ id: m, label: MONTH_LABELS[m] || m }))}
-                value={month}
-                onChange={m => dispatch({ type: 'SET_MONTH', month: m })}
-              />
+              <MonthPicker value={month} onChange={setMonth} size="sm" />
             </div>
 
             {/* Totals */}
             <div className="grid grid-cols-2 gap-3">
               <Card className="text-center p-3">
-                <div className="text-xs text-muted mb-0.5">This month</div>
+                <div className="text-xs text-muted mb-0.5">{month === getLocalMonth() ? 'This month' : formatMonth(month)}</div>
                 <div className="font-bold text-sm text-text num">{formatRs(monthTotal)}</div>
               </Card>
               <Card className="text-center p-3">
@@ -277,7 +273,7 @@ export default function MedicalClient() {
               <MoneyField
                 value={form.amount}
                 onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
-                placeholder="2,500"
+                placeholder="e.g. 2,500"
                 hasError={!!error}
               />
             </Field>

@@ -49,7 +49,7 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
       <input
         ref={setRefs}
         type="date"
-        className={`form-input date-field-input w-full !pl-10.5 cursor-pointer ${errorStyles} ${className}`.trim()}
+        className={`form-input date-field-input w-full !pl-9 !pr-2 cursor-pointer ${errorStyles} ${className}`.trim()}
         onClick={e => {
           onClick?.(e);
           if (!e.defaultPrevented) openPicker(e.currentTarget);

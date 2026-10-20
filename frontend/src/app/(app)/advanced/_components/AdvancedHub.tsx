@@ -23,7 +23,7 @@ export function AdvancedHub({ hasBusiness, onOpen }: AdvancedHubProps) {
   }[] = [
     {
       id: 'letters',
-      title: 'Legal & Bank Letters',
+      title: 'Formal Letters',
       description: 'Generate formatted letters for banks, employment verification, and official inquiries.',
       icon: 'file-text',
       badge: 'Templates',
@@ -32,7 +32,7 @@ export function AdvancedHub({ hasBusiness, onOpen }: AdvancedHubProps) {
     },
     {
       id: 'medical',
-      title: 'Medical Health Center',
+      title: 'Medical Vault',
       description: 'Track healthcare expenditures, lab reports, doctor consultations, and appointment reminders.',
       icon: 'heart',
       badge: 'Health',

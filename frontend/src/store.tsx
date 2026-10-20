@@ -11,6 +11,7 @@ import type {
   BusinessBranch, EmploymentProfile, WorkMode, OwnerDraw,
   BankAccount, Card, Transaction, UserPlan,
 } from './types';
+import { getLocalDate, getLocalMonth } from '@/utils/date';
 
 const SEP_2026 = '2026-09';
 
@@ -132,7 +133,7 @@ const initialState: AppState = {
 const emptyInitialState: AppState = {
   ...initialState,
   currentPage: 'dashboard',
-  selectedMonth: new Date().toISOString().slice(0, 7),
+  selectedMonth: getLocalMonth(),
   profile: { ...initialState.profile, name: '', email: '' },
   income: [], expenses: [], financePayments: [], loans: [], bankAccounts: [], cards: [], transactions: [], pawnedItems: [], savingsGoals: [],
   personalSpendingBudget: 0, letters: [], agreements: [], companies: [], businessBranches: [],
@@ -297,7 +298,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'MARK_FINANCE_PAYMENT_PAID': {
       const fp = state.financePayments.find(f => f.id === action.id);
       if (!fp) return state;
-      const paymentDate = action.date || new Date().toISOString().slice(0, 10);
+      const paymentDate = action.date || getLocalDate();
       const payAmount = action.amount !== undefined ? action.amount : fp.amount;
       const newMonths = Math.max(0, (fp.monthsRemaining || 1) - 1);
       const newStatus = newMonths === 0 ? 'completed' : fp.status || 'active';
@@ -414,7 +415,7 @@ function reducer(state: AppState, action: Action): AppState {
         repayments: [
           ...(l.repayments || []),
           {
-            date: action.date || new Date().toISOString().slice(0, 10),
+            date: action.date || getLocalDate(),
             amount: action.amount,
             note: action.note,
             paymentMethod: action.paymentMethod || 'cash',
@@ -442,7 +443,7 @@ function reducer(state: AppState, action: Action): AppState {
       const p = state.pawnedItems.find(pi => pi.id === action.id);
       if (!p) return state;
       const pType = action.paymentType || 'interest';
-      const paymentDate = action.date || new Date().toISOString().slice(0, 10);
+      const paymentDate = action.date || getLocalDate();
       const currentPrincipal = p.principalOutstanding !== undefined ? p.principalOutstanding : p.amountReceived;
       let payAmount = action.amount;
       if (!payAmount) {

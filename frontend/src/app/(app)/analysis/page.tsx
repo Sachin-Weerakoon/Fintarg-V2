@@ -12,6 +12,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
+import { MonthPicker } from '@/components/ui/MonthPicker';
+import { useSelectedMonth } from '@/hooks/useSelectedMonth';
 import {
   CATEGORY_PALETTE,
   DonutChart,
@@ -38,7 +40,6 @@ import {
   dailySpending,
   debtSummary,
   financialLadder,
-  firstDataMonth,
   forecastMonths,
   goalProjections,
   healthScore,
@@ -150,10 +151,9 @@ function AnalysisContent() {
   const searchParams = useSearchParams();
   const rawTab = (searchParams.get('tab') as Tab) || 'overview';
   const initialTab: Tab = (['overview', 'spending', 'forecast', 'goals'] as Tab[]).includes(rawTab) ? rawTab : 'overview';
-  const urlMonth = searchParams.get('month');
 
   const { state, dispatch } = useApp();
-  const month = urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) ? urlMonth : state.selectedMonth;
+  const [month, setMonth] = useSelectedMonth();
   const today = todayISO();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [trim, setTrim] = useState(10);
@@ -207,12 +207,6 @@ function AnalysisContent() {
     }
   }, [rawBranchId, branchId]);
 
-  useEffect(() => {
-    if (urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) && urlMonth !== state.selectedMonth) {
-      dispatch({ type: 'SET_MONTH', month: urlMonth });
-    }
-  }, [urlMonth, state.selectedMonth, dispatch]);
-
   const handleTabChange = (newTab: Tab) => {
     setTab(newTab);
     const params = new URLSearchParams(searchParams.toString());
@@ -251,19 +245,11 @@ function AnalysisContent() {
     router.replace(`/analysis?${params.toString()}`, { scroll: false });
   };
 
-  const handleMonthChange = (newMonth: string) => {
-    dispatch({ type: 'SET_MONTH', month: newMonth });
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('month', newMonth);
-    router.replace(`/analysis?${params.toString()}`, { scroll: false });
-  };
-
   const hasData = state.income.length + state.expenses.length > 0;
 
   const series = useMemo(() => buildSeries(state, month, 6), [state, month]);
   const forecast = useMemo(() => forecastMonths(state, series, 3), [state, series]);
   const current = useMemo(() => monthPoint(state, month), [state, month]);
-  const prevMonthKey = addMonths(month, -1);
   const prevPoint = series.length > 1 ? series[series.length - 2] : null;
   const cats = useMemo(() => categoryChanges(state, month), [state, month]);
   const daily = useMemo(() => dailySpending(state, month), [state, month]);
@@ -277,10 +263,6 @@ function AnalysisContent() {
   const runway = runwayMonths(state, month);
   const reserves = liquidReserves(state);
 
-  const minMonth = firstDataMonth(state) ?? month;
-  const maxMonth = monthOf(today) > month ? monthOf(today) : month;
-  const prevM = month > minMonth ? prevMonthKey : null;
-  const nextM = month < maxMonth ? addMonths(month, 1) : null;
 
   const trendData: TrendPoint[] = [
     ...series.map(p => ({ label: monthLabel(p.month, 'short'), income: p.income, outflow: p.outflow, net: p.net })),
@@ -359,15 +341,7 @@ function AnalysisContent() {
         description={pageDescription}
         actions={
           <>
-            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-surface-hover border border-border no-print">
-              <Button variant="ghost" size="sm" onClick={() => prevM && handleMonthChange(prevM)} disabled={!prevM} className="!p-1.5" title="Previous month" aria-label="Previous month">
-                <Icon name="chevron-left" size={16} />
-              </Button>
-              <span className="px-2 text-xs font-bold text-text min-w-[104px] text-center">{monthLabel(month)}</span>
-              <Button variant="ghost" size="sm" onClick={() => nextM && handleMonthChange(nextM)} disabled={!nextM} className="!p-1.5" title="Next month" aria-label="Next month">
-                <Icon name="chevron-right" size={16} />
-              </Button>
-            </div>
+            <MonthPicker value={month} onChange={setMonth} size="sm" className="no-print" />
             {scope === 'consolidated' ? (
               <Link href="/print/analysis" target="_blank" className="no-print">
                 <Button variant="secondary" size="sm" iconLeft={<Icon name="download" size={14} />}>

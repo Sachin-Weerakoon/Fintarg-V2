@@ -23,6 +23,7 @@ import {
 } from '@/utils/loanMath';
 import { fetchLoanPayoff } from '@/services/storeApi';
 import type { Loan } from '@/types';
+import { getLocalDate } from '@/utils/date';
 
 export function LoansTab() {
   const { state, dispatch } = useApp();
@@ -36,7 +37,7 @@ export function LoansTab() {
     method: 'reducing_balance' as 'reducing_balance' | 'simple' | 'compound',
     interestBasis: 'annual' as 'annual' | 'monthly',
     tenureMonths: '12',
-    startDate: new Date().toISOString().slice(0, 10),
+    startDate: getLocalDate(),
     dueDate: '',
   });
   const [editId, setEditId] = useState<string | null>(null);
@@ -45,7 +46,7 @@ export function LoansTab() {
   const [repayingLoan, setRepayingLoan] = useState<Loan | null>(null);
   const [repaymentForm, setRepaymentForm] = useState({
     amount: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: getLocalDate(),
     note: '',
     paymentMethod: 'cash',
     bankAccountId: '',
@@ -75,7 +76,7 @@ export function LoansTab() {
     const tenure = Number(form.tenureMonths) || 12;
     const calc = calculateLoan(principal, rate, tenure, form.method, form.interestBasis);
 
-    const startDate = form.startDate || new Date().toISOString().slice(0, 10);
+    const startDate = form.startDate || getLocalDate();
     const defaultDue = new Date(startDate);
     defaultDue.setMonth(defaultDue.getMonth() + tenure);
     const dueDate = form.dueDate || defaultDue.toISOString().slice(0, 10);
@@ -116,7 +117,7 @@ export function LoansTab() {
       method: 'reducing_balance',
       interestBasis: 'annual',
       tenureMonths: '12',
-      startDate: new Date().toISOString().slice(0, 10),
+      startDate: getLocalDate(),
       dueDate: '',
     });
   };
@@ -141,7 +142,7 @@ export function LoansTab() {
     setRepayingLoan(null);
     setRepaymentForm({
       amount: '',
-      date: new Date().toISOString().slice(0, 10),
+      date: getLocalDate(),
       note: '',
       paymentMethod: 'cash',
       bankAccountId: '',
@@ -264,7 +265,7 @@ export function LoansTab() {
                             setRepayingLoan(ln);
                             setRepaymentForm({
                               amount: '',
-                              date: new Date().toISOString().slice(0, 10),
+                              date: getLocalDate(),
                               note: '',
                               paymentMethod: 'cash',
                               bankAccountId: '',
@@ -278,7 +279,7 @@ export function LoansTab() {
                             variant="secondary"
                             size="sm"
                             onClick={async () => {
-                              const today = new Date().toISOString().slice(0, 10);
+                              const today = getLocalDate();
                               // Settlement includes interest accrued since the last installment, which only the server knows exactly.
                               let settlementAmount = ln.balance;
                               try {
@@ -380,7 +381,7 @@ export function LoansTab() {
                     interestBasis: 'annual',
                     tenureMonths: '12',
                     method: 'reducing_balance',
-                    startDate: new Date().toISOString().slice(0, 10),
+                    startDate: getLocalDate(),
                     dueDate: '',
                   });
                 }}
@@ -402,7 +403,7 @@ export function LoansTab() {
             <MoneyField
               value={form.amount}
               onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
-              placeholder="1,000,000"
+              placeholder="e.g. 1,000,000"
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
@@ -412,7 +413,7 @@ export function LoansTab() {
                 step="0.1"
                 value={form.rate}
                 onChange={e => setForm(f => ({ ...f, rate: e.target.value }))}
-                placeholder="12"
+                placeholder="e.g. 12"
               />
             </Field>
             <Field id="loan-basis" label="Interest Basis" required>
@@ -431,7 +432,7 @@ export function LoansTab() {
                 type="number"
                 value={form.tenureMonths}
                 onChange={e => setForm(f => ({ ...f, tenureMonths: e.target.value }))}
-                placeholder="12"
+                placeholder="e.g. 12"
               />
             </Field>
             <Field id="loan-method" label="Method" required>
@@ -508,7 +509,7 @@ export function LoansTab() {
                     interestBasis: 'annual',
                     tenureMonths: '12',
                     method: 'reducing_balance',
-                    startDate: new Date().toISOString().slice(0, 10),
+                    startDate: getLocalDate(),
                     dueDate: '',
                   });
                 }}

@@ -1,5 +1,6 @@
 import { apiClient, ApiError } from './apiClient';
 import type { AppState, Transaction, UserPlan } from '@/types';
+import { getLocalMonth } from '../utils/date';
 
 type RawRecord = Record<string, any> & { _id: string };
 type ListResult = { data: RawRecord[] };
@@ -679,7 +680,7 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
     case 'SET_PERSONAL_SPENDING_BUDGET':
       return void (await send('/api/backend/profile/personal-budget', 'PUT', {
         budget: action.budget,
-        month: action.month || new Date().toISOString().slice(0, 7),
+        month: action.month || getLocalMonth(),
       }));
     case 'UPDATE_PROFILE':
       return void (await send('/api/backend/profile', 'PATCH', action.profile));

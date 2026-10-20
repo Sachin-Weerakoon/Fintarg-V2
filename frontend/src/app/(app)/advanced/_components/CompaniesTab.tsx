@@ -258,7 +258,7 @@ export function CompaniesTab() {
               <FormField id="add-co-tin" label="TIN Number">
                 <Input
                   id="add-co-tin"
-                  placeholder="109876543"
+                  placeholder="e.g. 109876543"
                   value={form.tinNumber}
                   onChange={e => setForm(f => ({ ...f, tinNumber: e.target.value }))}
                 />
