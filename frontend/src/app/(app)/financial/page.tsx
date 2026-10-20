@@ -6,6 +6,8 @@ import { useApp, formatRs, calcMonthlyIncome, calcFinancePayments } from '@/stor
 import { PageContainer } from '@/components/ui/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
+import { MonthPicker } from '@/components/ui/MonthPicker';
+import { useSelectedMonth } from '@/hooks/useSelectedMonth';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -38,15 +40,13 @@ function FinancialContent() {
   const rawTab = searchParams.get('tab') as Tab | null;
   const initialTab: Tab = (rawTab && TAB_OPTIONS.some(t => t.id === rawTab)) ? rawTab : 'accounts';
 
-  const { state, dispatch } = useApp();
-  const urlMonth = searchParams.get('month');
-  const initialMonth = urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) ? urlMonth : state.selectedMonth;
+  const { state } = useApp();
+  const [month, setMonth] = useSelectedMonth();
 
   const rawStream = searchParams.get('stream') as StreamScope | null;
   const initialStream: StreamScope = (rawStream && ['all', 'salary', 'business'].includes(rawStream)) ? rawStream : 'all';
 
   const [tab, setTab] = useState<Tab>(initialTab);
-  const [month, setMonth] = useState(initialMonth);
   const [streamScope, setStreamScope] = useState<StreamScope>(initialStream);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
 
@@ -58,25 +58,10 @@ function FinancialContent() {
     }
   }, [rawTab, tab]);
 
-  useEffect(() => {
-    if (urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) && urlMonth !== month) {
-      setMonth(urlMonth);
-      dispatch({ type: 'SET_MONTH', month: urlMonth });
-    }
-  }, [urlMonth, month, dispatch]);
-
   const handleTabChange = (newTab: Tab) => {
     setTab(newTab);
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', newTab);
-    router.replace(`/financial?${params.toString()}`, { scroll: false });
-  };
-
-  const handleMonthChange = (newMonth: string) => {
-    setMonth(newMonth);
-    dispatch({ type: 'SET_MONTH', month: newMonth });
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('month', newMonth);
     router.replace(`/financial?${params.toString()}`, { scroll: false });
   };
 
@@ -87,12 +72,6 @@ function FinancialContent() {
     params.set('stream', s);
     router.replace(`/financial?${params.toString()}`, { scroll: false });
   };
-
-  const months = useMemo(() => {
-    const list = Array.from(new Set(state.expenses.map(e => e.date.slice(0, 7)))).sort();
-    if (!list.includes(state.selectedMonth)) list.push(state.selectedMonth);
-    return list.slice(-4);
-  }, [state.expenses, state.selectedMonth]);
 
   // Compute multi-stream financial KPI metrics
   const streamKPIs = useMemo(() => {
@@ -197,19 +176,7 @@ function FinancialContent() {
       <PageHeader
         title="Financial Ledger"
         description="Unified corporate & personal financial hub: manage bank accounts, multi-stream cash flows, operating expenses, and transactions."
-        actions={
-          months.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-muted">Month:</span>
-              <SegmentedTabs
-                size="sm"
-                options={months.map(m => ({ id: m, label: m }))}
-                value={month}
-                onChange={handleMonthChange}
-              />
-            </div>
-          )
-        }
+        actions={<MonthPicker value={month} onChange={setMonth} size="sm" />}
       />
 
       {/* Multi-Stream Intelligence & Scope Switcher for Hybrid & Business Profiles */}

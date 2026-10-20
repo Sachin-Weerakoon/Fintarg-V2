@@ -23,6 +23,7 @@ import {
   formatExpiryInput,
 } from '@/utils/bankData';
 import type { BankAccount, Card as CardType } from '@/types';
+import { getLocalDate } from '@/utils/date';
 
 export function AccountsTab() {
   const { state, dispatch } = useApp();
@@ -74,7 +75,7 @@ export function AccountsTab() {
     fromEntity: '',
     toEntity: '',
     amount: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: getLocalDate(),
     description: '',
   });
   const [transferError, setTransferError] = useState('');
@@ -134,7 +135,7 @@ export function AccountsTab() {
         fromEntity: '',
         toEntity: '',
         amount: '',
-        date: new Date().toISOString().slice(0, 10),
+        date: getLocalDate(),
         description: '',
       });
     } catch (err: any) {
@@ -648,7 +649,7 @@ export function AccountsTab() {
                   <Input
                     value={accountForm.branchCode}
                     onChange={e => setAccountForm(f => ({ ...f, branchCode: e.target.value }))}
-                    placeholder="034"
+                    placeholder="e.g. 034"
                   />
                 </Field>
                 <Field id="acc-swift" label="SWIFT / BIC" hint="e.g. COMB-LK-LX">
@@ -665,7 +666,7 @@ export function AccountsTab() {
                   type="number"
                   value={accountForm.currentBalance}
                   onChange={e => setAccountForm(f => ({ ...f, currentBalance: e.target.value }))}
-                  placeholder="150,000"
+                  placeholder="e.g. 150,000"
                 />
               </Field>
 
@@ -929,7 +930,7 @@ export function AccountsTab() {
                     }));
                     if (cardError) setCardError('');
                   }}
-                  placeholder="4532 1100 2345 6789"
+                  placeholder="e.g. 4532 1100 2345 6789"
                 />
               </Field>
 
@@ -999,7 +1000,7 @@ export function AccountsTab() {
                       type="number"
                       value={cardForm.creditLimit}
                       onChange={e => setCardForm(f => ({ ...f, creditLimit: e.target.value }))}
-                      placeholder="200,000"
+                      placeholder="e.g. 200,000"
                     />
                   </Field>
                   <div className="grid grid-cols-2 gap-3">
@@ -1010,7 +1011,7 @@ export function AccountsTab() {
                         max="31"
                         value={cardForm.billingDay}
                         onChange={e => setCardForm(f => ({ ...f, billingDay: e.target.value }))}
-                        placeholder="15"
+                        placeholder="e.g. 15"
                       />
                     </Field>
                     <Field id="card-dueday" label="Due Day">
@@ -1020,7 +1021,7 @@ export function AccountsTab() {
                         max="31"
                         value={cardForm.dueDay}
                         onChange={e => setCardForm(f => ({ ...f, dueDay: e.target.value }))}
-                        placeholder="28"
+                        placeholder="e.g. 28"
                       />
                     </Field>
                   </div>

@@ -181,7 +181,7 @@ const expenseBaseSchema = z.object({
   paymentMethod: paymentMethodEnum.default('cash'),
   bankAccountId: z.string().optional().nullable(),
   cardId: z.string().optional().nullable(),
-  sourceType: z.enum(['salary', 'business']).optional().default('salary'),
+  sourceType: z.enum(['salary', 'business', 'medical']).optional().default('salary'),
   companyId: z.string().optional().nullable(),
   branchId: z.string().optional().nullable(),
 });

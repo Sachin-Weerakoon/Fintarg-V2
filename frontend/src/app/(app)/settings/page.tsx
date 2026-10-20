@@ -21,6 +21,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { THEME_COLORS, LIGHT_DEFAULTS, validateCustomOverrides, SIDEBAR_PRESETS } from '@/lib/theme';
+import { getLocalDate } from '@/utils/date';
 
 type Tab = 'appearance' | 'profile' | 'contacts' | 'reminders' | 'account';
 
@@ -541,7 +542,7 @@ function ProfileTab() {
             id="prof-nic"
             value={form.nicNumber || ''}
             onChange={e => setForm(f => ({ ...f, nicNumber: e.target.value }))}
-            placeholder="200012345678"
+            placeholder="e.g. 200012345678"
           />
         </FormField>
 
@@ -887,7 +888,7 @@ function AccountTab() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `fintarg-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `fintarg-data-export-${getLocalDate()}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();

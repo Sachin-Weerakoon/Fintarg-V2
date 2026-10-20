@@ -76,6 +76,34 @@ export function monthLabel(month: string, style: 'long' | 'short' = 'long'): str
 /* ────────────────────────────────────────────────────────────────────────── */
 
 export const clamp = (v: number, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, v));
+
+export interface CashflowSplit {
+  /** Red (spent) segment width, 0–100. */
+  spentPct: number;
+  /** Green (remaining) segment width, 0–100. spentPct + remainingPct is 0 or 100. */
+  remainingPct: number;
+  /** Expenses as % of income, rounded; null when there is no income to compare against. */
+  burnRate: number | null;
+  /** Never negative. */
+  remaining: number;
+  hasData: boolean;
+}
+
+/** Spent / remaining split for the dashboard health bar. */
+export function cashflowSplit(income: number, expenses: number): CashflowSplit {
+  const inc = Math.max(0, income || 0);
+  const exp = Math.max(0, expenses || 0);
+  if (inc === 0 && exp === 0) return { spentPct: 0, remainingPct: 0, burnRate: null, remaining: 0, hasData: false };
+  if (inc === 0) return { spentPct: 100, remainingPct: 0, burnRate: null, remaining: 0, hasData: true };
+  const spentPct = clamp((exp / inc) * 100);
+  return {
+    spentPct,
+    remainingPct: 100 - spentPct,
+    burnRate: Math.round((exp / inc) * 100),
+    remaining: Math.max(0, inc - exp),
+    hasData: true,
+  };
+}
 const sum = (xs: number[]) => xs.reduce((s, x) => s + x, 0);
 export const mean = (xs: number[]) => (xs.length ? sum(xs) / xs.length : 0);
 

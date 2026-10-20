@@ -16,6 +16,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import type { EmploymentProfile } from '@/types';
+import { getLocalDate } from '@/utils/date';
 
 export function SalaryWorkspace({
   companyName,
@@ -42,7 +43,7 @@ export function SalaryWorkspace({
 
   // Owner Draw Form for Directors & Business Owners
   const [drawAmount, setDrawAmount] = useState('');
-  const [drawDate, setDrawDate] = useState(new Date().toISOString().slice(0, 10));
+  const [drawDate, setDrawDate] = useState(getLocalDate());
   const [recordingDraw, setRecordingDraw] = useState(false);
 
   const handleRecordDraw = async () => {
@@ -306,7 +307,7 @@ export function SalaryWorkspace({
                   id="emp-gross"
                   value={form.monthlyGross}
                   onChange={v => setForm(f => ({ ...f, monthlyGross: String(v) }))}
-                  placeholder="250,000"
+                  placeholder="e.g. 250,000"
                 />
               </FormField>
 
@@ -315,7 +316,7 @@ export function SalaryWorkspace({
                   id="emp-deductions"
                   value={form.monthlyDeductions}
                   onChange={v => setForm(f => ({ ...f, monthlyDeductions: String(v) }))}
-                  placeholder="20,000"
+                  placeholder="e.g. 20,000"
                 />
               </FormField>
 
@@ -325,7 +326,7 @@ export function SalaryWorkspace({
                   type="number"
                   min="1"
                   max="31"
-                  placeholder="25"
+                  placeholder="e.g. 25"
                   value={form.payday}
                   onChange={e => setForm(f => ({ ...f, payday: e.target.value }))}
                 />
@@ -336,7 +337,7 @@ export function SalaryWorkspace({
                   id="emp-target"
                   value={form.monthlySavingsTarget}
                   onChange={v => setForm(f => ({ ...f, monthlySavingsTarget: String(v) }))}
-                  placeholder="50,000"
+                  placeholder="e.g. 50,000"
                 />
               </FormField>
 
@@ -435,7 +436,7 @@ export function SalaryWorkspace({
                   id="emp-gross"
                   value={form.monthlyGross}
                   onChange={v => setForm(f => ({ ...f, monthlyGross: String(v) }))}
-                  placeholder="250,000"
+                  placeholder="e.g. 250,000"
                 />
               </FormField>
 
@@ -444,7 +445,7 @@ export function SalaryWorkspace({
                   id="emp-deductions"
                   value={form.monthlyDeductions}
                   onChange={v => setForm(f => ({ ...f, monthlyDeductions: String(v) }))}
-                  placeholder="20,000"
+                  placeholder="e.g. 20,000"
                 />
               </FormField>
 
@@ -454,7 +455,7 @@ export function SalaryWorkspace({
                   type="number"
                   min="1"
                   max="31"
-                  placeholder="25"
+                  placeholder="e.g. 25"
                   value={form.payday}
                   onChange={e => setForm(f => ({ ...f, payday: e.target.value }))}
                 />
@@ -465,7 +466,7 @@ export function SalaryWorkspace({
                   id="emp-target"
                   value={form.monthlySavingsTarget}
                   onChange={v => setForm(f => ({ ...f, monthlySavingsTarget: String(v) }))}
-                  placeholder="50,000"
+                  placeholder="e.g. 50,000"
                 />
               </FormField>
 

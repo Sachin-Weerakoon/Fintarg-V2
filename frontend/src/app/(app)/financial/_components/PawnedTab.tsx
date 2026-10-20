@@ -16,6 +16,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import type { PawnedItem } from '@/types';
+import { getLocalDate } from '@/utils/date';
 
 export function PawnedTab() {
   const { state, dispatch } = useApp();
@@ -27,7 +28,7 @@ export function PawnedTab() {
     ticketNumber: '',
     amountReceived: '',
     interestRate: '',
-    nextDue: new Date().toISOString().slice(0, 10),
+    nextDue: getLocalDate(),
     redemptionDate: '',
   });
 
@@ -38,13 +39,13 @@ export function PawnedTab() {
     paymentType: 'interest' as 'interest' | 'part_principal' | 'redemption',
     paymentMethod: 'cash',
     bankAccountId: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: getLocalDate(),
     note: '',
   });
 
   const submit = () => {
     if (!form.description || !form.amountReceived) return;
-    const nextDue = form.nextDue || new Date().toISOString().slice(0, 10);
+    const nextDue = form.nextDue || getLocalDate();
     const defaultRedemption = new Date();
     defaultRedemption.setMonth(defaultRedemption.getMonth() + 6);
     const redemptionDate = form.redemptionDate || defaultRedemption.toISOString().slice(0, 10);
@@ -72,7 +73,7 @@ export function PawnedTab() {
       ticketNumber: '',
       amountReceived: '',
       interestRate: '',
-      nextDue: new Date().toISOString().slice(0, 10),
+      nextDue: getLocalDate(),
       redemptionDate: '',
     });
   };
@@ -96,7 +97,7 @@ export function PawnedTab() {
       paymentType: type,
       paymentMethod: 'cash',
       bankAccountId: '',
-      date: new Date().toISOString().slice(0, 10),
+      date: getLocalDate(),
       note: '',
     });
   };
@@ -333,7 +334,7 @@ export function PawnedTab() {
           <MoneyField
             value={form.amountReceived}
             onChange={v => setForm(f => ({ ...f, amountReceived: String(v) }))}
-            placeholder="50,000"
+            placeholder="e.g. 50,000"
           />
         </Field>
         <Field id="pawn-rate" label="Interest rate (% per month)" required>
@@ -342,7 +343,7 @@ export function PawnedTab() {
             step="0.1"
             value={form.interestRate}
             onChange={e => setForm(f => ({ ...f, interestRate: e.target.value }))}
-            placeholder="2.0"
+            placeholder="e.g. 2.0"
           />
         </Field>
         <div className="grid grid-cols-2 gap-3">

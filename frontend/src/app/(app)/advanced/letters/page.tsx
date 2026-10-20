@@ -19,6 +19,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FormalLetterSheet } from '@/components/ui/FormalLetterSheet';
+import { getLocalDate } from '@/utils/date';
 
 type Template = 'bank' | 'offer' | 'general';
 
@@ -200,7 +201,7 @@ function LettersClient() {
         id: newId,
         type: template,
         mode,
-        date: new Date().toISOString().slice(0, 10),
+        date: getLocalDate(),
         addressedTo: form.addressedTo,
         purpose: form.purpose,
         body: finalBody,
@@ -226,7 +227,7 @@ function LettersClient() {
   return (
     <PageContainer>
       <PageHeader
-        title="Formal Letter Generator"
+        title="Formal Letters"
         description="Draft, customize, and export Sri Lankan legal, enterprise, and banking correspondence."
         actions={
           <Link href="/advanced">
@@ -355,7 +356,7 @@ function LettersClient() {
                 <Input
                   value={form.accountNumber}
                   onChange={e => setForm(f => ({ ...f, accountNumber: e.target.value }))}
-                  placeholder="0011223344"
+                  placeholder="e.g. 0011223344"
                 />
               </Field>
             )}
@@ -518,7 +519,7 @@ export default function LettersPage() {
   return (
     <Suspense fallback={
       <PageContainer>
-        <PageHeader title="Formal Letter Generator" description="Loading letters generator..." />
+        <PageHeader title="Formal Letters" description="Loading letters generator..." />
       </PageContainer>
     }>
       <LettersClient />

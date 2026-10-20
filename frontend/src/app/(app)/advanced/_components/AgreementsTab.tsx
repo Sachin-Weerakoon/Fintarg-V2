@@ -198,7 +198,7 @@ export function AgreementsTab({ companyId }: { companyId?: string } = {}) {
                 id="agr-val"
                 value={form.value}
                 onChange={v => setForm(f => ({ ...f, value: String(v) }))}
-                placeholder="1,200,000"
+                placeholder="e.g. 1,200,000"
               />
             </FormField>
 

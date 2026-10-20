@@ -31,25 +31,21 @@ import { useToast } from '@/components/ui/ToastProvider';
 import { MoneyField } from '@/components/ui/MoneyField';
 import { DateField } from '@/components/ui/DateField';
 import { SegmentedTabs, type TabOption } from '@/components/ui/SegmentedTabs';
+import { MonthPicker } from '@/components/ui/MonthPicker';
+import { useSelectedMonth } from '@/hooks/useSelectedMonth';
 import type { SavingsGoal } from '@/types';
+import { getLocalDate } from '@/utils/date';
 
 type GoalDomain = 'personal' | 'business' | 'branch';
 
 function GoalsContent() {
   const _router = useRouter();
   const searchParams = useSearchParams();
-  const urlMonth = searchParams.get('month');
 
   const { state, dispatch } = useApp();
   const confirm = useConfirm();
   const toast = useToast();
-  const month = urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) ? urlMonth : state.selectedMonth;
-
-  useEffect(() => {
-    if (urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) && urlMonth !== state.selectedMonth) {
-      dispatch({ type: 'SET_MONTH', month: urlMonth });
-    }
-  }, [urlMonth, state.selectedMonth, dispatch]);
+  const [month, setMonth] = useSelectedMonth();
 
   const hasBusiness =
     state.profile.plan === 'business' ||
@@ -290,7 +286,7 @@ function GoalsContent() {
         monthlyTarget: monthly,
         targetAmount: targetAmt,
         targetDate: goalForm.targetDate || undefined,
-        endDate: goalForm.targetDate || new Date().toISOString().slice(0, 10),
+        endDate: goalForm.targetDate || getLocalDate(),
         savedAmount: 0,
         contributions: [],
         scope: domain,
@@ -346,7 +342,7 @@ function GoalsContent() {
       type: 'ADD_SAVING_CONTRIBUTION',
       goalId,
       amount: Number(s.amount),
-      date: s.date || new Date().toISOString().slice(0, 10),
+      date: s.date || getLocalDate(),
       note: s.note,
       debitAccount: s.debitAccount,
       paymentMethod: s.paymentMethod || 'cash',
@@ -357,7 +353,7 @@ function GoalsContent() {
       ...prev,
       [goalId]: {
         amount: '',
-        date: new Date().toISOString().slice(0, 10),
+        date: getLocalDate(),
         note: '',
         debitAccount: false,
         paymentMethod: 'cash',
@@ -426,7 +422,8 @@ function GoalsContent() {
             : 'Automate daily targets, track contributions, and ensure personal target feasibility.'
         }
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <MonthPicker value={month} onChange={setMonth} size="sm" />
             {domain === 'personal' ? (
               <div className="text-xs px-3 py-1.5 rounded-xl border border-border bg-surface-hover flex items-center gap-2">
                 <span className="text-muted font-medium">Free cash:</span>
@@ -836,7 +833,7 @@ function GoalsContent() {
                       id="comp-target-input"
                       value={compTargetInput}
                       onChange={v => setCompTargetInput(String(v))}
-                      placeholder="2,500,000"
+                      placeholder="e.g. 2,500,000"
                     />
                   </Field>
                 </div>
@@ -1047,7 +1044,7 @@ function GoalsContent() {
                       id="branch-target-input"
                       value={branchTargetInput}
                       onChange={v => setBranchTargetInput(String(v))}
-                      placeholder="800,000"
+                      placeholder="e.g. 800,000"
                     />
                   </Field>
                 </div>
@@ -1221,7 +1218,7 @@ function GoalCardItem({
   const isPersonal = !goal.scope || goal.scope === 'personal';
   const cashForThisGoal = freeCash - otherGoalsTarget;
   const feasible = !isPersonal || cashForThisGoal >= goal.monthlyTarget;
-  const sv = saving[goal.id] || { amount: '', date: new Date().toISOString().slice(0, 10), note: '' };
+  const sv = saving[goal.id] || { amount: '', date: getLocalDate(), note: '' };
 
   const targetTypeLabel =
     goal.targetType === 'reserve'
@@ -1387,7 +1384,7 @@ function GoalCardItem({
             <Input
               id={`contrib-amount-${goal.id}`}
               type="number"
-              placeholder="10,000"
+              placeholder="e.g. 10,000"
               value={sv.amount}
               onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, amount: e.target.value } }))}
             />

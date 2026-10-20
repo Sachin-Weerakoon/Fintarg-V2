@@ -6,6 +6,7 @@ export interface IMedicalExpense extends Document {
   type: string;
   amountCents: number;
   note: string;
+  expenseId?: mongoose.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -16,6 +17,8 @@ const MedicalExpenseSchema = new Schema<IMedicalExpense>({
   type: { type: String, required: true },
   amountCents: { type: Number, required: true, min: 1 },
   note: { type: String, default: '' },
+  // The Expense row this record created in the financial ledger.
+  expenseId: { type: Schema.Types.ObjectId, ref: 'Expense', default: null },
 }, { timestamps: true });
 
 export const MedicalExpenseModel = mongoose.models.MedicalExpense || mongoose.model<IMedicalExpense>('MedicalExpense', MedicalExpenseSchema);
