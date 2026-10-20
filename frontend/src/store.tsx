@@ -210,6 +210,19 @@ type Action =
 
 type PersistedCollection = Extract<Action, { type: 'REPLACE_RECORD_ID' }>['collection'];
 
+/** Actions whose persisted result is derived by the backend ledger and must be re-read after saving. */
+const SERVER_RECONCILED_ACTIONS = new Set<Action['type']>([
+  'ADD_INCOME', 'UPDATE_INCOME', 'DELETE_INCOME',
+  'ADD_EXPENSE', 'UPDATE_EXPENSE', 'DELETE_EXPENSE',
+  'MARK_FINANCE_PAYMENT_PAID', 'DELETE_FINANCE_PAYMENT_PAYMENT',
+  'DELETE_BANK_ACCOUNT', 'UPDATE_BANK_ACCOUNT', 'DELETE_CARD',
+  'ADD_TRANSACTION', 'DELETE_TRANSACTION', 'TRANSFER_FUNDS', 'DELETE_TRANSFER',
+  'RECORD_LOAN_REPAYMENT', 'DELETE_LOAN_REPAYMENT',
+  'RECORD_PAWN_PAYMENT', 'DELETE_PAWN_PAYMENT',
+  'ADD_SAVING_CONTRIBUTION', 'DELETE_SAVING_CONTRIBUTION',
+  'ADD_BRANCH', 'UPDATE_BRANCH',
+]);
+
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'ROLLBACK': return action.previousState;
@@ -723,6 +736,11 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
     void loadData();
   }, [loadData]);
 
+  const refreshFromServer = async () => {
+    const currentPlan = (stateRef.current?.profile?.plan || initialProfile?.plan || 'basic') as UserPlan;
+    reduce({ type: 'HYDRATE', data: await loadPersistedData(currentPlan) });
+  };
+
   const dispatch = async (action: Action): Promise<string | undefined> => {
     const prevState = stateRef.current;
     reduce(action);
@@ -769,13 +787,17 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
         }
       }
 
+      // The ledger (balances, principal/interest splits, payment ids, cascades) is computed
+      // server-side, so reconcile instead of trusting the optimistic local estimate.
+      if (SERVER_RECONCILED_ACTIONS.has(action.type)) {
+        void refreshFromServer().catch(e => console.warn('[store] Failed to refresh records after save:', e));
+      }
+
       return serverId;
     } catch (error: any) {
       console.error('Unable to save account change', error);
       try {
-        const currentPlan = (stateRef.current?.profile?.plan || initialProfile?.plan || 'basic') as UserPlan;
-        const freshData = await loadPersistedData(currentPlan);
-        reduce({ type: 'HYDRATE', data: freshData });
+        await refreshFromServer();
       } catch {
         reduce({ type: 'ROLLBACK', previousState: prevState });
       }

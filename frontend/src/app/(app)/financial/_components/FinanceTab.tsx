@@ -553,7 +553,7 @@ export function FinanceTab() {
                 onChange={e => setPaymentForm(f => ({ ...f, bankAccountId: e.target.value }))}
               >
                 <option value="">Select Account...</option>
-                {state.bankAccounts.map(b => (
+                {state.bankAccounts.filter(b => !b.isArchived).map(b => (
                   <option key={b.id} value={b.id}>
                     {b.bankName} - {b.accountNumber} ({formatRs(b.currentBalance)})
                   </option>

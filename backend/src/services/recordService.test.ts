@@ -2,8 +2,11 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
 import { addGoalContribution, calculateLoanPayoff, createRecord, deleteFinancePaymentPayment, deleteGoalContribution, deleteLoanRepayment, deletePawnPayment, deleteRecord, deriveNextDueDate, getRecord, getTransactionHistory, listRecords, recordFinancePayment, recordLoanRepayment, recordPawnPayment, updateRecord } from './recordService';
-import { recomputeBalance } from './ledgerService';
+import { ensureCashWallet, recomputeBalance, transferFunds } from './ledgerService';
 import { BankAccountModel } from '../models/BankAccount';
+import { BranchEntryModel } from '../models/BranchEntry';
+import { CardModel } from '../models/Card';
+import { ExpenseModel } from '../models/Expense';
 import { FinancePaymentModel } from '../models/FinancePayment';
 import { PawnedItemModel } from '../models/PawnedItem';
 import { SavingsGoalModel } from '../models/SavingsGoal';
@@ -312,7 +315,7 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
       assert.strictEqual(r1.paymentMethod, 'cash');
 
       // Balance reduced
-      assert.strictEqual(updated.balanceCents, 10000000 - 888488);
+      assert.strictEqual(updated.balanceCents, 10000000 - 788488, 'only the principal portion reduces a reducing-balance loan');
 
       // Linked transaction verified
       assert.ok(r1.transactionId);
@@ -1118,5 +1121,266 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
       );
     });
   });
-});
 
+  describe('bank account deletion safeguards and archive (ledger integrity)', () => {
+    const blockedMessage = 'Cannot delete account with a non-zero balance or active transactions. Please transfer remaining funds or archive the account.';
+
+    it('rejects deleting an account with a non-zero balance', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const account = await createRecord('bankAccounts', uid, { bankName: 'BOC', accountNumber: '1001', balance: 500 });
+
+      await assert.rejects(
+        () => deleteRecord('bankAccounts', uid, String(account._id)),
+        (err: any) => err.status === 400 && err.message === blockedMessage,
+      );
+      assert.ok(await BankAccountModel.exists({ _id: account._id }));
+    });
+
+    it('rejects deleting a zero-balance account that still has transfer history, keeping both legs intact', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const a = await createRecord('bankAccounts', uid, { bankName: 'BOC', accountNumber: 'A-1', balance: 1000 });
+      const b = await createRecord('bankAccounts', uid, { bankName: 'NSB', accountNumber: 'B-1', balance: 0 });
+      const out = await transferFunds(uid, { fromAccountId: String(a._id), toAccountId: String(b._id), amountCents: 100000, date: '2026-03-01' });
+      await transferFunds(uid, { fromAccountId: String(b._id), toAccountId: String(a._id), amountCents: 100000, date: '2026-03-02' });
+      assert.strictEqual((await BankAccountModel.findById(b._id)).balanceCents, 0);
+
+      await assert.rejects(
+        () => deleteRecord('bankAccounts', uid, String(b._id)),
+        (err: any) => err.status === 400 && err.message === blockedMessage,
+      );
+      assert.strictEqual(await TransactionModel.countDocuments({ transferGroupId: out.transferGroupId }), 2);
+      assert.strictEqual((await recomputeBalance(uid, String(a._id))).driftCents, 0);
+      assert.strictEqual((await recomputeBalance(uid, String(b._id))).driftCents, 0);
+    });
+
+    it('never deletes the built-in cash wallet', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const cash = await ensureCashWallet(uid);
+      await assert.rejects(
+        () => deleteRecord('bankAccounts', uid, String(cash._id)),
+        (err: any) => err.status === 400 && /cash wallet/i.test(err.message),
+      );
+      await assert.rejects(
+        () => updateRecord('bankAccounts', uid, String(cash._id), { isArchived: true }),
+        (err: any) => err.status === 400 && /cash wallet/i.test(err.message),
+      );
+    });
+
+    it('deletes an empty unused account, removing unused linked cards and nulling soft references', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const account = await createRecord('bankAccounts', uid, { bankName: 'DFCC', accountNumber: '2002', balance: 0 });
+      const card = await createRecord('cards', uid, { bankAccountId: String(account._id), cardType: 'debit', cardNumber: '4111111111111111', cardHolder: 'Test' });
+      const plan = await createRecord('financePayments', uid, { lender: 'Lease Co', amount: 1000, dueDay: 5, monthsRemaining: 3, bankAccountId: String(account._id) });
+
+      await deleteRecord('bankAccounts', uid, String(account._id));
+
+      assert.strictEqual(await BankAccountModel.exists({ _id: account._id }), null);
+      assert.strictEqual(await CardModel.exists({ _id: card._id }), null);
+      assert.strictEqual((await FinancePaymentModel.findById(plan._id)).bankAccountId, null);
+    });
+
+    it('archives an account: history is preserved but new activity is rejected without orphaned records', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const account = await createRecord('bankAccounts', uid, { bankName: 'Sampath', accountNumber: '3003', balance: 0 });
+      await createRecord('incomes', uid, { amount: 200, date: '2026-04-01', source: 'Salary', type: 'salary', frequency: 'monthly', paymentMethod: 'bank_transfer', bankAccountId: String(account._id) });
+
+      const archived = await updateRecord('bankAccounts', uid, String(account._id), { isArchived: true });
+      assert.strictEqual((archived as any).isArchived, true);
+      assert.strictEqual(await TransactionModel.countDocuments({ bankAccountId: account._id }), 1);
+
+      await assert.rejects(
+        () => createRecord('expenses', uid, { amount: 50, date: '2026-04-02', category: 'Food', paymentMethod: 'bank_transfer', bankAccountId: String(account._id) }),
+        (err: any) => err.status === 400 && /archived/i.test(err.message),
+      );
+      assert.strictEqual(await ExpenseModel.countDocuments({ userId: uid }), 0);
+      assert.strictEqual((await BankAccountModel.findById(account._id)).balanceCents, 20000);
+    });
+  });
+
+  describe('business branch entry synchronization', () => {
+    async function setupBranch(uid: string) {
+      const company = await createRecord('companies', uid, { name: 'Acme Holdings' });
+      return createRecord('businessBranches', uid, { companyId: String(company._id), name: 'Kandy', monthlyTarget: 0, annualTarget: 0 });
+    }
+    const entry = (overrides: Record<string, unknown> = {}) => ({ date: '2026-05-01', type: 'revenue', category: 'Sales', amount: 100, note: '', ...overrides });
+
+    it('creates, updates and prunes entries so storage matches the submitted array', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const branch = await setupBranch(uid);
+      const branchId = String(branch._id);
+
+      await updateRecord('businessBranches', uid, branchId, { entries: [entry({ id: 'tmp-1' }), entry({ id: 'tmp-2', amount: 250 })] });
+      let stored = (await getRecord('businessBranches', uid, branchId) as any).entries;
+      assert.strictEqual(stored.length, 2);
+      const [first, second] = stored.sort((x: any, y: any) => x.amountCents - y.amountCents);
+
+      // Drop the second entry, edit the first, and add a new one
+      await updateRecord('businessBranches', uid, branchId, {
+        entries: [entry({ id: String(first._id), amount: 120 }), entry({ id: 'tmp-3', type: 'utility', category: 'Power', amount: 75 })],
+      });
+      stored = (await getRecord('businessBranches', uid, branchId) as any).entries;
+      assert.strictEqual(stored.length, 2);
+      assert.strictEqual(await BranchEntryModel.exists({ _id: second._id }), null, 'removed entry must be deleted from MongoDB');
+      assert.strictEqual(stored.find((e: any) => String(e._id) === String(first._id)).amountCents, 12000);
+
+      // Updating other fields without `entries` leaves entries untouched
+      await updateRecord('businessBranches', uid, branchId, { location: 'Peradeniya Rd' });
+      assert.strictEqual(await BranchEntryModel.countDocuments({ branchId }), 2);
+
+      // An empty array clears all entries
+      await updateRecord('businessBranches', uid, branchId, { entries: [] });
+      assert.strictEqual(await BranchEntryModel.countDocuments({ branchId }), 0);
+    });
+
+    it('persists entries submitted when the branch is created', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const company = await createRecord('companies', uid, { name: 'Beta Traders' });
+      const branch = await createRecord('businessBranches', uid, {
+        companyId: String(company._id), name: 'Galle', monthlyTarget: 0, annualTarget: 0,
+        entries: [entry({ id: 'local-1' }), entry({ id: 'local-2', type: 'utility', category: 'Water', amount: 30 })],
+      });
+      const stored = (await getRecord('businessBranches', uid, String(branch._id)) as any).entries;
+      assert.strictEqual(stored.length, 2);
+    });
+
+    it("never touches another user's entry when its id is submitted, and validates entries before writing", async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const otherUid = new mongoose.Types.ObjectId().toString();
+      const branch = await setupBranch(uid);
+      const otherBranch = await setupBranch(otherUid);
+      const foreign = await BranchEntryModel.create({ userId: otherUid, branchId: otherBranch._id, date: '2026-05-01', type: 'revenue', category: 'Sales', amountCents: 9900 });
+
+      await updateRecord('businessBranches', uid, String(branch._id), { entries: [entry({ id: String(foreign._id), amount: 1 })] });
+      assert.strictEqual((await BranchEntryModel.findById(foreign._id)).amountCents, 9900);
+      assert.strictEqual(await BranchEntryModel.countDocuments({ branchId: branch._id, userId: uid }), 1);
+
+      await assert.rejects(
+        () => updateRecord('businessBranches', uid, String(branch._id), { entries: [entry({ date: '2026-02-31' })] }),
+        (err: any) => err.status === 400 && /date/i.test(err.message),
+      );
+      await assert.rejects(
+        () => updateRecord('businessBranches', uid, String(branch._id), { entries: [entry({ amount: 0 })] }),
+        (err: any) => err.status === 400 && /amount/i.test(err.message),
+      );
+      assert.strictEqual(await BranchEntryModel.countDocuments({ branchId: branch._id, userId: uid }), 1, 'rejected payloads must not prune');
+    });
+  });
+
+  describe('reducing-balance loan interest allocation', () => {
+    // 100,000 @ 12% p.a. over 12 months: EMI 8,884.88, month-1 interest 1,000.00
+    async function createLoan(uid: string) {
+      return createRecord('loans', uid, {
+        lender: 'NDB', amount: 100000, rate: 12, method: 'reducing_balance', tenureMonths: 12, startDate: '2026-01-01',
+      });
+    }
+
+    it('two half-installments in the same month allocate interest once, matching a single full EMI', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const loan = await createLoan(uid);
+      const afterFirst = await recordLoanRepayment(uid, String(loan._id), 4442.44, '2026-02-01');
+      assert.strictEqual(afterFirst.repayments[0].interestCents, 100000);
+      assert.strictEqual(afterFirst.repayments[0].principalCents, 344244);
+
+      const afterSecond = await recordLoanRepayment(uid, String(loan._id), 4442.44, '2026-02-01');
+      assert.strictEqual(afterSecond.repayments[1].interestCents, 0, 'interest for the period was already paid');
+      assert.strictEqual(afterSecond.repayments[1].principalCents, 444244);
+      assert.strictEqual(afterSecond.balanceCents, 10000000 - 788488);
+    });
+
+    it('a partial payment smaller than accrued interest pays interest only; the rest stays due', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const loan = await createLoan(uid);
+      const partial = await recordLoanRepayment(uid, String(loan._id), 500, '2026-02-01');
+      assert.strictEqual(partial.repayments[0].interestCents, 50000);
+      assert.strictEqual(partial.repayments[0].principalCents, 0);
+      assert.strictEqual(partial.balanceCents, 10000000);
+
+      const rest = await recordLoanRepayment(uid, String(loan._id), 8384.88, '2026-02-01');
+      assert.strictEqual(rest.repayments[1].interestCents, 50000);
+      assert.strictEqual(rest.repayments[1].principalCents, 788488);
+    });
+
+    it('an extra mid-period payment accrues pro-rated interest on the actual outstanding balance', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const loan = await createLoan(uid);
+      await recordLoanRepayment(uid, String(loan._id), 8884.88, '2026-02-01');
+      // 14 of 28 days into February on 92,115.12 outstanding: 921.1512 * 14/28 = 460.58
+      const extra = await recordLoanRepayment(uid, String(loan._id), 50000, '2026-02-15');
+      assert.strictEqual(extra.repayments[1].interestCents, 46058);
+      assert.strictEqual(extra.repayments[1].principalCents, 5000000 - 46058);
+      assert.strictEqual(extra.balanceCents, 9211512 - (5000000 - 46058));
+
+      const payoff = await calculateLoanPayoff(uid, String(loan._id), '2026-02-15');
+      assert.strictEqual(payoff.accruedInterestCents, 0);
+      assert.strictEqual(payoff.payoffAmountCents, extra.balanceCents);
+    });
+
+    it('charges every elapsed period when a month is skipped', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const loan = await createLoan(uid);
+      const late = await recordLoanRepayment(uid, String(loan._id), 8884.88, '2026-03-01');
+      assert.strictEqual(late.repayments[0].interestCents, 200000);
+      assert.strictEqual(late.repayments[0].principalCents, 688488);
+    });
+
+    it('payoff = remaining principal + accrued interest; paying it settles to zero and overpaying is rejected', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const loan = await createLoan(uid);
+      await recordLoanRepayment(uid, String(loan._id), 8884.88, '2026-02-01');
+
+      const payoff = await calculateLoanPayoff(uid, String(loan._id), '2026-03-01');
+      assert.strictEqual(payoff.remainingBalanceCents, 9211512);
+      assert.strictEqual(payoff.accruedInterestCents, 92115);
+      assert.strictEqual(payoff.payoffAmountCents, 9303627);
+
+      await assert.rejects(
+        () => recordLoanRepayment(uid, String(loan._id), 93036.28, '2026-03-01'),
+        (err: any) => err.status === 400 && /exceeds the payoff amount of 93036\.27/.test(err.message),
+      );
+      const settled = await recordLoanRepayment(uid, String(loan._id), 93036.27, '2026-03-01');
+      assert.strictEqual(settled.balanceCents, 0);
+      assert.strictEqual(settled.repayments[1].interestCents, 92115);
+
+      // Undo restores outstanding principal from the principal portions only
+      const undone = await deleteLoanRepayment(uid, String(loan._id), String(settled.repayments[1]._id));
+      assert.strictEqual(undone.balanceCents, 9211512);
+      const cash = await BankAccountModel.findOne({ userId: uid, accountType: 'cash' });
+      assert.strictEqual(cash.balanceCents, -888488);
+      assert.strictEqual((await recomputeBalance(uid, String(cash._id))).driftCents, 0);
+    });
+  });
+
+  describe('pawn redemption including interest and zero-drift undo', () => {
+    it('splits redemption into principal + interest and undo restores both exactly', async () => {
+      const uid = new mongoose.Types.ObjectId().toString();
+      const item = await createRecord('pawnedItems', uid, { description: 'Gold Bangle', amountReceived: 50000, interestRate: 12, nextDue: '2026-05-01' });
+
+      await recordPawnPayment(uid, String(item._id), { paymentType: 'part_principal', amount: 20000, date: '2026-05-01' });
+      await assert.rejects(
+        () => recordPawnPayment(uid, String(item._id), { paymentType: 'part_principal', amount: 40000 }),
+        (err: any) => err.status === 400 && /exceeds the outstanding principal/.test(err.message),
+      );
+      await assert.rejects(
+        () => recordPawnPayment(uid, String(item._id), { paymentType: 'redemption', amount: 29000 }),
+        (err: any) => err.status === 400 && /must cover the outstanding principal/.test(err.message),
+      );
+
+      const redeemed = await recordPawnPayment(uid, String(item._id), { paymentType: 'redemption', amount: 31000, date: '2026-05-20' });
+      assert.strictEqual(redeemed.status, 'redeemed');
+      assert.strictEqual(redeemed.redemptionDate, '2026-05-20');
+      assert.strictEqual(redeemed.principalOutstandingCents, 0);
+      assert.strictEqual(redeemed.interestPaidCents, 100000);
+      assert.strictEqual(redeemed.payments[1].principalCents, 3000000);
+      assert.strictEqual(redeemed.payments[1].interestCents, 100000);
+
+      const undone = await deletePawnPayment(uid, String(item._id), String(redeemed.payments[1]._id));
+      assert.strictEqual(undone.principalOutstandingCents, 3000000, 'undo must not add the interest portion back to principal');
+      assert.strictEqual(undone.interestPaidCents, 0);
+      assert.strictEqual(undone.status, 'active');
+
+      const cash = await BankAccountModel.findOne({ userId: uid, accountType: 'cash' });
+      assert.strictEqual(cash.balanceCents, -2000000);
+      assert.strictEqual((await recomputeBalance(uid, String(cash._id))).driftCents, 0);
+    });
+  });
+});

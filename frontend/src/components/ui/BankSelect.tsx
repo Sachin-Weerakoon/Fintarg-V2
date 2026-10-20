@@ -33,6 +33,8 @@ export function BankSelect({
   required = false,
   className = '',
 }: BankSelectProps) {
+  // Archived accounts accept no new activity; keep one only if it is already the selected value.
+  const selectable = bankAccounts.filter(account => !account.isArchived || account.id === value);
   return (
     <Field id={id} label={label} hint={hint} error={error} className={className}>
       <Select
@@ -40,13 +42,13 @@ export function BankSelect({
         value={value}
         onChange={e => onChange(e.target.value)}
         hasError={hasError || Boolean(error)}
-        disabled={disabled || bankAccounts.length === 0}
+        disabled={disabled || selectable.length === 0}
         required={required}
       >
         <option value="">
-          {bankAccounts.length === 0 ? 'No bank accounts available' : placeholder}
+          {selectable.length === 0 ? 'No bank accounts available' : placeholder}
         </option>
-        {bankAccounts.map(account => {
+        {selectable.map(account => {
           const lastFour = account.accountNumber ? account.accountNumber.slice(-4) : '----';
           return (
             <option key={account.id} value={account.id}>

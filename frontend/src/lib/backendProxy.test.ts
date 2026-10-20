@@ -21,6 +21,24 @@ describe('Frontend Backend Proxy Integration', () => {
     expect(body).toEqual({ error: 'Backend unavailable' });
   });
 
+  it('forwards the query string to upstream in proxyBackendRequest', async () => {
+    let capturedUrl: URL | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (url) => {
+      capturedUrl = url as URL;
+      return new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+
+    const request = new NextRequest('http://localhost:3000/api/backend/transactions/history?bankAccountId=abc&limit=20&search=rent%20due', {
+      method: 'GET',
+    });
+    await proxyBackendRequest(request, '/api/transactions/history');
+
+    expect(capturedUrl?.pathname).toBe('/api/transactions/history');
+    expect(capturedUrl?.searchParams.get('bankAccountId')).toBe('abc');
+    expect(capturedUrl?.searchParams.get('limit')).toBe('20');
+    expect(capturedUrl?.searchParams.get('search')).toBe('rent due');
+  });
+
   it('forwards cookie, authorization, and custom headers to upstream in proxyBackend', async () => {
     let capturedHeaders: Headers | undefined;
     let capturedUrl: URL | undefined;

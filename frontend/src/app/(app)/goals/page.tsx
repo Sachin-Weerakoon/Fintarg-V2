@@ -1442,7 +1442,7 @@ function GoalCardItem({
                   className="text-xs py-1"
                 >
                   <option value="">Select Bank Account...</option>
-                  {bankAccounts.map(b => (
+                  {bankAccounts.filter(b => !b.isArchived).map(b => (
                     <option key={b.id} value={b.id}>
                       {b.bankName} - {b.accountNumber} ({formatRs(b.currentBalance)})
                     </option>

@@ -58,6 +58,8 @@ export interface BankAccount {
   openingBalance?: number;
   currency?: string;
   notes?: string;
+  /** Closed to new activity; history is kept. Accounts with money or history are archived rather than deleted. */
+  isArchived?: boolean;
 }
 
 export interface Card {

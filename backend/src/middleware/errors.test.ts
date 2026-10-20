@@ -23,7 +23,7 @@ describe('Error Middleware & HttpError', () => {
   });
 
   it('errorHandler maps SyntaxError (malformed body) to 400', async () => {
-    const { errorHandler } = await import('./errors');
+    const { errorHandler } = await import('./errors.js');
     let capturedStatus = 0;
     let capturedJson: any = null;
     const mockRes: any = {
@@ -46,7 +46,7 @@ describe('Error Middleware & HttpError', () => {
   });
 
   it('errorHandler maps Mongoose ValidationError to 400 with details', async () => {
-    const { errorHandler } = await import('./errors');
+    const { errorHandler } = await import('./errors.js');
     let capturedStatus = 0;
     let capturedJson: any = null;
     const mockRes: any = {
@@ -73,7 +73,7 @@ describe('Error Middleware & HttpError', () => {
   });
 
   it('errorHandler maps Mongoose CastError to 400', async () => {
-    const { errorHandler } = await import('./errors');
+    const { errorHandler } = await import('./errors.js');
     let capturedStatus = 0;
     let capturedJson: any = null;
     const mockRes: any = {
@@ -98,7 +98,7 @@ describe('Error Middleware & HttpError', () => {
   });
 
   it('errorHandler maps unhandled error to 500 without leaking stack traces', async () => {
-    const { errorHandler } = await import('./errors');
+    const { errorHandler } = await import('./errors.js');
     let capturedStatus = 0;
     let capturedJson: any = null;
     const mockRes: any = {
@@ -118,7 +118,7 @@ describe('Error Middleware & HttpError', () => {
   });
 
   it('errorHandler maps HttpError with code and extra metadata (PLAN_REQUIRED)', async () => {
-    const { errorHandler } = await import('./errors');
+    const { errorHandler } = await import('./errors.js');
     let capturedStatus = 0;
     let capturedJson: any = null;
     const mockRes: any = {

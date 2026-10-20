@@ -8,6 +8,8 @@ export interface IReminder extends Document {
   dueDate: string;
   channel: 'email' | 'in-app';
   status: 'pending' | 'sent' | 'dismissed';
+  sentAt?: Date | null;
+  emailAttempts: number;
   createdAt: Date;
 }
 
@@ -19,6 +21,10 @@ const ReminderSchema = new Schema<IReminder>({
   dueDate: { type: String, required: true },
   channel: { type: String, enum: ['email', 'in-app'], required: true },
   status: { type: String, enum: ['pending', 'sent', 'dismissed'], default: 'pending' },
+  sentAt: { type: Date, default: null },
+  emailAttempts: { type: Number, default: 0 },
 }, { timestamps: false });
+
+ReminderSchema.index({ status: 1, channel: 1, dueDate: 1 });
 
 export const ReminderModel = mongoose.models.Reminder || mongoose.model<IReminder>('Reminder', ReminderSchema);

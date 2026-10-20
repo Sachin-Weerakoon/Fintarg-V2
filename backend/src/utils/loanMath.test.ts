@@ -6,6 +6,10 @@ import {
   calculateSimpleInterest,
   calculateLoan,
   calculateAmortizationSchedule,
+  accruedReducingBalanceInterestCents,
+  addMonthsIso,
+  completedPeriods,
+  monthlyRateFor,
 } from './loanMath';
 
 describe('Shared Loan Maths (Test Vectors & Verification)', () => {
@@ -68,5 +72,34 @@ describe('Shared Loan Maths (Test Vectors & Verification)', () => {
     const reducingLoan = calculateLoan(100_000, 12, 12, 'reducing_balance');
     assert.strictEqual(compoundLoan.monthlyPayment, reducingLoan.monthlyPayment);
     assert.strictEqual(compoundLoan.totalInterest, reducingLoan.totalInterest);
+  });
+});
+
+describe('Reducing-balance interest accrual', () => {
+  it('addMonthsIso clamps to the end of shorter months', () => {
+    assert.strictEqual(addMonthsIso('2026-01-31', 1), '2026-02-28');
+    assert.strictEqual(addMonthsIso('2024-01-31', 1), '2024-02-29');
+    assert.strictEqual(addMonthsIso('2026-11-15', 2), '2027-01-15');
+  });
+
+  it('completedPeriods counts installment anniversaries on or before the date', () => {
+    assert.strictEqual(completedPeriods('2026-01-01', '2026-01-31'), 0);
+    assert.strictEqual(completedPeriods('2026-01-01', '2026-02-01'), 1);
+    assert.strictEqual(completedPeriods('2026-01-01', '2026-03-15'), 2);
+  });
+
+  it('accrues one full period of interest matching the amortization schedule', () => {
+    const rate = monthlyRateFor(12, 'annual');
+    assert.strictEqual(accruedReducingBalanceInterestCents(10_000_000, rate, '2026-01-01', [], '2026-02-01'), 100_000);
+    // After paying 7,884.88 principal on Feb 1, March interest is on 92,115.12
+    const reductions = [{ date: '2026-02-01', principalCents: 788_488 }];
+    assert.strictEqual(accruedReducingBalanceInterestCents(10_000_000, rate, '2026-01-01', reductions, '2026-03-01'), 100_000 + 92_115);
+  });
+
+  it('pro-rates a partial period by days and ignores reductions after the as-of date', () => {
+    const rate = monthlyRateFor(1, 'monthly');
+    // 15 of 31 January days on 31,000.00 at 1%/month = 150.00
+    assert.strictEqual(accruedReducingBalanceInterestCents(3_100_000, rate, '2026-01-01', [{ date: '2026-01-20', principalCents: 1_000_000 }], '2026-01-16'), 15_000);
+    assert.strictEqual(accruedReducingBalanceInterestCents(10_000_000, rate, '2026-01-01', [], '2026-01-01'), 0);
   });
 });

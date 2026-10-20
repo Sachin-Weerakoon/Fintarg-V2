@@ -258,6 +258,7 @@ export async function loadPersistedData(plan: UserPlan = 'basic'): Promise<Parti
       openingBalance: (row.openingBalanceCents ?? row.balanceCents ?? 0) / 100,
       currency: row.currency || 'LKR',
       notes: row.notes || '',
+      isArchived: Boolean(row.isArchived),
     })),
     cards: cards.map(row => ({
       id: row._id,
@@ -272,7 +273,7 @@ export async function loadPersistedData(plan: UserPlan = 'basic'): Promise<Parti
       expiryMonth: row.expiryMonth,
       expiryYear: row.expiryYear,
       creditLimit: (row.creditLimitCents || 0) / 100,
-      currentBalance: (row.currentBalanceCents || 0) / 100,
+      currentBalance: (row.currentBalanceCents ?? row.balanceCents ?? 0) / 100,
       billingDay: row.billingDay,
       dueDay: row.dueDay,
     })),
@@ -503,6 +504,7 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
         accountType: action.entry.accountType === 'checking' ? 'current' : action.entry.accountType || 'savings',
         currency: action.entry.currency || 'LKR',
         notes: action.entry.notes || '',
+        ...(action.entry.isArchived !== undefined ? { isArchived: Boolean(action.entry.isArchived) } : {}),
       }));
     case 'DELETE_BANK_ACCOUNT':
       return void (await send(`/api/backend/records/bankAccounts/${id}`, 'DELETE'));
@@ -781,5 +783,25 @@ export async function fetchTransactionHistory(filters: Record<string, any> = {})
       closingBalance: res.summary?.closingBalanceCents !== undefined ? res.summary.closingBalanceCents / 100 : undefined,
       count: totalCount,
     },
+  };
+}
+
+export interface LoanPayoffQuote {
+  /** Outstanding principal plus interest accrued up to `asOfDate`, in rupees. */
+  payoffAmount: number;
+  remainingPrincipal: number;
+  accruedInterest: number;
+  asOfDate: string;
+}
+
+export async function fetchLoanPayoff(loanId: string, date?: string): Promise<LoanPayoffQuote> {
+  const id = encodeURIComponent(await resolveRecordId(loanId));
+  const query = date ? `?date=${encodeURIComponent(date)}` : '';
+  const { data } = await apiClient<{ data: RawRecord }>(`/api/backend/records/loans/${id}/payoff${query}`);
+  return {
+    payoffAmount: (data.payoffAmountCents || 0) / 100,
+    remainingPrincipal: (data.remainingBalanceCents || 0) / 100,
+    accruedInterest: (data.accruedInterestCents || 0) / 100,
+    asOfDate: data.asOfDate,
   };
 }

@@ -109,3 +109,95 @@ export function calculateAmortizationSchedule(
 
   return schedule;
 }
+
+
+/**
+ * Monthly interest rate (as a fraction) for a loan's quoted rate and basis.
+ */
+export function monthlyRateFor(ratePercent: number, interestBasis: 'monthly' | 'annual' = 'annual'): number {
+  const effectiveAnnualRate = interestBasis === 'monthly' ? ratePercent * 12 : ratePercent;
+  return (effectiveAnnualRate / 100) / 12;
+}
+
+function isoToDayNumber(iso: string): number {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  return Date.UTC(y, m - 1, d) / 86_400_000;
+}
+
+/**
+ * Adds calendar months to a YYYY-MM-DD date, clamping the day to the target month's length
+ * (e.g. 2026-01-31 + 1 month = 2026-02-28).
+ */
+export function addMonthsIso(iso: string, months: number): string {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  const target = new Date(Date.UTC(y, m - 1 + months, 1));
+  const daysInTarget = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(d, daysInTarget));
+  return target.toISOString().slice(0, 10);
+}
+
+/**
+ * Number of whole installment periods (anniversaries of startDate) that have fallen due on or before asOfDate.
+ */
+export function completedPeriods(startDate: string, asOfDate: string): number {
+  if (asOfDate <= startDate) return 0;
+  let k = 0;
+  while (addMonthsIso(startDate, k + 1) <= asOfDate) k++;
+  return k;
+}
+
+export interface PrincipalReduction {
+  date: string;
+  principalCents: number;
+}
+
+/**
+ * Total interest (in cents) accrued on a reducing-balance loan from startDate up to asOfDate.
+ *
+ * Interest accrues on the actual outstanding principal: each installment period earns
+ * `balance * monthlyRate`, pro-rated by days whenever the balance changes mid-period or
+ * asOfDate falls inside a period. This makes the split independent of how many payments
+ * were made, so extra, partial, or same-month payments allocate interest correctly.
+ */
+export function accruedReducingBalanceInterestCents(
+  principalCents: number,
+  monthlyRate: number,
+  startDate: string,
+  reductions: PrincipalReduction[],
+  asOfDate: string,
+): number {
+  if (monthlyRate <= 0 || asOfDate <= startDate) return 0;
+  const events = reductions
+    .filter(r => r.date <= asOfDate)
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+  let balance = principalCents;
+  let eventIdx = 0;
+  let period = 1;
+  let periodStart = startDate;
+  let periodEnd = addMonthsIso(startDate, 1);
+  let cursor = startDate;
+  let accrued = 0;
+
+  while (cursor < asOfDate) {
+    while (eventIdx < events.length && events[eventIdx].date <= cursor) {
+      balance = Math.max(0, balance - (Number(events[eventIdx].principalCents) || 0));
+      eventIdx++;
+    }
+    let segmentEnd = periodEnd < asOfDate ? periodEnd : asOfDate;
+    if (eventIdx < events.length && events[eventIdx].date < segmentEnd) segmentEnd = events[eventIdx].date;
+
+    const periodDays = isoToDayNumber(periodEnd) - isoToDayNumber(periodStart);
+    const segmentDays = isoToDayNumber(segmentEnd) - isoToDayNumber(cursor);
+    accrued += balance * monthlyRate * (segmentDays / periodDays);
+
+    cursor = segmentEnd;
+    if (cursor === periodEnd) {
+      period++;
+      periodStart = periodEnd;
+      periodEnd = addMonthsIso(startDate, period);
+    }
+  }
+
+  return Math.round(accrued);
+}
