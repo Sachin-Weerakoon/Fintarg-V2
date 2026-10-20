@@ -7,8 +7,7 @@ export async function sendMail(to: string, subject: string, html: string): Promi
     return false;
   }
 
-
-  try{
+  try {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${env.RESEND_API_KEY}` },
@@ -17,10 +16,8 @@ export async function sendMail(to: string, subject: string, html: string): Promi
     });
     if (!response.ok) logger.error({ status: response.status, subject }, 'Email delivery failed');
     return response.ok;
-  }catch (error){
-
+  } catch (error) {
     logger.error({ err: error, subject }, 'Email delivery error');
     return false;
   }
-
 }

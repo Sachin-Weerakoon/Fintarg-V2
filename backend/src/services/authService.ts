@@ -148,7 +148,7 @@ export async function deleteUserAccount(userId: string, password: string, confir
 
   const uid = new mongoose.Types.ObjectId(userId);
 
-    const userDataModels: mongoose.Model<any>[] = [
+  const userDataModels: mongoose.Model<any>[] = [
     ProfileModel, BankAccountModel, CardModel, TransactionModel, ExpenseModel, IncomeModel,
     LoanModel, PawnedItemModel, FinancePaymentModel, SavingsGoalModel, ReminderModel,
     DocumentModel, FileModel, CompanyModel, BusinessBranchModel, BranchEntryModel,
