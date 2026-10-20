@@ -77,6 +77,21 @@ export async function ensureCashWallet(userId: string | mongoose.Types.ObjectId)
 }
 
 /**
+ * Archived accounts are closed to new activity; their history stays intact and reversible.
+ */
+export async function assertAccountNotArchived(
+  userId: mongoose.Types.ObjectId,
+  bankAccountId: mongoose.Types.ObjectId,
+  session?: mongoose.ClientSession,
+) {
+  const query = BankAccountModel.exists({ _id: bankAccountId, userId, isArchived: true });
+  if (session) query.session(session);
+  if (await query) {
+    throw new HttpError(400, 'This account is archived. Unarchive it before recording new activity.');
+  }
+}
+
+/**
  * Posts a transaction to the ledger and adjusts the cached balances on the account and/or card.
  */
 export async function postTransaction(
@@ -101,6 +116,8 @@ export async function postTransaction(
   if (!Number.isFinite(amountCents) || amountCents <= 0) {
     throw new HttpError(400, 'Transaction amount must be a positive number');
   }
+
+  if (bankAccountId) await assertAccountNotArchived(uId, bankAccountId, session);
 
   // 1. Adjust bank account balance
   if (bankAccountId) {
@@ -412,6 +429,8 @@ export async function updateTransactionById(
     if (!Number.isFinite(newAmountCents) || newAmountCents <= 0) {
       throw new HttpError(400, 'Transaction amount must be a positive number');
     }
+
+    if (newBankAccountId) await assertAccountNotArchived(uId, newBankAccountId, session);
 
     if (newBankAccountId) {
       let delta = 0;

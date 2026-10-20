@@ -649,7 +649,8 @@ describe('Backend API Integration Tests', () => {
       });
       assert.strictEqual(repayRes.status, 200);
       const updatedLoan = (await repayRes.json()).data;
-      assert.strictEqual(updatedLoan.balanceCents, 10000000 - 888488);
+      // Reducing balance: only the principal portion (888488 - 100000 interest) reduces the balance
+      assert.strictEqual(updatedLoan.balanceCents, 10000000 - 788488);
       assert.strictEqual(updatedLoan.repayments.length, 1);
       assert.strictEqual(updatedLoan.repayments[0].note, 'Installment #1');
       assert.strictEqual(updatedLoan.repayments[0].amountCents, 888488);
@@ -1532,7 +1533,7 @@ describe('Backend API Integration Tests', () => {
       const regData = await regRes.json();
       const cronUserId = regData.user.id;
 
-      await ReminderModel.create({
+      const reminder = await ReminderModel.create({
         userId: cronUserId,
         type: 'custom',
         label: '<script>alert("xss")</script> Pay Electric Bill',
@@ -1547,6 +1548,19 @@ describe('Backend API Integration Tests', () => {
       assert.strictEqual(goodReminders.status, 200);
       const remindersData = await goodReminders.json();
       assert.ok(remindersData.found >= 1);
+
+      // Email is not configured in tests, so delivery fails: the claim is released and the attempt counted
+      const afterFailure = await ReminderModel.findById(reminder._id).lean() as any;
+      assert.strictEqual(afterFailure.status, 'pending');
+      assert.strictEqual(afterFailure.sentAt, null);
+      assert.strictEqual(afterFailure.emailAttempts, 1);
+
+      // Once the attempt cap is reached the reminder is no longer picked up, so it cannot starve newer ones
+      await ReminderModel.updateOne({ _id: reminder._id }, { $set: { emailAttempts: 5 } });
+      await fetch(`${baseUrl}/api/cron/reminders`, { headers: { 'x-cron-secret': env.CRON_SECRET } });
+      const capped = await ReminderModel.findById(reminder._id).lean() as any;
+      assert.strictEqual(capped.emailAttempts, 5);
+      assert.strictEqual(capped.status, 'pending');
     });
   });
 });

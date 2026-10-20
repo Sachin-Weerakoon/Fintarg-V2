@@ -4,6 +4,8 @@ export interface IPawnPayment {
   _id?: mongoose.Types.ObjectId;
   date: string;
   amountCents: number;
+  principalCents?: number;
+  interestCents?: number;
   paymentType: 'interest' | 'part_principal' | 'redemption';
   paymentMethod: string;
   bankAccountId?: mongoose.Types.ObjectId | null;
@@ -30,6 +32,8 @@ export interface IPawnedItem extends Document {
 const PawnPaymentSchema = new Schema<IPawnPayment>({
   date: { type: String, required: true },
   amountCents: { type: Number, required: true },
+  principalCents: { type: Number, default: 0 },
+  interestCents: { type: Number, default: 0 },
   paymentType: { type: String, enum: ['interest', 'part_principal', 'redemption'], default: 'interest' },
   paymentMethod: { type: String, default: 'cash' },
   bankAccountId: { type: Schema.Types.ObjectId, ref: 'BankAccount', default: null },
