@@ -21,7 +21,7 @@ describe('Backend API Integration Tests', () => {
         serverSelectionTimeoutMS: 10000,
       });
       // Ensure indexes (especially unique indexes like User.email) are built before test execution
-      const { UserModel } = await import('../models/User');
+      const { UserModel } = await import('../models/User.js');
       await UserModel.init();
     } catch (err) {
       const msg = (err as Error)?.message || String(err);
@@ -649,7 +649,8 @@ describe('Backend API Integration Tests', () => {
       });
       assert.strictEqual(repayRes.status, 200);
       const updatedLoan = (await repayRes.json()).data;
-      assert.strictEqual(updatedLoan.balanceCents, 10000000 - 888488);
+      // Reducing balance: only the principal portion (888488 - 100000 interest) reduces the balance
+      assert.strictEqual(updatedLoan.balanceCents, 10000000 - 788488);
       assert.strictEqual(updatedLoan.repayments.length, 1);
       assert.strictEqual(updatedLoan.repayments[0].note, 'Installment #1');
       assert.strictEqual(updatedLoan.repayments[0].amountCents, 888488);
@@ -890,7 +891,7 @@ describe('Backend API Integration Tests', () => {
       assert.ok(lockedData.error.includes('temporarily locked'));
 
       // 5. Simulate lockout expiration by updating lockedUntil in database
-      const { UserModel } = await import('../models/User');
+      const { UserModel } = await import('../models/User.js');
       await UserModel.updateOne(
         { email: lockEmail },
         { $set: { lockedUntil: new Date(Date.now() - 5000) } }
@@ -970,8 +971,8 @@ describe('Backend API Integration Tests', () => {
       assert.strictEqual(meBeforeReset.status, 200);
 
       // 3. Create two pending reset tokens in DB
-      const { UserModel } = await import('../models/User');
-      const { PasswordResetModel } = await import('../models/PasswordReset');
+      const { UserModel } = await import('../models/User.js');
+      const { PasswordResetModel } = await import('../models/PasswordReset.js');
       const { randomBytes, createHash } = await import('node:crypto');
 
       const userDoc = await UserModel.findOne({ email: resetUserEmail });
@@ -1321,13 +1322,13 @@ describe('Backend API Integration Tests', () => {
       assert.strictEqual(deleteRes.status, 200);
 
       // 9. Verify cascade purge in database
-      const { UserModel } = await import('../models/User');
-      const { ProfileModel } = await import('../models/Profile');
-      const { BankAccountModel } = await import('../models/BankAccount');
-      const { CardModel } = await import('../models/Card');
-      const { LoanModel } = await import('../models/Loan');
-      const { ExpenseModel } = await import('../models/Expense');
-      const { TransactionModel } = await import('../models/Transaction');
+      const { UserModel } = await import('../models/User.js');
+      const { ProfileModel } = await import('../models/Profile.js');
+      const { BankAccountModel } = await import('../models/BankAccount.js');
+      const { CardModel } = await import('../models/Card.js');
+      const { LoanModel } = await import('../models/Loan.js');
+      const { ExpenseModel } = await import('../models/Expense.js');
+      const { TransactionModel } = await import('../models/Transaction.js');
 
       const userExists = await UserModel.findById(userId);
       assert.strictEqual(userExists, null);
@@ -1488,15 +1489,15 @@ describe('Backend API Integration Tests', () => {
       assert.strictEqual(goodData.profile.nicNumber, '199512345678');
 
       // Verify UserModel.name was also updated
-      const { UserModel } = await import('../models/User');
+      const { UserModel } = await import('../models/User.js');
       const user = await UserModel.findOne({ email: profEmail });
       assert.strictEqual(user?.name, 'Updated Name');
     });
 
     it('GET /api/cron endpoints enforce timingSafe secret and process reminders safely (3.9)', async () => {
-      const { env } = await import('../config/env');
-      const { ReminderModel } = await import('../models/Reminder');
-      const { UserModel } = await import('../models/User');
+      const { env } = await import('../config/env.js');
+      const { ReminderModel } = await import('../models/Reminder.js');
+      const { UserModel } = await import('../models/User.js');
 
       // 1. Unauthenticated or wrong secret -> 401
       const unauthCron = await fetch(`${baseUrl}/api/cron/maintenance`);
@@ -1532,7 +1533,7 @@ describe('Backend API Integration Tests', () => {
       const regData = await regRes.json();
       const cronUserId = regData.user.id;
 
-      await ReminderModel.create({
+      const reminder = await ReminderModel.create({
         userId: cronUserId,
         type: 'custom',
         label: '<script>alert("xss")</script> Pay Electric Bill',
@@ -1547,6 +1548,19 @@ describe('Backend API Integration Tests', () => {
       assert.strictEqual(goodReminders.status, 200);
       const remindersData = await goodReminders.json();
       assert.ok(remindersData.found >= 1);
+
+      // Email is not configured in tests, so delivery fails: the claim is released and the attempt counted
+      const afterFailure = await ReminderModel.findById(reminder._id).lean() as any;
+      assert.strictEqual(afterFailure.status, 'pending');
+      assert.strictEqual(afterFailure.sentAt, null);
+      assert.strictEqual(afterFailure.emailAttempts, 1);
+
+      // Once the attempt cap is reached the reminder is no longer picked up, so it cannot starve newer ones
+      await ReminderModel.updateOne({ _id: reminder._id }, { $set: { emailAttempts: 5 } });
+      await fetch(`${baseUrl}/api/cron/reminders`, { headers: { 'x-cron-secret': env.CRON_SECRET } });
+      const capped = await ReminderModel.findById(reminder._id).lean() as any;
+      assert.strictEqual(capped.emailAttempts, 5);
+      assert.strictEqual(capped.status, 'pending');
     });
   });
 });

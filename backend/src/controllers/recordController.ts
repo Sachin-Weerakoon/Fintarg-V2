@@ -124,7 +124,7 @@ export const getLoanPayoff: RequestHandler = asyncHandler(async (request, respon
   const userId = request.auth?.userId;
   if (!userId) throw new HttpError(401, 'Authentication required');
   response.json({
-    data: await calculateLoanPayoff(userId, request.params.id),
+    data: await calculateLoanPayoff(userId, request.params.id, typeof request.query.date === 'string' ? request.query.date : undefined),
   });
 });
 

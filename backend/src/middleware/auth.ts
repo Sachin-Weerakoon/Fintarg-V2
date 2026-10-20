@@ -44,7 +44,7 @@ export const requireAuth: RequestHandler = asyncHandler(async (request, _respons
   next();
 });
 
-const businessRecordKinds = new Set(['companies', 'businessBranches', 'ownerDraws', 'agreements']);
+const businessRecordKinds = new Set(['companies', 'businessBranches', 'branchEntries', 'ownerDraws', 'agreements']);
 
 export const requireBusinessPlan: RequestHandler = asyncHandler(async (request, _response, next) => {
   if (!businessRecordKinds.has(request.params.kind)) return next();

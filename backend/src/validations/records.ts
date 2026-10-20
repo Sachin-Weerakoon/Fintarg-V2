@@ -64,6 +64,7 @@ const bankAccountSchema = z.object({
   currency: z.string().trim().max(10).default('LKR'),
   notes: optionalText,
   isDefault: z.boolean().default(false),
+  isArchived: z.boolean().optional(),
 });
 
 const cardSchema = z.object({
