@@ -186,7 +186,9 @@ export function SalaryWorkspace({
     if (!selected) return;
     const net = Math.max(0, selected.monthlyGross - selected.monthlyDeductions);
     const incId = 'inc_sal_' + selected.id + '_' + state.selectedMonth;
-    const day = String(selected.payday || 25).padStart(2, '0');
+    const [year, month] = state.selectedMonth.split('-').map(Number);
+    const maxDays = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const safeDay = String(Math.min(selected.payday || 25, maxDays)).padStart(2, '0');
     await dispatch({
       type: 'ADD_INCOME',
       entry: {
@@ -195,7 +197,7 @@ export function SalaryWorkspace({
         type: 'salary',
         amount: net,
         frequency: 'monthly',
-        date: `${state.selectedMonth}-${day}`,
+        date: `${state.selectedMonth}-${safeDay}`,
       },
     });
     showToast(`Posted ${formatRs(net)} take-home salary to income ledger.`, 'success');

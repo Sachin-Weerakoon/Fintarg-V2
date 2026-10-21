@@ -14,6 +14,11 @@ export interface FormalLetterSheetProps {
   companyTin?: string;
   companyAddress?: string;
   companyContact?: string;
+  bankAccountDetails?: {
+    bankName: string;
+    accountNumber: string;
+    branch?: string;
+  };
   className?: string;
 }
 
@@ -27,6 +32,7 @@ export function FormalLetterSheet({
   companyTin,
   companyAddress,
   companyContact,
+  bankAccountDetails,
   className = '',
 }: FormalLetterSheetProps) {
   const effectiveRef = refNumber || 'FNT-LTR-' + (date ? date.replace(/[^0-9]/g, '') : getLocalDate().replace(/-/g, ''));
@@ -41,13 +47,13 @@ export function FormalLetterSheet({
 
   return (
     <div
-      className={`bg-white text-slate-900 border border-slate-200/90 rounded-2xl shadow-xl overflow-hidden print:border-0 print:shadow-none print:rounded-none print:m-0 print:p-0 ${className}`.trim()}
+      className={`bg-white text-slate-900 border border-slate-200/90 rounded-2xl shadow-xl overflow-hidden print:w-full print:max-w-none print:border-0 print:shadow-none print:rounded-none print:m-0 print:p-0 ${className}`.trim()}
       style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
     >
       {/* Top brand identity gradient accent bar */}
       <div className="h-1.5 w-full bg-gradient-to-r from-[#0FA3B1] via-[#35C2D0] to-[#0A6D78]" />
 
-      <div className="p-8 sm:p-12 print:p-8">
+      <div className="p-8 sm:p-12 print:p-0">
         {/* Formal Letterhead */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-200 pb-6 mb-6">
           <div>
@@ -83,6 +89,19 @@ export function FormalLetterSheet({
               {companyBr && <span><strong className="text-slate-800">BR:</strong> {companyBr}</span>}
               {companyTin && <span><strong className="text-slate-800">TIN:</strong> {companyTin}</span>}
               {companyContact && <span><strong className="text-slate-800">Tel:</strong> {companyContact}</span>}
+            </div>
+          </div>
+        )}
+
+        {bankAccountDetails && (
+          <div className="mb-6 p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs font-sans text-slate-600">
+            <div className="font-extrabold text-slate-900 mb-1">Connected Bank Account</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <span><strong className="text-slate-800">Bank:</strong> {bankAccountDetails.bankName}</span>
+              <span><strong className="text-slate-800">Account:</strong> {bankAccountDetails.accountNumber}</span>
+              {bankAccountDetails.branch && (
+                <span><strong className="text-slate-800">Branch:</strong> {bankAccountDetails.branch}</span>
+              )}
             </div>
           </div>
         )}

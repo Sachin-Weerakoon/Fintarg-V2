@@ -159,16 +159,16 @@ function AnalysisContent() {
   const [trim, setTrim] = useState(10);
   const [extraSave, setExtraSave] = useState(5000);
 
-  // Business & Branch Scope State
+  // URL parameters are the source of truth so browser navigation and shared links stay in sync.
   const rawScope = searchParams.get('scope') as AnalysisScope;
-  const initialScope: AnalysisScope = (['consolidated', 'company', 'branch'] as AnalysisScope[]).includes(rawScope) ? rawScope : 'consolidated';
-  const [scope, setScope] = useState<AnalysisScope>(initialScope);
+  const scope: AnalysisScope = (['consolidated', 'company', 'branch'] as AnalysisScope[]).includes(rawScope)
+    ? rawScope
+    : 'consolidated';
 
   const rawCompanyId = searchParams.get('companyId') || '';
-  const [companyId, setCompanyId] = useState(rawCompanyId);
-
   const rawBranchId = searchParams.get('branchId') || '';
-  const [branchId, setBranchId] = useState(rawBranchId);
+  const companyId = rawCompanyId;
+  const branchId = rawBranchId;
 
   const isBusinessUser =
     state.profile.plan === 'business' ||
@@ -176,10 +176,13 @@ function AnalysisContent() {
     (state.companies && state.companies.length > 0) ||
     (state.businessBranches && state.businessBranches.length > 0);
 
-  const selectedCompany = state.companies.find(c => c.id === (companyId || state.companies[0]?.id)) || state.companies[0];
+  const requestedBranch = state.businessBranches.find(b => b.id === branchId);
+  const selectedCompany = state.companies.find(c =>
+    c.id === (companyId || requestedBranch?.companyId || state.companies[0]?.id)
+  ) || state.companies[0];
   const companyBranches = state.businessBranches.filter(b => b.companyId === (selectedCompany?.id || ''));
   const selectedBranch =
-    state.businessBranches.find(b => b.id === branchId) ||
+    companyBranches.find(b => b.id === branchId) ||
     companyBranches[0] ||
     state.businessBranches[0];
 
@@ -190,22 +193,10 @@ function AnalysisContent() {
   }, [rawTab, tab]);
 
   useEffect(() => {
-    if (rawScope && (['consolidated', 'company', 'branch'] as AnalysisScope[]).includes(rawScope) && rawScope !== scope) {
-      setScope(rawScope);
+    if (urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) && urlMonth !== state.selectedMonth) {
+      dispatch({ type: 'SET_MONTH', month: urlMonth });
     }
-  }, [rawScope, scope]);
-
-  useEffect(() => {
-    if (rawCompanyId && rawCompanyId !== companyId) {
-      setCompanyId(rawCompanyId);
-    }
-  }, [rawCompanyId, companyId]);
-
-  useEffect(() => {
-    if (rawBranchId && rawBranchId !== branchId) {
-      setBranchId(rawBranchId);
-    }
-  }, [rawBranchId, branchId]);
+  }, [urlMonth, state.selectedMonth, dispatch]);
 
   const handleTabChange = (newTab: Tab) => {
     setTab(newTab);
@@ -215,7 +206,6 @@ function AnalysisContent() {
   };
 
   const handleScopeChange = (newScope: AnalysisScope, newCompanyId?: string, newBranchId?: string) => {
-    setScope(newScope);
     const params = new URLSearchParams(searchParams.toString());
     if (newScope === 'consolidated') {
       params.delete('scope');
@@ -226,7 +216,6 @@ function AnalysisContent() {
       params.set('scope', 'company');
       if (coId) {
         params.set('companyId', coId);
-        setCompanyId(coId);
       }
       params.delete('branchId');
     } else if (newScope === 'branch') {
@@ -235,11 +224,9 @@ function AnalysisContent() {
       params.set('scope', 'branch');
       if (coId) {
         params.set('companyId', coId);
-        setCompanyId(coId);
       }
       if (brId) {
         params.set('branchId', brId);
-        setBranchId(brId);
       }
     }
     router.replace(`/analysis?${params.toString()}`, { scroll: false });
@@ -363,7 +350,7 @@ function AnalysisContent() {
         }
       />
 
-      {isBusinessUser && (
+      {(isBusinessUser || scope !== 'consolidated') && (
         <AnalysisScopeSelector
           scope={scope}
           companyId={selectedCompany?.id || ''}

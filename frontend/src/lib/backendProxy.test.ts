@@ -83,6 +83,39 @@ describe('Frontend Backend Proxy Integration', () => {
     expect(response.headers.get('set-cookie')).toBe('fintarg_token=jwt_sample_token; Path=/; HttpOnly; SameSite=Strict');
   });
 
+  it('returns a graceful 503 when proxyBackend cannot reach the upstream', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Connection refused'));
+    const request = new NextRequest('http://localhost:3000/api/auth/login', { method: 'POST' });
+
+    const response = await proxyBackend(request, '/api/auth/login', { mode: 'signin' });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Backend service temporarily unavailable',
+    });
+  });
+
+  it('preserves multiple upstream Set-Cookie headers in proxyBackend', async () => {
+    const cookies = [
+      'fintarg_token=first; Path=/; HttpOnly; SameSite=Strict',
+      'fintarg_refresh=second; Path=/; HttpOnly; SameSite=Strict',
+    ];
+    const upstream = new Response(JSON.stringify({ ok: true }), { status: 200 });
+    Object.defineProperty(upstream.headers, 'getSetCookie', { value: () => cookies });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(upstream);
+
+    const request = new NextRequest('http://localhost:3000/api/auth/login', { method: 'POST' });
+    const response = await proxyBackend(request, '/api/auth/login', { mode: 'signin' });
+
+    const forwardedCookies = response.headers.getSetCookie?.();
+    if (forwardedCookies) {
+      expect(forwardedCookies).toEqual(cookies);
+    } else {
+      const combinedCookies = response.headers.get('set-cookie') || '';
+      for (const cookie of cookies) expect(combinedCookies).toContain(cookie);
+    }
+  });
+
   it('handles invalid non-JSON upstream response gracefully in proxyBackend', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response('Internal Server Error HTML', {

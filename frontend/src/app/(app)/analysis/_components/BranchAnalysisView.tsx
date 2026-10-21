@@ -462,7 +462,7 @@ export function BranchAnalysisView({
                   centerValue={formatRs(metrics.totalCosts)}
                 />
               ) : (
-                <div className="text-xs text-muted py-8">No operating bills recorded</div>
+                <EmptyState title="No operating bills recorded" helper="Add branch expenses to see the cost distribution." />
               )}
             </div>
           </Card>

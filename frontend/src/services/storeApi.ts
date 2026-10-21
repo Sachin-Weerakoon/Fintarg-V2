@@ -554,11 +554,19 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
       return void (await send(`/api/backend/records/transactions/${id}`, 'DELETE'));
 
     case 'TRANSFER_FUNDS': {
+      const fromAccountId = action.fromAccountId && action.fromAccountId !== 'cash'
+        ? await resolveRecordId(action.fromAccountId)
+        : action.fromAccountId;
+      const toAccountId = action.toAccountId && action.toAccountId !== 'cash'
+        ? await resolveRecordId(action.toAccountId)
+        : action.toAccountId;
+      const fromCardId = action.fromCardId ? await resolveRecordId(action.fromCardId) : action.fromCardId;
+      const toCardId = action.toCardId ? await resolveRecordId(action.toCardId) : action.toCardId;
       const res = await send('/api/backend/records/transfers', 'POST', {
-        fromAccountId: action.fromAccountId,
-        fromCardId: action.fromCardId,
-        toAccountId: action.toAccountId,
-        toCardId: action.toCardId,
+        fromAccountId,
+        fromCardId,
+        toAccountId,
+        toCardId,
         amount: action.amount,
         date: action.date,
         description: action.description,

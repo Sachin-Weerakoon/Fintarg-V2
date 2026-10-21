@@ -26,6 +26,14 @@ const businessBottomItems = [
   { href: '/advanced', label: 'Advanced', page: 'advanced' },
 ];
 
+const bothBottomItems = [
+  { href: '/', label: 'Home', page: 'dashboard' },
+  { href: '/salary', label: 'Salary', page: 'salary' },
+  { href: '/financial', label: 'Financial', page: 'financial' },
+  { href: '/analysis', label: 'Analysis', page: 'analysis' },
+  { href: '/advanced', label: 'Advanced', page: 'advanced' },
+];
+
 function getPageIconName(page: string): IconName {
   switch (page) {
     case 'dashboard':
@@ -77,10 +85,12 @@ function AppLayoutInner({
     ...sidebarVars,
   } as React.CSSProperties;
 
-  const mobileBottomItems = user.workMode === 'salary' ? salaryBottomItems : businessBottomItems;
+  const mobileBottomItems = user.workMode === 'both'
+    ? bothBottomItems
+    : user.workMode === 'salary' ? salaryBottomItems : businessBottomItems;
   const currentTab = searchParams?.get('tab') || undefined;
 
-  const showSalaryInSidebar = user.workMode === 'salary';
+  const showSalaryInSidebar = user.workMode !== 'business';
   const hasBusiness = user.workMode !== 'salary' || state.profile?.plan === 'business' || (state.companies && state.companies.length > 0);
 
   const navSections: { title?: string; items: { href: string; label: string; icon: IconName; isActive: boolean; badge?: string }[] }[] = [

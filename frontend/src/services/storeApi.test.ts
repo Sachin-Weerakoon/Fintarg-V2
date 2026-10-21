@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fetchTransactionHistory, persistStoreAction, loadPersistedData, list, loadBusinessData } from './storeApi';
+import { fetchTransactionHistory, persistStoreAction, loadPersistedData, list, loadBusinessData, resolvedServerIds } from './storeApi';
 
 describe('storeApi loan mapping and readonly field stripping (1.2)', () => {
   beforeEach(() => {
@@ -202,6 +202,38 @@ describe('storeApi loan mapping and readonly field stripping (1.2)', () => {
       date: '2026-10-12',
       description: 'Savings top-up',
     });
+  });
+
+  it('TRANSFER_FUNDS resolves pending local account and card IDs before posting', async () => {
+    let capturedBody: any;
+    resolvedServerIds.set('ba_local_1', 'server_account_1');
+    resolvedServerIds.set('cd_local_2', 'server_card_2');
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (_url, init) => {
+      capturedBody = JSON.parse(init?.body as string);
+      return new Response(JSON.stringify({ data: { transferGroupId: 'trf_1000' } }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    try {
+      await persistStoreAction({
+        type: 'TRANSFER_FUNDS',
+        fromAccountId: 'ba_local_1',
+        toCardId: 'cd_local_2',
+        amount: 5000,
+        date: '2026-10-12',
+      });
+      expect(capturedBody).toEqual({
+        fromAccountId: 'server_account_1',
+        toCardId: 'server_card_2',
+        amount: 5000,
+        date: '2026-10-12',
+      });
+    } finally {
+      resolvedServerIds.delete('ba_local_1');
+      resolvedServerIds.delete('cd_local_2');
+    }
   });
 
   it('DELETE_TRANSFER sends DELETE to /api/backend/records/transfers/:transferGroupId (2.7)', async () => {
@@ -537,6 +569,3 @@ describe('fetchTransactionHistory contract alignment (2.10)', () => {
     });
   });
 });
-
-
-

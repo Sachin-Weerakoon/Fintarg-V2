@@ -16,16 +16,27 @@ export async function proxyBackend(request: NextRequest, path: string, body?: un
   if (realIp) headers.set('x-real-ip', realIp);
   if (body !== undefined) headers.set('content-type', 'application/json');
 
-  const upstream = await fetch(new URL(path, backendUrl), {
-    method: request.method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    cache: 'no-store',
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(new URL(path, backendUrl), {
+      method: request.method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: 'no-store',
+    });
+  } catch {
+    return NextResponse.json({ error: 'Backend service temporarily unavailable' }, { status: 503 });
+  }
+
   const payload = await upstream.json().catch(() => ({ error: 'Backend returned an invalid response' }));
   const response = NextResponse.json(payload, { status: upstream.status });
-  const setCookie = upstream.headers.get('set-cookie');
-  if (setCookie) response.headers.set('set-cookie', setCookie);
+  const setCookies = upstream.headers.getSetCookie?.();
+  if (setCookies?.length) {
+    for (const setCookie of setCookies) response.headers.append('set-cookie', setCookie);
+  } else {
+    const setCookie = upstream.headers.get('set-cookie');
+    if (setCookie) response.headers.set('set-cookie', setCookie);
+  }
   return response;
 }
 

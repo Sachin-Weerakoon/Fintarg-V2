@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useApp } from '@/store';
@@ -117,7 +117,7 @@ function LettersClient() {
   const hasBusiness = profile.plan === 'business' || profile.workMode === 'business' || profile.workMode === 'both' || (state.companies && state.companies.length > 0);
 
   const nonCashAccounts = state.bankAccounts.filter(b => b.accountType !== 'cash');
-  const defaultAccount = nonCashAccounts[0] || state.bankAccounts[0] || null;
+  const defaultAccount = nonCashAccounts[0] || null;
   const [selectedAccountId, setSelectedAccountId] = useState(defaultAccount?.id || '');
 
   const urlCompanyId = searchParams.get('companyId');
@@ -136,12 +136,26 @@ function LettersClient() {
   const [editBody, setEditBody] = useState('');
   const [saved, setSaved] = useState(false);
 
+  const selectedAccount = state.bankAccounts.find(b => b.id === selectedAccountId) || defaultAccount;
+
   useEffect(() => {
     if (urlCompanyId && state.companies.some(c => c.id === urlCompanyId)) {
       setSelectedCompanyId(urlCompanyId);
       setMode('business');
     }
   }, [urlCompanyId, state.companies]);
+
+  useEffect(() => {
+    if (!selectedAccount) return;
+    if (!selectedAccountId) setSelectedAccountId(selectedAccount.id);
+    setForm(current => ({
+      ...current,
+      accountNumber: !current.accountNumber || current.accountNumber === profile.accountNumber
+        ? selectedAccount.accountNumber || current.accountNumber
+        : current.accountNumber,
+      addressedTo: current.addressedTo || `The Manager, ${selectedAccount.bankName}`,
+    }));
+  }, [selectedAccount, selectedAccountId, profile.accountNumber]);
 
   const selectedCompany = state.companies.find(c => c.id === selectedCompanyId) || state.companies[0] || null;
 
@@ -498,6 +512,18 @@ function LettersClient() {
                   companyTin={selectedCompany?.tinNumber}
                   companyAddress={selectedCompany?.address}
                   companyContact={selectedCompany?.contact}
+                  bankAccountDetails={
+                    template === 'bank' &&
+                    selectedAccount &&
+                    selectedAccount.accountNumber &&
+                    (editing ? editBody : generated).includes(selectedAccount.accountNumber)
+                      ? {
+                          bankName: selectedAccount.bankName,
+                          accountNumber: selectedAccount.accountNumber,
+                          branch: selectedAccount.branch,
+                      }
+                      : undefined
+                  }
                   className="shadow-sm"
                 />
               )}

@@ -531,25 +531,20 @@ export function AccountsTab() {
                           >
                             <Icon name="edit" size={14} />
                           </Button>
-                          {acc.accountType !== 'cash' && (
+                          {acc.accountType !== 'cash' &&
+                            acc.id !== 'cash' &&
+                            acc.id !== 'cash_wallet' &&
+                            acc.name.trim().toLowerCase() !== 'cash wallet' && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-xs"
-                              onClick={() => setAccountArchived(acc, !acc.isArchived)}
+                              className="text-danger-text hover:text-danger-text"
+                              onClick={() => handleDeleteAccount(acc.id, acc.name)}
+                              aria-label="Delete account"
                             >
-                              {acc.isArchived ? 'Unarchive' : 'Archive'}
+                              <Icon name="trash" size={14} />
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-danger-text hover:text-danger-text"
-                            onClick={() => handleDeleteAccount(acc)}
-                            aria-label="Delete account"
-                          >
-                            <Icon name="trash" size={14} />
-                          </Button>
                         </div>
                       </div>
                     </Card>

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { BrandLogo } from '@/components/ui/BrandLogo';
+import { Alert } from '@/components/ui/Alert';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -22,14 +23,19 @@ export default function ForgotPassword() {
     }
     setLoading(true);
     try {
-      await fetch('/api/auth/forgot-password', {
+      const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data.error || 'Could not send a reset link. Please try again.');
+        return;
+      }
       setSent(true);
     } catch {
-      setError('Network error. Please try again.');
+      setError('Connection error. The password service is temporarily unavailable. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -53,7 +59,12 @@ export default function ForgotPassword() {
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
-            <Field id="email" label={<span className="text-slate-200">Email address</span>} error={error}>
+            {error && (
+              <Alert tone="danger" onDismiss={() => setError('')}>
+                {error}
+              </Alert>
+            )}
+            <Field id="email" label={<span className="text-slate-200">Email address</span>}>
               <Input
                 type="email"
                 value={email}

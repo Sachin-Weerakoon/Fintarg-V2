@@ -7,10 +7,13 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 
-const MONTH_LABELS: Record<string, string> = {
-  '2026-07': 'July 2026',
-  '2026-08': 'August 2026',
-  '2026-09': 'September 2026',
+const formatMonth = (month: string) => {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return new Date(Date.UTC(year, monthNumber - 1, 1)).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 };
 
 export default function PrintAnalysisPage() {
@@ -24,8 +27,7 @@ export default function PrintAnalysisPage() {
   const maxCat = Math.max(...catEntries.map(c => c[1]), 1);
 
   const pawnInterest = state.pawnedItems.reduce((s, p) => s + Math.round(p.amountReceived * p.interestRate / 100), 0);
-  const fpTotal = state.financePayments.reduce((s, f) => s + f.amount, 0);
-  const projectedBalance = freeCash - pawnInterest - fpTotal - loanInterest;
+  const projectedBalance = freeCash - pawnInterest;
 
   const handlePrint = () => {
     window.print();
@@ -66,7 +68,7 @@ export default function PrintAnalysisPage() {
             </p>
           </div>
           <div className="text-right text-xs text-muted space-y-1">
-            <div className="font-bold text-text">Period: {MONTH_LABELS[month] || month}</div>
+            <div className="font-bold text-text">Period: {formatMonth(month)}</div>
             <div>Generated: {new Date().toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
             <div className="text-[11px] text-muted">Ref: FNT-EXP-{month.replace('-', '')}</div>
           </div>
