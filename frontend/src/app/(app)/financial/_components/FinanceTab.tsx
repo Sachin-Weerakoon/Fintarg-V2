@@ -18,6 +18,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import type { FinancePayment } from '@/types';
+import { getLocalDate } from '@/utils/date';
 
 export function FinanceTab() {
   const { state, dispatch } = useApp();
@@ -46,7 +47,7 @@ export function FinanceTab() {
     amount: '',
     paymentMethod: 'bank_transfer',
     bankAccountId: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: getLocalDate(),
     note: '',
   });
 
@@ -109,7 +110,7 @@ export function FinanceTab() {
       amount: String(fp.amount),
       paymentMethod: fp.paymentKind === 'cheque' ? 'cheque' : fp.paymentKind === 'standing_order' ? 'standing_order' : fp.bankAccountId ? 'bank_transfer' : 'cash',
       bankAccountId: fp.bankAccountId || '',
-      date: new Date().toISOString().slice(0, 10),
+      date: getLocalDate(),
       note: `Installment for ${fp.lender || fp.payee || 'Finance Payment'}`,
     });
   };
@@ -429,19 +430,19 @@ export function FinanceTab() {
           <MoneyField
             value={form.amount}
             onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
-            placeholder="25,000"
+            placeholder="e.g. 25,000"
           />
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field id="fp-dueday" label="Due Day (1-31)" required>
+          <Field id="fp-dueday" label="Due Day" hint="Day of month, 1–31" required>
             <Input
               type="number"
               min="1"
               max="31"
               value={form.dueDay}
               onChange={e => setForm(f => ({ ...f, dueDay: e.target.value }))}
-              placeholder="10"
+              placeholder="e.g. 10"
             />
           </Field>
           <Field id="fp-nextdue" label="Next Due Date" required>
@@ -463,7 +464,7 @@ export function FinanceTab() {
               min="0"
               value={form.monthsRemaining}
               onChange={e => setForm(f => ({ ...f, monthsRemaining: e.target.value }))}
-              placeholder="18"
+              placeholder="e.g. 18"
             />
           </Field>
         )}
@@ -553,7 +554,7 @@ export function FinanceTab() {
                 onChange={e => setPaymentForm(f => ({ ...f, bankAccountId: e.target.value }))}
               >
                 <option value="">Select Account...</option>
-                {state.bankAccounts.map(b => (
+                {state.bankAccounts.filter(b => !b.isArchived).map(b => (
                   <option key={b.id} value={b.id}>
                     {b.bankName} - {b.accountNumber} ({formatRs(b.currentBalance)})
                   </option>

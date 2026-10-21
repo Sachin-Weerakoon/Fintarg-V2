@@ -48,7 +48,10 @@ export async function proxyBackendRequest(request: NextRequest, path: string) {
       if (value) headers.set(name, value);
     }
     const body = request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.arrayBuffer();
-    const upstream = await fetch(new URL(path, backendUrl), { method: request.method, headers, body, cache: 'no-store' });
+    // Forward the query string (filters, pagination, ?date=) unless the caller already set one.
+    const target = new URL(path, backendUrl);
+    if (!target.search) target.search = request.nextUrl.search;
+    const upstream = await fetch(target, { method: request.method, headers, body, cache: 'no-store' });
     const responseHeaders = new Headers();
     for (const name of ['content-type', 'content-disposition', 'cache-control', 'set-cookie']) {
       const value = upstream.headers.get(name);

@@ -17,7 +17,10 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { MonthPicker } from '@/components/ui/MonthPicker';
+import { useSelectedMonth } from '@/hooks/useSelectedMonth';
 import { getLocalMonth, getTimeOfDayGreeting } from '@/utils/date';
+import { cashflowSplit } from '@/lib/insights';
 
 export default function DashboardClient() {
   const { state } = useApp();
@@ -28,7 +31,8 @@ export default function DashboardClient() {
     setGreeting(getTimeOfDayGreeting());
   }, []);
 
-  const selectedMonth = state.selectedMonth || getLocalMonth();
+  const [storeMonth, setSelectedMonth] = useSelectedMonth();
+  const selectedMonth = storeMonth || getLocalMonth();
   const monthlyIncome = calcMonthlyIncome(state.income, selectedMonth);
   const monthlyExpenses = calcMonthlyExpenses(state.expenses, selectedMonth);
   const netPosition = monthlyIncome - monthlyExpenses;
@@ -40,7 +44,10 @@ export default function DashboardClient() {
     ...(state.savingsGoals.length === 0 ? ['Set up a savings target to track your progress toward financial freedom.'] : []),
   ];
 
-  const burnRate = monthlyIncome > 0 ? Math.min(100, Math.round((monthlyExpenses / monthlyIncome) * 100)) : 0;
+  const split = cashflowSplit(monthlyIncome, monthlyExpenses);
+  // null = no income to compare against (shown as "—")
+  const burnRate = split.burnRate;
+  const burnRateLabel = burnRate === null ? '—' : `${burnRate}%`;
   const userName = state.profile?.name?.trim();
 
   // Liquidity and daily budget calculations
@@ -152,7 +159,8 @@ export default function DashboardClient() {
         title={`${greeting}${userName ? `, ${userName}` : ''}`}
         description="Here is your financial pulse and priority items for this month."
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <MonthPicker value={selectedMonth} onChange={setSelectedMonth} size="sm" />
             <Link href="/financial?tab=expenses">
               <Button variant="primary" iconLeft={<Icon name="plus" size={16} />}>
                 Record Entry
@@ -207,7 +215,7 @@ export default function DashboardClient() {
                 {!hasFinancialData
                   ? 'Connect your bank accounts or enter your income and expense records to unlock automated daily burn rate tracking and cashflow advice.'
                   : netPosition < 0
-                  ? `Your monthly outflows exceed income by ${formatRs(Math.abs(netPosition))}. At an active burn rate of ${burnRate}%, your spending pace exceeds inbound revenue. Consider deferring non-essential purchases to preserve liquidity.`
+                  ? `Your monthly outflows exceed income by ${formatRs(Math.abs(netPosition))}. ${burnRate === null ? 'With no income recorded this month' : `At an active burn rate of ${burnRate}%`}, your spending pace exceeds inbound revenue. Consider deferring non-essential purchases to preserve liquidity.`
                   : `You maintain a positive buffer of ${formatRs(netPosition)} for ${selectedMonth}. Your recommended safe-to-spend budget is ${formatRs(dailyBudget)}/day across the remaining ${daysLeft} days.`}
               </p>
             </div>
@@ -239,8 +247,8 @@ export default function DashboardClient() {
         <StatCard
           label="Total Expenses"
           value={formatRs(monthlyExpenses)}
-          detail={hasFinancialData ? `${burnRate}% of income` : 'No expenses yet'}
-          tone={burnRate > 85 ? 'danger' : 'warning'}
+          detail={!hasFinancialData ? 'No expenses yet' : burnRate === null ? 'No income this month' : `${burnRate}% of income`}
+          tone={burnRate === null ? (monthlyExpenses > 0 ? 'danger' : 'warning') : burnRate > 85 ? 'danger' : 'warning'}
           icon={<Icon name="arrow-down" size={18} />}
         />
         <StatCard
@@ -297,7 +305,7 @@ export default function DashboardClient() {
                   </div>
                 </div>
                 <div className="text-xs font-semibold px-3 py-1 rounded-xl bg-surface border border-border text-text shadow-sm">
-                  Burn rate: <span className="font-bold text-primary-text">{burnRate}%</span>
+                  Burn rate: <span className="font-bold text-primary-text">{burnRateLabel}</span>
                 </div>
               </div>
 
@@ -305,11 +313,19 @@ export default function DashboardClient() {
               <div className="mt-4 space-y-1.5">
                 <div className="flex justify-between text-xs font-medium text-muted">
                   <span>Spent: <span className="num font-semibold text-text">{formatRs(monthlyExpenses)}</span></span>
-                  <span>Remaining: <span className="num font-semibold text-text">{formatRs(Math.max(0, netPosition))}</span></span>
+                  <span>Remaining: <span className="num font-semibold text-text">{split.hasData ? formatRs(split.remaining) : '—'}</span></span>
                 </div>
-                <div className="h-3 w-full bg-border rounded-full overflow-hidden flex shadow-inner">
-                  <div className="h-full bg-danger-solid transition-all duration-500" style={{ width: `${Math.min(100, burnRate)}%` }} />
-                  <div className="h-full bg-success-solid transition-all duration-500" style={{ width: `${Math.max(0, 100 - burnRate)}%` }} />
+                <div
+                  className="h-3 w-full bg-border rounded-full overflow-hidden flex shadow-inner"
+                  role="progressbar"
+                  aria-label="Share of income spent this month"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(split.spentPct)}
+                  aria-valuetext={!split.hasData ? 'No data' : burnRate === null ? 'Expenses with no income' : `${burnRate}% of income spent`}
+                >
+                  <div className="h-full bg-danger-solid transition-all duration-500" style={{ width: `${split.spentPct}%` }} />
+                  <div className="h-full bg-success-solid transition-all duration-500" style={{ width: `${split.remainingPct}%` }} />
                 </div>
               </div>
 

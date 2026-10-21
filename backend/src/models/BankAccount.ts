@@ -14,6 +14,7 @@ export interface IBankAccount extends Document {
   currency: string;
   notes?: string;
   isDefault: boolean;
+  isArchived: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,6 +33,7 @@ const BankAccountSchema = new Schema<IBankAccount>({
   currency: { type: String, default: 'LKR', trim: true },
   notes: { type: String, default: '', trim: true },
   isDefault: { type: Boolean, default: false },
+  isArchived: { type: Boolean, default: false },
 }, { timestamps: true });
 
 export const BankAccountModel = mongoose.models.BankAccount || mongoose.model<IBankAccount>('BankAccount', BankAccountSchema);

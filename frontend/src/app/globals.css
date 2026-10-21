@@ -569,6 +569,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .form-input-dark::-webkit-calendar-picker-indicator {
   filter: invert(0.85);
 }
+/* DateField draws its own clickable calendar icon, so hide the native one (no double icon) */
+input[type="date"].date-field-input::-webkit-calendar-picker-indicator {
+  display: none;
+}
 
 /* Modern Range Slider */
 input[type="range"] {

@@ -11,6 +11,7 @@ import type {
   BusinessBranch, EmploymentProfile, WorkMode, OwnerDraw,
   BankAccount, Card, Transaction, UserPlan,
 } from './types';
+import { getLocalDate, getLocalMonth } from '@/utils/date';
 
 const SEP_2026 = '2026-09';
 
@@ -132,7 +133,7 @@ const initialState: AppState = {
 const emptyInitialState: AppState = {
   ...initialState,
   currentPage: 'dashboard',
-  selectedMonth: new Date().toISOString().slice(0, 7),
+  selectedMonth: getLocalMonth(),
   profile: { ...initialState.profile, name: '', email: '' },
   income: [], expenses: [], financePayments: [], loans: [], bankAccounts: [], cards: [], transactions: [], pawnedItems: [], savingsGoals: [],
   personalSpendingBudget: 0, letters: [], agreements: [], companies: [], businessBranches: [],
@@ -210,6 +211,20 @@ type Action =
 
 type PersistedCollection = Extract<Action, { type: 'REPLACE_RECORD_ID' }>['collection'];
 
+/** Actions whose persisted result is derived by the backend ledger and must be re-read after saving. */
+const SERVER_RECONCILED_ACTIONS = new Set<Action['type']>([
+  'ADD_INCOME', 'UPDATE_INCOME', 'DELETE_INCOME',
+  'ADD_EXPENSE', 'UPDATE_EXPENSE', 'DELETE_EXPENSE',
+  'ADD_MEDICAL_EXPENSE', 'DELETE_MEDICAL_EXPENSE',
+  'MARK_FINANCE_PAYMENT_PAID', 'DELETE_FINANCE_PAYMENT_PAYMENT',
+  'DELETE_BANK_ACCOUNT', 'UPDATE_BANK_ACCOUNT', 'DELETE_CARD',
+  'ADD_TRANSACTION', 'DELETE_TRANSACTION', 'TRANSFER_FUNDS', 'DELETE_TRANSFER',
+  'RECORD_LOAN_REPAYMENT', 'DELETE_LOAN_REPAYMENT',
+  'RECORD_PAWN_PAYMENT', 'DELETE_PAWN_PAYMENT',
+  'ADD_SAVING_CONTRIBUTION', 'DELETE_SAVING_CONTRIBUTION',
+  'ADD_BRANCH', 'UPDATE_BRANCH',
+]);
+
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'ROLLBACK': return action.previousState;
@@ -283,7 +298,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'MARK_FINANCE_PAYMENT_PAID': {
       const fp = state.financePayments.find(f => f.id === action.id);
       if (!fp) return state;
-      const paymentDate = action.date || new Date().toISOString().slice(0, 10);
+      const paymentDate = action.date || getLocalDate();
       const payAmount = action.amount !== undefined ? action.amount : fp.amount;
       const newMonths = Math.max(0, (fp.monthsRemaining || 1) - 1);
       const newStatus = newMonths === 0 ? 'completed' : fp.status || 'active';
@@ -400,7 +415,7 @@ function reducer(state: AppState, action: Action): AppState {
         repayments: [
           ...(l.repayments || []),
           {
-            date: action.date || new Date().toISOString().slice(0, 10),
+            date: action.date || getLocalDate(),
             amount: action.amount,
             note: action.note,
             paymentMethod: action.paymentMethod || 'cash',
@@ -428,7 +443,7 @@ function reducer(state: AppState, action: Action): AppState {
       const p = state.pawnedItems.find(pi => pi.id === action.id);
       if (!p) return state;
       const pType = action.paymentType || 'interest';
-      const paymentDate = action.date || new Date().toISOString().slice(0, 10);
+      const paymentDate = action.date || getLocalDate();
       const currentPrincipal = p.principalOutstanding !== undefined ? p.principalOutstanding : p.amountReceived;
       let payAmount = action.amount;
       if (!payAmount) {
@@ -723,6 +738,11 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
     void loadData();
   }, [loadData]);
 
+  const refreshFromServer = async () => {
+    const currentPlan = (stateRef.current?.profile?.plan || initialProfile?.plan || 'basic') as UserPlan;
+    reduce({ type: 'HYDRATE', data: await loadPersistedData(currentPlan) });
+  };
+
   const dispatch = async (action: Action): Promise<string | undefined> => {
     const prevState = stateRef.current;
     reduce(action);
@@ -769,13 +789,17 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
         }
       }
 
+      // The ledger (balances, principal/interest splits, payment ids, cascades) is computed
+      // server-side, so reconcile instead of trusting the optimistic local estimate.
+      if (SERVER_RECONCILED_ACTIONS.has(action.type)) {
+        void refreshFromServer().catch(e => console.warn('[store] Failed to refresh records after save:', e));
+      }
+
       return serverId;
     } catch (error: any) {
       console.error('Unable to save account change', error);
       try {
-        const currentPlan = (stateRef.current?.profile?.plan || initialProfile?.plan || 'basic') as UserPlan;
-        const freshData = await loadPersistedData(currentPlan);
-        reduce({ type: 'HYDRATE', data: freshData });
+        await refreshFromServer();
       } catch {
         reduce({ type: 'ROLLBACK', previousState: prevState });
       }

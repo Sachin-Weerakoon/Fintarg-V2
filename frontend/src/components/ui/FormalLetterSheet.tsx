@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { BrandLogo } from './BrandLogo';
+import { getLocalDate } from '../../utils/date';
 
 export interface FormalLetterSheetProps {
   body: string;
@@ -34,7 +35,7 @@ export function FormalLetterSheet({
   bankAccountDetails,
   className = '',
 }: FormalLetterSheetProps) {
-  const effectiveRef = refNumber || 'FNT-LTR-' + (date ? date.replace(/[^0-9]/g, '') : new Date().toISOString().slice(0, 10).replace(/-/g, ''));
+  const effectiveRef = refNumber || 'FNT-LTR-' + (date ? date.replace(/[^0-9]/g, '') : getLocalDate().replace(/-/g, ''));
   const effectiveDate = date || new Date().toLocaleDateString('en-LK', { day: 'numeric', month: 'long', year: 'numeric' });
 
   // Clean and split body into logical blocks

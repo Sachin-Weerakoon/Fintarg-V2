@@ -25,19 +25,23 @@ export function FormField({
   const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
 
   return (
-    <div className={`space-y-1.5 ${className}`.trim()}>
+    <div className={`@container space-y-1.5 ${className}`.trim()}>
       {label && (
-        <label htmlFor={id} className="flex items-center justify-between text-xs font-semibold text-text tracking-tight">
-          <span className="flex items-center gap-1">
-            {label}
+        /* Same rule as Field: the label never wraps; the pill hides in narrow columns. */
+        <label htmlFor={id} className="flex items-center justify-between gap-2 min-w-0 text-xs font-semibold text-text tracking-tight">
+          <span className="flex items-center gap-1 min-w-0 whitespace-nowrap">
+            <span className="truncate">{label}</span>
             {required && (
-              <span className="text-danger-solid font-bold ml-0.5" aria-hidden="true">
-                *
-              </span>
+              <>
+                <span className="text-danger-solid font-bold ml-0.5" aria-hidden="true">
+                  *
+                </span>
+                <span className="sr-only">(required)</span>
+              </>
             )}
           </span>
           {required && (
-            <span className="text-[10px] uppercase font-semibold text-primary-600 dark:text-primary-400 bg-primary-500/10 dark:bg-primary-400/10 border border-primary-500/20 px-2 py-0.5 rounded-full tracking-wider select-none">
+            <span aria-hidden="true" className="hidden @[12rem]:inline-block shrink-0 text-[10px] uppercase font-semibold text-primary-600 dark:text-primary-400 bg-primary-500/10 dark:bg-primary-400/10 border border-primary-500/20 px-2 py-0.5 rounded-full tracking-wider select-none">
               Required
             </span>
           )}

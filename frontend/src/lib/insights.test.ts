@@ -6,6 +6,7 @@ import {
   buildInsights,
   buildPlan,
   buildSeries,
+  cashflowSplit,
   categoryChanges,
   daysBetween,
   daysInMonth,
@@ -227,5 +228,29 @@ describe('health score & plan', () => {
   it('first plan step addresses a deficit', () => {
     const plan = buildPlan(baseState({ expenses: [exp('a', '2026-09-03', 140000, 'Personal')] }), '2026-09', '2026-09-20');
     expect(plan[0].id).toBe('cover-gap');
+  });
+});
+
+describe('cashflowSplit (dashboard health bar)', () => {
+  it('no data: empty track, no burn rate', () => {
+    expect(cashflowSplit(0, 0)).toEqual({ spentPct: 0, remainingPct: 0, burnRate: null, remaining: 0, hasData: false });
+  });
+  it('expenses but no income: fully red, no burn rate, nothing remaining', () => {
+    expect(cashflowSplit(0, 5000)).toEqual({ spentPct: 100, remainingPct: 0, burnRate: null, remaining: 0, hasData: true });
+  });
+  it('income only: fully green', () => {
+    expect(cashflowSplit(100000, 0)).toMatchObject({ spentPct: 0, remainingPct: 100, burnRate: 0, remaining: 100000 });
+  });
+  it('normal month: red = expenses / income, green = rest', () => {
+    expect(cashflowSplit(100000, 25000)).toMatchObject({ spentPct: 25, remainingPct: 75, burnRate: 25, remaining: 75000 });
+  });
+  it('overspent: red capped at 100, burn rate shows the real %', () => {
+    expect(cashflowSplit(100000, 150000)).toMatchObject({ spentPct: 100, remainingPct: 0, burnRate: 150, remaining: 0 });
+  });
+  it('segments never overfill the track', () => {
+    for (const [i, e] of [[0, 0], [0, 1], [1, 0], [3, 1], [1, 3], [7, 7]]) {
+      const s = cashflowSplit(i, e);
+      expect(s.spentPct + s.remainingPct).toBeLessThanOrEqual(100);
+    }
   });
 });

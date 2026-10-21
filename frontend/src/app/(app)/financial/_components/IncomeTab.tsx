@@ -15,6 +15,7 @@ import { PaymentMethodField, PaymentMethod } from '@/components/ui/PaymentMethod
 import { BankSelect } from '@/components/ui/BankSelect';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
+import { getLocalDate } from '@/utils/date';
 
 export function IncomeTab({
   month,
@@ -46,7 +47,7 @@ export function IncomeTab({
     type: defaultType,
     amount: '',
     frequency: 'monthly',
-    date: new Date().toISOString().slice(0, 10),
+    date: getLocalDate(),
     paymentMethod: 'bank_transfer',
     bankAccountId: '',
   });
@@ -80,7 +81,7 @@ export function IncomeTab({
       type: defaultType,
       amount: '',
       frequency: 'monthly',
-      date: new Date().toISOString().slice(0, 10),
+      date: getLocalDate(),
       paymentMethod: 'bank_transfer',
       bankAccountId: '',
     });
@@ -205,7 +206,7 @@ export function IncomeTab({
                   type: defaultType,
                   amount: '',
                   frequency: 'monthly',
-                  date: new Date().toISOString().slice(0, 10),
+                  date: getLocalDate(),
                   paymentMethod: 'bank_transfer',
                   bankAccountId: '',
                 });

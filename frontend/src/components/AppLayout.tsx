@@ -10,6 +10,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { NotificationCenter } from '@/components/NotificationCenter';
+import { pageTitleOf } from '@/lib/pageTitles';
 
 const salaryBottomItems = [
   { href: '/', label: 'Home', page: 'dashboard' },
@@ -52,23 +53,6 @@ function getPageIconName(page: string): IconName {
     default:
       return 'info';
   }
-}
-
-function pageTitleOf(pathname: string, tab?: string): string {
-  if (pathname === '/') return 'Home';
-  if (pathname === '/salary') return 'Salary & Payday';
-  if (pathname === '/financial') return 'Financial';
-  if (pathname === '/analysis') return 'Analysis';
-  if (pathname === '/goals') return 'Goals';
-  if (pathname === '/advanced') {
-    if (tab === 'salary') return 'Salary & Payday';
-    if (tab === 'letters') return 'Letters';
-    if (tab === 'medical') return 'Medical';
-    if (tab === 'agreements') return 'Business Agreements';
-    return 'Advanced Features';
-  }
-  if (pathname === '/settings') return 'Settings';
-  return 'Fintarg';
 }
 
 function AppLayoutInner({

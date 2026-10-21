@@ -1,4 +1,5 @@
 import React from 'react';
+import { DateField } from './DateField';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   hasError?: boolean;
@@ -16,6 +17,12 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
   },
   ref
 ) {
+  // Date inputs share DateField so every date picker on the site looks and behaves the same.
+  if (props.type === 'date' && !iconLeft && !iconRight) {
+    const { type: _type, ...dateProps } = props;
+    return <DateField ref={ref} hasError={hasError} className={className} {...dateProps} />;
+  }
+
   const errorStyles = hasError
     ? '!border-danger-solid focus:!border-danger-solid focus:!ring-4 focus:!ring-danger-solid/15 !shadow-[0_0_0_1px_rgba(220,38,38,0.2)]'
     : '';

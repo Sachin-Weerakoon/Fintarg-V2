@@ -20,6 +20,7 @@ import { Icon } from '@/components/ui/Icon';
 import type { BusinessBranch, BranchEntry, SavingsGoal } from '@/types';
 import { SalaryWorkspace } from './SalaryWorkspace';
 import { AgreementsTab } from './AgreementsTab';
+import { getLocalDate } from '@/utils/date';
 
 type BranchTab = 'overview' | 'finances' | 'salary' | 'targets' | 'agreements' | 'letters';
 
@@ -61,12 +62,12 @@ export function BusinessWorkspace() {
   const [costAmount, setCostAmount] = useState('');
   const [costCategory, setCostCategory] = useState('Electricity');
   const [costNote, setCostNote] = useState('');
-  const [costDate, setCostDate] = useState(new Date().toISOString().slice(0, 10));
+  const [costDate, setCostDate] = useState(getLocalDate());
 
   // Income entry form
   const [incomeAmount, setIncomeAmount] = useState('');
   const [incomeNote, setIncomeNote] = useState('');
-  const [incomeDate, setIncomeDate] = useState(new Date().toISOString().slice(0, 10));
+  const [incomeDate, setIncomeDate] = useState(getLocalDate());
 
   // Company Form
   const [businessForm, setBusinessForm] = useState({
@@ -157,7 +158,7 @@ export function BusinessWorkspace() {
         monthlyTarget: Math.ceil(amt / 3),
         targetAmount: amt,
         targetDate: branchGoalDate || undefined,
-        endDate: branchGoalDate || new Date().toISOString().slice(0, 10),
+        endDate: branchGoalDate || getLocalDate(),
         savedAmount: 0,
         contributions: [],
         scope: 'branch',
@@ -181,7 +182,7 @@ export function BusinessWorkspace() {
     }
     const newEntry: BranchEntry = {
       id: 'entry_' + Date.now(),
-      date: new Date().toISOString().slice(0, 10),
+      date: getLocalDate(),
       type: 'revenue',
       category: 'Daily Sales',
       amount: amt,
@@ -463,7 +464,7 @@ export function BusinessWorkspace() {
                   id="new-br-target"
                   value={branchForm.monthlyTarget}
                   onChange={v => setBranchForm(f => ({ ...f, monthlyTarget: String(v) }))}
-                  placeholder="500,000"
+                  placeholder="e.g. 500,000"
                 />
               </FormField>
             </FormGrid>
@@ -727,7 +728,7 @@ export function BusinessWorkspace() {
                       <FormField id="inc-amt" label="Amount (Rs.) *" required>
                         <MoneyField
                           id="inc-amt"
-                          placeholder="150,000"
+                          placeholder="e.g. 150,000"
                           value={incomeAmount}
                           onChange={v => setIncomeAmount(String(v))}
                         />
@@ -796,7 +797,7 @@ export function BusinessWorkspace() {
                       <FormField id="cost-amt" label="Amount (Rs.) *" required>
                         <MoneyField
                           id="cost-amt"
-                          placeholder="35,000"
+                          placeholder="e.g. 35,000"
                           value={costAmount}
                           onChange={v => setCostAmount(String(v))}
                         />
@@ -1062,7 +1063,7 @@ export function BusinessWorkspace() {
                         <FormField id="br-goal-amt" label="Target Total (Rs.) *" required>
                           <MoneyField
                             id="br-goal-amt"
-                            placeholder="350,000"
+                            placeholder="e.g. 350,000"
                             value={branchGoalAmount}
                             onChange={v => setBranchGoalAmount(String(v))}
                           />

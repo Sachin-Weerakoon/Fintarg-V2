@@ -20,11 +20,11 @@ import { FileModel } from '../models/File';
 import { BankAccountModel } from '../models/BankAccount';
 import { CardModel } from '../models/Card';
 import { TransactionModel } from '../models/Transaction';
-import { calculateAmortizationSchedule, calculateLoan } from '../utils/loanMath';
+import { accruedReducingBalanceInterestCents, calculateLoan, completedPeriods, monthlyRateFor } from '../utils/loanMath';
 import { getDaysInMonth } from '../utils/dateMath';
 import { HttpError } from '../middleware/errors';
 import { isValidIsoDate, transferSchema, type RecordKind } from '../validations/records';
-import { deleteTransfer, ensureCashWallet, postTransaction, replaceTransaction, reverseTransaction, reverseTransactionById, transferFunds, updateTransactionById } from './ledgerService';
+import { assertAccountNotArchived, deleteTransfer, ensureCashWallet, postTransaction, replaceTransaction, reverseTransaction, reverseTransactionById, transferFunds, updateTransactionById, withLedgerSession } from './ledgerService';
 
 const models: Record<RecordKind, Model<any>> = {
   bankAccounts: BankAccountModel,
@@ -87,6 +87,45 @@ export function deriveNextDueDate(dueDay: number, fromDate: Date = new Date()): 
   const safeDay = Math.min(d, daysInMonth);
 
   return `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`;
+}
+
+function isAmortizingLoan(method: string | undefined) {
+  return (method || 'simple') !== 'simple';
+}
+
+/**
+ * Cents of repayments that have reduced the loan balance. Amortizing (reducing balance / compound)
+ * loans track outstanding principal, so only the principal portion counts; simple (flat) loans
+ * have always tracked balance as principal minus total paid.
+ */
+function principalRepaidCents(method: string | undefined, repayments: any[] = []) {
+  const field = isAmortizingLoan(method) ? 'principalCents' : 'amountCents';
+  return repayments.reduce((sum: number, r: any) => sum + (Number(r[field]) || 0), 0);
+}
+
+/**
+ * Interest accrued and still unpaid on a loan as of a date. Driven by dates and actual principal
+ * outstanding rather than by repayment count, so extra, partial, or same-month payments cannot
+ * misalign the principal/interest split.
+ */
+function loanInterestDueCents(loan: any, asOfDate: string) {
+  const repayments: any[] = loan.repayments || [];
+  const interestPaidCents = repayments.reduce((sum: number, r: any) => sum + (Number(r.interestCents) || 0), 0);
+  let accruedCents = 0;
+  if (isAmortizingLoan(loan.method)) {
+    accruedCents = accruedReducingBalanceInterestCents(
+      Number(loan.principalCents) || 0,
+      monthlyRateFor(Number(loan.ratePercent) || 0, loan.interestBasis || 'annual'),
+      String(loan.startDate),
+      repayments.map((r: any) => ({ date: String(r.date), principalCents: Number(r.principalCents) || 0 })),
+      asOfDate,
+    );
+  } else if (loan.tenureMonths > 0 && loan.totalInterestCents > 0) {
+    // Flat interest: one equal share falls due per installment; the first is due on any payment.
+    const installmentsDue = Math.min(loan.tenureMonths, Math.max(1, completedPeriods(String(loan.startDate), asOfDate)));
+    accruedCents = Math.min(loan.totalInterestCents, Math.round(loan.totalInterestCents * installmentsDue / loan.tenureMonths));
+  }
+  return Math.max(0, accruedCents - interestPaidCents);
 }
 
 function toStoredForCreate(kind: RecordKind, input: Record<string, unknown>) {
@@ -279,7 +318,7 @@ function toStoredForUpdate(kind: RecordKind, input: Record<string, unknown>, exi
 
       if ('principalCents' in stored && !('balanceCents' in stored)) {
         const totalRepaidCents = Array.isArray(existingDoc.repayments) && existingDoc.repayments.length > 0
-          ? existingDoc.repayments.reduce((sum: number, r: any) => sum + (Number(r.amountCents) || 0), 0)
+          ? principalRepaidCents(method, existingDoc.repayments)
           : Math.max(0, (Number(existingDoc.principalCents) || 0) - (Number(existingDoc.balanceCents) || 0));
 
         stored.balanceCents = Math.max(0, newPrincipalCents - totalRepaidCents);
@@ -451,6 +490,9 @@ export async function createRecord(kind: RecordKind, userId: string, input: Reco
   if (input.bankAccountId && (kind === 'cards' || kind === 'expenses' || kind === 'incomes' || kind === 'transactions' || kind === 'financePayments')) {
     if (!mongoose.isValidObjectId(input.bankAccountId)) throw new HttpError(400, 'Invalid bank account id');
     if (!await BankAccountModel.exists({ _id: input.bankAccountId, userId })) throw new HttpError(404, 'Bank account not found');
+    if (kind !== 'cards') {
+      await assertAccountNotArchived(new mongoose.Types.ObjectId(userId), new mongoose.Types.ObjectId(String(input.bankAccountId)));
+    }
   }
   if (input.cardId && (kind === 'expenses' || kind === 'transactions')) {
     if (!mongoose.isValidObjectId(input.cardId)) throw new HttpError(400, 'Invalid card id');
@@ -475,37 +517,66 @@ export async function createRecord(kind: RecordKind, userId: string, input: Reco
     await AuditLogModel.create({ userId, action: 'create', resourceType: kind, resourceId: record._id });
     return record.toObject();
   }
+  const initialEntries = kind === 'businessBranches' && Array.isArray(data.entries)
+    ? prepareBranchEntries(data.entries as Record<string, unknown>[])
+    : [];
   if (kind === 'businessBranches') delete data.entries;
   if (kind === 'branchEntries') data.branchId = new mongoose.Types.ObjectId(String(input.branchId));
   if (kind === 'ownerDraws') data.companyId = new mongoose.Types.ObjectId(String(input.companyId));
   const record = await models[kind].create({ ...data, userId: new mongoose.Types.ObjectId(userId) });
+  if (initialEntries.length) await syncBranchEntries(userId, record._id.toString(), initialEntries);
 
-  if (kind === 'expenses') {
-    await postTransaction({
-      userId,
-      type: 'expense',
-      amountCents: Number(data.amountCents || 0),
-      date: String(data.date),
-      category: String(data.category || 'General'),
-      description: String(data.note || 'Expense'),
-      paymentMethod: (data.paymentMethod as any) || 'cash',
-      bankAccountId: data.bankAccountId ? new mongoose.Types.ObjectId(String(data.bankAccountId)) : null,
-      cardId: data.cardId ? new mongoose.Types.ObjectId(String(data.cardId)) : null,
-      referenceId: record._id.toString(),
-    });
+  try {
+    if (kind === 'expenses') {
+      await postTransaction({
+        userId,
+        type: 'expense',
+        amountCents: Number(data.amountCents || 0),
+        date: String(data.date),
+        category: String(data.category || 'General'),
+        description: String(data.note || 'Expense'),
+        paymentMethod: (data.paymentMethod as any) || 'cash',
+        bankAccountId: data.bankAccountId ? new mongoose.Types.ObjectId(String(data.bankAccountId)) : null,
+        cardId: data.cardId ? new mongoose.Types.ObjectId(String(data.cardId)) : null,
+        referenceId: record._id.toString(),
+      });
+    }
+    if (kind === 'incomes') {
+      await postTransaction({
+        userId,
+        type: 'income',
+        amountCents: Number(data.amountCents || 0),
+        date: String(data.date),
+        category: String(data.source || 'General'),
+        description: String(data.source || 'Income'),
+        paymentMethod: (data.paymentMethod as any) || 'bank_transfer',
+        bankAccountId: data.bankAccountId ? new mongoose.Types.ObjectId(String(data.bankAccountId)) : null,
+        referenceId: record._id.toString(),
+      });
+    }
+  } catch (error) {
+    // Never leave an expense/income without its backing ledger row.
+    await models[kind].deleteOne({ _id: record._id, userId });
+    throw error;
   }
-  if (kind === 'incomes') {
-    await postTransaction({
-      userId,
-      type: 'income',
-      amountCents: Number(data.amountCents || 0),
-      date: String(data.date),
-      category: String(data.source || 'General'),
-      description: String(data.source || 'Income'),
-      paymentMethod: (data.paymentMethod as any) || 'bank_transfer',
-      bankAccountId: data.bankAccountId ? new mongoose.Types.ObjectId(String(data.bankAccountId)) : null,
-      referenceId: record._id.toString(),
-    });
+
+  if (kind === 'medicalExpenses') {
+    // Every medical cost is also a real expense, so it shows in the financial ledger and balances.
+    try {
+      const expense: any = await createRecord('expenses', userId, {
+        date: data.date,
+        amount: Number(data.amountCents || 0) / 100,
+        category: 'Medical',
+        note: data.note ? `Medical: ${data.type} · ${data.note}` : `Medical: ${data.type}`,
+        recurring: false,
+        sourceType: 'medical',
+      });
+      record.set('expenseId', expense._id);
+      await record.save();
+    } catch (error) {
+      await models[kind].deleteOne({ _id: record._id, userId });
+      throw error;
+    }
   }
 
   await AuditLogModel.create({ userId, action: 'create', resourceType: kind, resourceId: record._id });
@@ -533,6 +604,9 @@ export async function updateRecord(kind: RecordKind, userId: string, id: string,
 
   const existingDoc = await models[kind].findOne({ _id: id, userId });
   if (!existingDoc) throw new HttpError(404, 'Record not found');
+  if (kind === 'bankAccounts' && existingDoc.accountType === 'cash' && input.isArchived === true) {
+    throw new HttpError(400, 'Cannot archive the built-in cash wallet account');
+  }
 
   if (kind === 'transactions') {
     if (existingDoc.referenceId || existingDoc.transferGroupId) {
@@ -557,7 +631,9 @@ export async function updateRecord(kind: RecordKind, userId: string, id: string,
   }
 
   const changes = toStoredForUpdate(kind, input, existingDoc);
-  const entries = kind === 'businessBranches' && Array.isArray(changes.entries) ? changes.entries as Record<string, unknown>[] : [];
+  // An `entries` array is the full desired set for the branch; omit it to leave entries untouched.
+  const syncEntries = kind === 'businessBranches' && Array.isArray(changes.entries);
+  const entries = syncEntries ? prepareBranchEntries(changes.entries as Record<string, unknown>[]) : [];
   delete changes.entries;
   const updated = await models[kind].findOneAndUpdate(
     { _id: id, userId },
@@ -565,17 +641,7 @@ export async function updateRecord(kind: RecordKind, userId: string, id: string,
     { new: true, runValidators: true },
   ).exec();
   if (!updated) throw new HttpError(404, 'Record not found');
-  if (kind === 'businessBranches') {
-    for (const entry of entries) {
-      const amountCents = Math.round(Number(entry.amount) * 100);
-      const entryData = { date: entry.date, type: entry.type, category: entry.category, amountCents, note: entry.note || '' };
-      if (mongoose.isValidObjectId(entry.id)) {
-        await BranchEntryModel.updateOne({ _id: entry.id, branchId: id, userId }, { $set: entryData }, { runValidators: true });
-      } else {
-        await BranchEntryModel.create({ ...entryData, branchId: id, userId });
-      }
-    }
-  }
+  if (syncEntries) await syncBranchEntries(userId, id, entries);
   if (kind === 'expenses') {
     await replaceTransaction(userId, updated._id.toString(), {
       userId,
@@ -607,14 +673,89 @@ export async function updateRecord(kind: RecordKind, userId: string, id: string,
   return updated;
 }
 
+type PreparedBranchEntry = { id: string | null; data: Record<string, unknown> };
+
+function prepareBranchEntries(entries: Record<string, unknown>[]): PreparedBranchEntry[] {
+  return entries.map((entry) => {
+    const date = String(entry.date ?? '');
+    if (!isValidIsoDate(date)) throw new HttpError(400, 'Branch entry date must be a valid YYYY-MM-DD date');
+    const amountCents = Math.round(Number(entry.amount) * 100);
+    if (!Number.isFinite(amountCents) || amountCents < 1) throw new HttpError(400, 'Branch entry amount must be greater than zero');
+    // Client-side temporary ids (and 12-char strings mongoose would accept) are treated as new entries.
+    const id = typeof entry.id === 'string' && /^[a-f0-9]{24}$/i.test(entry.id) ? entry.id : null;
+    return { id, data: { date, type: entry.type, category: entry.category, amountCents, note: entry.note || '' } };
+  });
+}
+
+/**
+ * Makes the branch's stored entries match `entries` exactly: updates known ids, creates new ones,
+ * and deletes any existing entry the payload no longer contains.
+ */
+async function syncBranchEntries(userId: string, branchId: string, entries: PreparedBranchEntry[]) {
+  await withLedgerSession(async (session) => {
+    const opts = session ? { session } : {};
+    const keptIds: mongoose.Types.ObjectId[] = [];
+    for (const { id, data } of entries) {
+      if (id) {
+        const result = await BranchEntryModel.updateOne({ _id: id, branchId, userId }, { $set: data }, { runValidators: true, ...opts });
+        if (result.matchedCount > 0) {
+          keptIds.push(new mongoose.Types.ObjectId(id));
+          continue;
+        }
+      }
+      const [created] = await BranchEntryModel.create([{ ...data, branchId, userId }], opts);
+      keptIds.push(created._id);
+    }
+    await BranchEntryModel.deleteMany({ branchId, userId, _id: { $nin: keptIds } }, opts);
+  });
+}
+
+const ACCOUNT_HAS_ACTIVITY_MESSAGE = 'Cannot delete account with a non-zero balance or active transactions. Please transfer remaining funds or archive the account.';
+
+/**
+ * Deletes a bank account only when doing so cannot break the ledger: zero balance, no ledger rows
+ * on it or on its linked cards. Remaining soft references are nulled so nothing dangles.
+ */
+async function deleteBankAccount(userId: string, id: string) {
+  const account = await BankAccountModel.findOne({ _id: id, userId });
+  if (!account) throw new HttpError(404, 'Record not found');
+  if (account.accountType === 'cash') {
+    throw new HttpError(400, 'Cannot delete the built-in cash wallet account');
+  }
+
+  const accountId = account._id as mongoose.Types.ObjectId;
+  const linkedCards = await CardModel.find({ bankAccountId: accountId, userId }).select('_id balanceCents').lean();
+  const cardIds = linkedCards.map((card: any) => card._id);
+  const hasActivity = (Number(account.balanceCents) || 0) !== 0
+    || linkedCards.some((card: any) => (Number(card.balanceCents) || 0) !== 0)
+    || Boolean(await TransactionModel.exists({
+      userId,
+      $or: [{ bankAccountId: accountId }, ...(cardIds.length ? [{ cardId: { $in: cardIds } }] : [])],
+    }));
+  if (hasActivity) throw new HttpError(400, ACCOUNT_HAS_ACTIVITY_MESSAGE);
+
+  await withLedgerSession(async (session) => {
+    const opts = session ? { session } : {};
+    const nullSubdocRef = (path: string) => ({
+      update: { $set: { [`${path}.$[ref].bankAccountId`]: null } },
+      options: { arrayFilters: [{ 'ref.bankAccountId': accountId }], ...opts },
+    });
+    await BankAccountModel.deleteOne({ _id: accountId, userId }, opts);
+    if (cardIds.length) await CardModel.deleteMany({ _id: { $in: cardIds }, userId }, opts);
+    for (const model of [ExpenseModel, IncomeModel, FinancePaymentModel]) {
+      await model.updateMany({ userId, bankAccountId: accountId }, { $set: { bankAccountId: null } }, opts);
+    }
+    for (const [model, path] of [[LoanModel, 'repayments'], [SavingsGoalModel, 'contributions'], [PawnedItemModel, 'payments'], [FinancePaymentModel, 'payments']] as const) {
+      const { update, options } = nullSubdocRef(path);
+      await (model as Model<any>).updateMany({ userId, [`${path}.bankAccountId`]: accountId }, update, options);
+    }
+  });
+  await AuditLogModel.create({ userId, action: 'delete', resourceType: 'bankAccounts', resourceId: accountId });
+}
+
 export async function deleteRecord(kind: RecordKind, userId: string, id: string) {
   if (!mongoose.isValidObjectId(id)) throw new HttpError(400, 'Invalid record id');
-  if (kind === 'bankAccounts') {
-    const account = await BankAccountModel.findOne({ _id: id, userId });
-    if (account?.accountType === 'cash') {
-      throw new HttpError(400, 'Cannot delete the built-in cash wallet account');
-    }
-  }
+  if (kind === 'bankAccounts') return deleteBankAccount(userId, id);
   if (kind === 'transactions') {
     const existingTx = await TransactionModel.findOne({ _id: id, userId });
     if (!existingTx) throw new HttpError(404, 'Record not found');
@@ -638,9 +779,10 @@ export async function deleteRecord(kind: RecordKind, userId: string, id: string)
   if (kind === 'expenses' || kind === 'incomes') {
     await reverseTransaction(userId, deleted._id.toString());
   }
-  if (kind === 'bankAccounts') {
-    await CardModel.deleteMany({ bankAccountId: deleted._id, userId });
-    await TransactionModel.deleteMany({ bankAccountId: deleted._id, userId });
+  // Medical record <-> ledger expense: deleting either side removes the other.
+  if (kind === 'expenses') await MedicalExpenseModel.deleteMany({ expenseId: deleted._id, userId });
+  if (kind === 'medicalExpenses' && deleted.expenseId && await ExpenseModel.exists({ _id: deleted.expenseId, userId })) {
+    await deleteRecord('expenses', userId, deleted.expenseId.toString());
   }
   await AuditLogModel.create({ userId, action: 'delete', resourceType: kind, resourceId: deleted._id });
 }
@@ -776,37 +918,20 @@ export async function recordLoanRepayment(
 
   const paymentDate = date && isValidIsoDate(date) ? date : new Date().toISOString().slice(0, 10);
 
-  // Split principal and interest using schedule / math
-  let principalCents = 0;
-  let interestCents = 0;
+  // Accrued interest is paid first; the remainder reduces principal.
+  const interestDueCents = loanInterestDueCents(loan, paymentDate);
+  const interestCents = Math.min(amountCents, interestDueCents);
+  const principalCents = amountCents - interestCents;
 
-  if (loan.method === 'simple') {
-    const monthlyInterestCents = loan.tenureMonths > 0 ? Math.round(loan.totalInterestCents / loan.tenureMonths) : 0;
-    interestCents = Math.min(amountCents, monthlyInterestCents);
-    principalCents = Math.max(0, amountCents - interestCents);
-  } else {
-    const schedule = calculateAmortizationSchedule(
-      loan.principalCents / 100,
-      loan.ratePercent,
-      loan.tenureMonths,
-      loan.interestBasis || 'annual',
-    );
-    const installmentIndex = (loan.repayments || []).length;
-    if (installmentIndex < schedule.length) {
-      const scheduledRow = schedule[installmentIndex];
-      const scheduledInterestCents = Math.round(scheduledRow.interest * 100);
-      const scheduledPrincipalCents = Math.round(scheduledRow.principal * 100);
-      if (amountCents === Math.round(scheduledRow.payment * 100)) {
-        interestCents = scheduledInterestCents;
-        principalCents = scheduledPrincipalCents;
-      } else {
-        interestCents = Math.min(amountCents, scheduledInterestCents);
-        principalCents = Math.max(0, amountCents - interestCents);
-      }
-    } else {
-      interestCents = 0;
-      principalCents = amountCents;
+  let newBalanceCents: number;
+  if (isAmortizingLoan(loan.method)) {
+    const outstandingCents = Math.max(0, loan.principalCents - principalRepaidCents(loan.method, loan.repayments));
+    if (principalCents > outstandingCents) {
+      throw new HttpError(400, `Repayment exceeds the payoff amount of ${((outstandingCents + interestDueCents) / 100).toFixed(2)}`);
     }
+    newBalanceCents = outstandingCents - principalCents;
+  } else {
+    newBalanceCents = Math.max(0, loan.balanceCents - amountCents);
   }
 
   loan.repayments = loan.repayments || [];
@@ -837,7 +962,7 @@ export async function recordLoanRepayment(
     transactionId: tx._id,
   });
 
-  loan.balanceCents = Math.max(0, loan.balanceCents - amountCents);
+  loan.balanceCents = newBalanceCents;
   await loan.save();
   await AuditLogModel.create({ userId, action: 'repay', resourceType: 'loans', resourceId: loan._id });
   return loan;
@@ -861,18 +986,14 @@ export async function deleteLoanRepayment(userId: string, loanId: string, repaym
   await reverseTransaction(userId, refId);
 
   loan.repayments.splice(repaymentIndex, 1);
-  const totalRepaidCents = (loan.repayments || []).reduce(
-    (sum: number, r: any) => sum + Number(r.amountCents || 0),
-    0,
-  );
-  loan.balanceCents = Math.max(0, loan.principalCents - totalRepaidCents);
+  loan.balanceCents = Math.max(0, loan.principalCents - principalRepaidCents(loan.method, loan.repayments));
   await loan.save();
 
   await AuditLogModel.create({ userId, action: 'undo-repay', resourceType: 'loans', resourceId: loan._id });
   return loan;
 }
 
-export async function calculateLoanPayoff(userId: string, loanId: string) {
+export async function calculateLoanPayoff(userId: string, loanId: string, asOfDate?: string) {
   if (!mongoose.isValidObjectId(loanId)) throw new HttpError(400, 'Invalid loan id');
 
   const loan = await LoanModel.findOne({ _id: loanId, userId });
@@ -891,10 +1012,14 @@ export async function calculateLoanPayoff(userId: string, loanId: string) {
     0,
   );
 
+  const asOf = asOfDate && isValidIsoDate(asOfDate) ? asOfDate : new Date().toISOString().slice(0, 10);
+  const amortizing = isAmortizingLoan(loan.method);
   const totalContractCents = loan.principalCents + loan.totalInterestCents;
   const remainingTotalContractCents = Math.max(0, totalContractCents - totalRepaidCents);
-  const remainingPrincipalCents = Math.max(0, loan.principalCents - totalRepaidCents);
-  const payoffAmountCents = remainingPrincipalCents;
+  const remainingPrincipalCents = Math.max(0, loan.principalCents - principalRepaidCents(loan.method, loan.repayments));
+  // Settlement = outstanding principal + interest accrued (pro-rated by day) since the last paid period.
+  const accruedInterestCents = amortizing && remainingPrincipalCents > 0 ? loanInterestDueCents(loan, asOf) : 0;
+  const payoffAmountCents = remainingPrincipalCents + accruedInterestCents;
   const interestSavingsCents = Math.max(0, remainingTotalContractCents - payoffAmountCents);
 
   return {
@@ -905,8 +1030,10 @@ export async function calculateLoanPayoff(userId: string, loanId: string) {
     totalRepaidCents,
     totalPrincipalRepaidCents,
     totalInterestRepaidCents,
-    remainingBalanceCents: loan.balanceCents,
+    remainingBalanceCents: amortizing ? remainingPrincipalCents : loan.balanceCents,
     remainingTotalContractCents,
+    accruedInterestCents,
+    asOfDate: asOf,
     payoffAmountCents,
     interestSavingsCents,
   };
@@ -962,6 +1089,24 @@ export async function recordPawnPayment(
     throw new HttpError(400, 'Amount must be specified for part-principal payment');
   }
 
+  // Track exactly how much of this payment reduced principal vs. paid interest so undo restores both with no drift.
+  let principalPortionCents = 0;
+  let interestPortionCents = 0;
+  if (paymentType === 'interest') {
+    interestPortionCents = amountCents;
+  } else if (paymentType === 'part_principal') {
+    if (amountCents > currentPrincipal) {
+      throw new HttpError(400, `Part-principal payment exceeds the outstanding principal of ${(currentPrincipal / 100).toFixed(2)}`);
+    }
+    principalPortionCents = amountCents;
+  } else {
+    if (amountCents < currentPrincipal) {
+      throw new HttpError(400, `Redemption amount must cover the outstanding principal of ${(currentPrincipal / 100).toFixed(2)}`);
+    }
+    principalPortionCents = currentPrincipal;
+    interestPortionCents = amountCents - currentPrincipal;
+  }
+
   const subdocId = new mongoose.Types.ObjectId();
 
   const tx = await postTransaction({
@@ -982,13 +1127,14 @@ export async function recordPawnPayment(
     dueDate.setUTCMonth(dueDate.getUTCMonth() + 1);
     item.nextDue = dueDate.toISOString().slice(0, 10);
   } else if (paymentType === 'part_principal') {
-    item.principalOutstandingCents = Math.max(0, currentPrincipal - amountCents);
+    item.principalOutstandingCents = currentPrincipal - principalPortionCents;
     if (item.principalOutstandingCents === 0) {
       item.status = 'redeemed';
       item.redemptionDate = paymentDate;
     }
   } else if (paymentType === 'redemption') {
     item.principalOutstandingCents = 0;
+    item.interestPaidCents = (item.interestPaidCents || 0) + interestPortionCents;
     item.status = 'redeemed';
     item.redemptionDate = paymentDate;
   }
@@ -998,6 +1144,8 @@ export async function recordPawnPayment(
     _id: subdocId,
     date: paymentDate,
     amountCents,
+    principalCents: principalPortionCents,
+    interestCents: interestPortionCents,
     paymentType,
     paymentMethod,
     bankAccountId: targetBankAccountId,
@@ -1037,7 +1185,11 @@ export async function deletePawnPayment(userId: string, pawnId: string, paymentI
     dueDate.setUTCMonth(dueDate.getUTCMonth() - 1);
     item.nextDue = dueDate.toISOString().slice(0, 10);
   } else if (payment.paymentType === 'part_principal' || payment.paymentType === 'redemption') {
-    item.principalOutstandingCents = (item.principalOutstandingCents || 0) + payment.amountCents;
+    // Legacy payments predate the principal/interest split and were applied wholly to principal.
+    const principalPortion = payment.principalCents || payment.interestCents ? Number(payment.principalCents) || 0 : payment.amountCents;
+    const interestPortion = payment.principalCents || payment.interestCents ? Number(payment.interestCents) || 0 : 0;
+    item.principalOutstandingCents = (item.principalOutstandingCents || 0) + principalPortion;
+    item.interestPaidCents = Math.max(0, (item.interestPaidCents || 0) - interestPortion);
     if (item.status === 'redeemed' && item.principalOutstandingCents > 0) {
       item.status = 'active';
       item.redemptionDate = '';

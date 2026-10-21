@@ -64,6 +64,7 @@ const bankAccountSchema = z.object({
   currency: z.string().trim().max(10).default('LKR'),
   notes: optionalText,
   isDefault: z.boolean().default(false),
+  isArchived: z.boolean().optional(),
 });
 
 const cardSchema = z.object({
@@ -180,7 +181,7 @@ const expenseBaseSchema = z.object({
   paymentMethod: paymentMethodEnum.default('cash'),
   bankAccountId: z.string().optional().nullable(),
   cardId: z.string().optional().nullable(),
-  sourceType: z.enum(['salary', 'business']).optional().default('salary'),
+  sourceType: z.enum(['salary', 'business', 'medical']).optional().default('salary'),
   companyId: z.string().optional().nullable(),
   branchId: z.string().optional().nullable(),
 });

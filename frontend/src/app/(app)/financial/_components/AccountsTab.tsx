@@ -23,6 +23,7 @@ import {
   formatExpiryInput,
 } from '@/utils/bankData';
 import type { BankAccount, Card as CardType } from '@/types';
+import { getLocalDate } from '@/utils/date';
 
 export function AccountsTab() {
   const { state, dispatch } = useApp();
@@ -74,7 +75,7 @@ export function AccountsTab() {
     fromEntity: '',
     toEntity: '',
     amount: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: getLocalDate(),
     description: '',
   });
   const [transferError, setTransferError] = useState('');
@@ -134,7 +135,7 @@ export function AccountsTab() {
         fromEntity: '',
         toEntity: '',
         amount: '',
-        date: new Date().toISOString().slice(0, 10),
+        date: getLocalDate(),
         description: '',
       });
     } catch (err: any) {
@@ -144,17 +145,48 @@ export function AccountsTab() {
     }
   };
 
-  const handleDeleteAccount = async (id: string, name: string) => {
+  const setAccountArchived = (acc: BankAccount, isArchived: boolean) => {
+    dispatch({ type: 'UPDATE_BANK_ACCOUNT', entry: { ...acc, isArchived } });
+    toast.success(isArchived ? `"${acc.name}" archived` : `"${acc.name}" restored`);
+  };
+
+  const handleDeleteAccount = async (acc: BankAccount) => {
+    if (acc.accountType === 'cash') {
+      toast.error('The built-in cash wallet cannot be deleted');
+      return;
+    }
+    // Mirrors the server rule: deleting an account with money or history would break the ledger.
+    const linkedCardIds = new Set(state.cards.filter(c => c.bankAccountId === acc.id).map(c => c.id));
+    const hasActivity = (acc.currentBalance || 0) !== 0
+      || state.cards.some(c => linkedCardIds.has(c.id) && (c.currentBalance || 0) !== 0)
+      || state.transactions.some(t => t.bankAccountId === acc.id || (t.cardId && linkedCardIds.has(t.cardId)));
+
+    if (hasActivity) {
+      if (acc.isArchived) {
+        toast.error(`"${acc.name}" still has a balance or transaction history, so it stays archived instead of being deleted`);
+        return;
+      }
+      const archive = await confirm({
+        title: 'Account Cannot Be Deleted',
+        message: `"${acc.name}" has a non-zero balance or transaction history. Transfer any remaining funds first, or archive it to keep its history while hiding it from new payments.`,
+        confirmLabel: 'Archive Account',
+        cancelLabel: 'Cancel',
+        tone: 'warning',
+      });
+      if (archive) setAccountArchived(acc, true);
+      return;
+    }
+
     const ok = await confirm({
       title: 'Delete Bank Account',
-      message: `Are you sure you want to remove "${name}"? Cards and transactions linked to this account may lose their reference.`,
+      message: `Are you sure you want to remove "${acc.name}"?${linkedCardIds.size ? ' Unused cards linked to it will also be removed.' : ''}`,
       confirmLabel: 'Yes, Delete',
       cancelLabel: 'No, Keep',
       tone: 'danger',
     });
     if (ok) {
-      dispatch({ type: 'DELETE_BANK_ACCOUNT', id });
-      toast.success(`Bank account "${name}" deleted`);
+      dispatch({ type: 'DELETE_BANK_ACCOUNT', id: acc.id });
+      toast.success(`Bank account "${acc.name}" deleted`);
     }
   };
 
@@ -389,7 +421,7 @@ export function AccountsTab() {
                   return (
                     <Card
                       key={acc.id}
-                      className="p-4 flex flex-col justify-between border-border hover:border-primary-500/40 transition-all shadow-sm"
+                      className={`p-4 flex flex-col justify-between border-border hover:border-primary-500/40 transition-all shadow-sm ${acc.isArchived ? 'opacity-70' : ''}`}
                     >
                       <div>
                         {/* Header */}
@@ -400,9 +432,16 @@ export function AccountsTab() {
                               {acc.bankName} {acc.branch ? `· ${acc.branch}` : ''}
                             </div>
                           </div>
-                          <Badge tone="primary" size="sm" className="uppercase text-[10px] shrink-0">
-                            {acc.accountType || 'savings'}
-                          </Badge>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {acc.isArchived && (
+                              <Badge tone="neutral" size="sm" className="uppercase text-[10px]">
+                                Archived
+                              </Badge>
+                            )}
+                            <Badge tone="primary" size="sm" className="uppercase text-[10px]">
+                              {acc.accountType || 'savings'}
+                            </Badge>
+                          </div>
                         </div>
 
                         {/* Visible Account Number Section with Copy Button */}
@@ -605,7 +644,7 @@ export function AccountsTab() {
                   <Input
                     value={accountForm.branchCode}
                     onChange={e => setAccountForm(f => ({ ...f, branchCode: e.target.value }))}
-                    placeholder="034"
+                    placeholder="e.g. 034"
                   />
                 </Field>
                 <Field id="acc-swift" label="SWIFT / BIC" hint="e.g. COMB-LK-LX">
@@ -622,7 +661,7 @@ export function AccountsTab() {
                   type="number"
                   value={accountForm.currentBalance}
                   onChange={e => setAccountForm(f => ({ ...f, currentBalance: e.target.value }))}
-                  placeholder="150,000"
+                  placeholder="e.g. 150,000"
                 />
               </Field>
 
@@ -886,7 +925,7 @@ export function AccountsTab() {
                     }));
                     if (cardError) setCardError('');
                   }}
-                  placeholder="4532 1100 2345 6789"
+                  placeholder="e.g. 4532 1100 2345 6789"
                 />
               </Field>
 
@@ -956,7 +995,7 @@ export function AccountsTab() {
                       type="number"
                       value={cardForm.creditLimit}
                       onChange={e => setCardForm(f => ({ ...f, creditLimit: e.target.value }))}
-                      placeholder="200,000"
+                      placeholder="e.g. 200,000"
                     />
                   </Field>
                   <div className="grid grid-cols-2 gap-3">
@@ -967,7 +1006,7 @@ export function AccountsTab() {
                         max="31"
                         value={cardForm.billingDay}
                         onChange={e => setCardForm(f => ({ ...f, billingDay: e.target.value }))}
-                        placeholder="15"
+                        placeholder="e.g. 15"
                       />
                     </Field>
                     <Field id="card-dueday" label="Due Day">
@@ -977,7 +1016,7 @@ export function AccountsTab() {
                         max="31"
                         value={cardForm.dueDay}
                         onChange={e => setCardForm(f => ({ ...f, dueDay: e.target.value }))}
-                        placeholder="28"
+                        placeholder="e.g. 28"
                       />
                     </Field>
                   </div>
@@ -1361,7 +1400,7 @@ export function AccountsTab() {
                 >
                   <option value="">Select source...</option>
                   <option value="cash">Cash Wallet</option>
-                  {state.bankAccounts.map(a => (
+                  {state.bankAccounts.filter(a => !a.isArchived).map(a => (
                     <option key={a.id} value={`ba_${a.id}`}>
                       {a.name} ({a.bankName}) · {formatRs(a.currentBalance || 0)}
                     </option>
@@ -1382,7 +1421,7 @@ export function AccountsTab() {
                 >
                   <option value="">Select destination...</option>
                   <option value="cash">Cash Wallet</option>
-                  {state.bankAccounts.map(a => (
+                  {state.bankAccounts.filter(a => !a.isArchived).map(a => (
                     <option key={a.id} value={`ba_${a.id}`}>
                       {a.name} ({a.bankName}) · {formatRs(a.currentBalance || 0)}
                     </option>
