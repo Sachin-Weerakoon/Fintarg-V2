@@ -19,6 +19,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
+import { MedicalTypeBreakdown } from './_components/MedicalTypeBreakdown';
 
 const MEDICAL_TYPES = ['Consultation', 'Pharmacy', 'Lab test', 'Hospital', 'Dental', 'Specialist', 'Other'];
 const MONTHS = ['2026-07', '2026-08', '2026-09'];
@@ -216,6 +217,8 @@ export default function MedicalClient() {
                 <div className="font-bold text-sm text-text num">{formatRs(allTimeTotal)}</div>
               </Card>
             </div>
+
+            <MedicalTypeBreakdown expenses={monthExpenses} />
 
             {/* Expenses table */}
             {state.medicalExpenses.length === 0 ? (
