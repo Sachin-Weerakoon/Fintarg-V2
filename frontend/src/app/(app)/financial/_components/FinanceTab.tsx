@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
 import { FormCard } from '@/components/ui/FormCard';
@@ -19,6 +19,8 @@ import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import type { FinancePayment } from '@/types';
 import { getLocalDate } from '@/utils/date';
+import { addMonths, monthOf, todayISO, upcomingObligations } from '@/lib/insights';
+import { BillsCalendar } from './BillsCalendar';
 
 export function FinanceTab() {
   const { state, dispatch } = useApp();
@@ -39,6 +41,10 @@ export function FinanceTab() {
     status: 'active' as NonNullable<FinancePayment['status']>,
   });
   const [editId, setEditId] = useState<string | null>(null);
+
+  // Bills calendar: 62 days covers the rest of this month and all of next month.
+  const today = todayISO();
+  const obligations = useMemo(() => upcomingObligations(state, today, 62), [state, today]);
   const [filterKind, setFilterKind] = useState<string>('all');
 
   // Mark as paid sheet state
@@ -180,6 +186,8 @@ export function FinanceTab() {
   return (
     <div className="grid md:grid-cols-3 gap-6">
       <div className="md:col-span-2 space-y-4">
+        <BillsCalendar obligations={obligations} today={today} maxMonth={addMonths(monthOf(today), 1)} />
+
         <div className="flex items-center justify-between">
           <SegmentedTabs
             size="sm"
