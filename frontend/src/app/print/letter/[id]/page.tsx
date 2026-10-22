@@ -32,9 +32,9 @@ export default function PrintLetterPage() {
   const company = state.companies?.find(c => c.id === letter?.companyId);
 
   return (
-    <div className="min-h-screen bg-slate-100/70 p-4 sm:p-8 print:p-0 print:bg-white text-slate-900">
+    <div className="min-h-screen bg-bg p-4 sm:p-8 print:p-0 print:bg-white text-text">
       {/* Top action bar - hidden during print */}
-      <div className="no-print max-w-4xl mx-auto mb-6 p-4 bg-white border border-slate-200/80 rounded-2xl flex items-center justify-between shadow-sm font-sans">
+      <div className="no-print max-w-4xl mx-auto mb-6 p-4 bg-surface border border-border rounded-2xl flex items-center justify-between shadow-sm font-sans">
         <Link
           href="/advanced/letters"
           className="text-xs font-semibold text-primary-text hover:underline flex items-center gap-1.5"

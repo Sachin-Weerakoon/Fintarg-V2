@@ -140,7 +140,8 @@ export function BusinessWorkspace() {
   const [branchGoalName, setBranchGoalName] = useState('');
   const [branchGoalAmount, setBranchGoalAmount] = useState('');
   const [branchGoalDate, setBranchGoalDate] = useState('');
-  const [branchGoalType, setBranchGoalType] = useState('expansion');
+  // Branch goals created here are always expansion funds; there is no picker for it.
+  const branchGoalType = 'expansion';
 
   const addBranchGoal = () => {
     if (!branchGoalName.trim() || !branchGoalAmount || !branch) {

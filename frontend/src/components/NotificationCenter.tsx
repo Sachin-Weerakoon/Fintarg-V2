@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useApp } from '@/store';
 import { useToast } from '@/components/ui/ToastProvider';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { buildInsights, upcomingObligations, todayISO, type Insight, type InsightCategory, type InsightSeverity } from '@/lib/insights';
 
 const DISMISS_KEY = 'fintarg.insights.dismissed.v1';
@@ -138,8 +140,8 @@ export function NotificationCenter({ variant = 'light' }: { variant?: 'light' | 
 
   const buttonClass =
     variant === 'dark'
-      ? 'text-white border border-white/20 bg-white/5 hover:bg-white/10'
-      : 'text-text border border-border bg-surface hover:bg-surface-hover';
+      ? '!text-white !border-white/20 !bg-white/5 hover:!bg-white/10'
+      : '!text-text !border-border !bg-surface hover:!bg-surface-hover';
 
   const filters: { id: Filter; label: string }[] = [
     { id: 'all', label: 'All' },
@@ -150,14 +152,14 @@ export function NotificationCenter({ variant = 'light' }: { variant?: 'light' | 
 
   return (
     <div className="relative" ref={rootRef}>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         id="notification-bell"
         onClick={() => setOpen(o => !o)}
         aria-label={`Notifications${unread.length ? `, ${unread.length} new` : ''}`}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 ${buttonClass}`}
+        className={`relative !w-10 !h-10 !min-w-0 !min-h-0 !p-0 !rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 ${buttonClass}`}
       >
         <span className={ringing ? 'animate-bell-ring inline-flex' : 'inline-flex'}>
           <Icon name="bell" size={18} />
@@ -171,7 +173,7 @@ export function NotificationCenter({ variant = 'light' }: { variant?: 'light' | 
             {unread.length > 9 ? '9+' : unread.length}
           </span>
         )}
-      </button>
+      </Button>
 
       {open && (
         <div
@@ -188,23 +190,16 @@ export function NotificationCenter({ variant = 'light' }: { variant?: 'light' | 
                 </div>
               </div>
               {visible.length > 0 && (
-                <button type="button" onClick={dismissAll} className="text-[11px] font-semibold text-slate-400 hover:text-white transition-colors">
+                <Button variant="link" onClick={dismissAll} className="!text-[11px] !text-white/60 hover:!text-white">
                   Clear all
-                </button>
+                </Button>
               )}
             </div>
             <div className="flex gap-1.5 mt-3">
               {filters.map(f => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setFilter(f.id)}
-                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
-                    filter === f.id ? 'bg-primary-500/20 border-primary-400/40 text-primary-300' : 'border-white/10 text-slate-400 hover:text-white hover:bg-white/5'
-                  }`}
-                >
+                <Chip key={f.id} tone="dark" selected={filter === f.id} onClick={() => setFilter(f.id)} className="!px-2.5 text-[11px]">
                   {f.label}
-                </button>
+                </Chip>
               ))}
             </div>
           </div>
@@ -212,11 +207,11 @@ export function NotificationCenter({ variant = 'light' }: { variant?: 'light' | 
           <div className="max-h-[min(60vh,440px)] overflow-y-auto">
             {filtered.length === 0 ? (
               <div className="px-6 py-10 text-center">
-                <div className="mx-auto w-12 h-12 rounded-2xl bg-emerald-400/10 border border-emerald-400/25 flex items-center justify-center text-emerald-300 mb-3">
+                <div className="mx-auto w-12 h-12 rounded-2xl bg-on-dark-success/10 border border-on-dark-success/25 flex items-center justify-center text-on-dark-success mb-3">
                   <Icon name="check" size={22} />
                 </div>
                 <div className="text-sm font-semibold">You’re all caught up</div>
-                <div className="text-xs text-slate-400 mt-1">New predictions and reminders will appear here.</div>
+                <div className="text-xs text-white/60 mt-1">New predictions and reminders will appear here.</div>
               </div>
             ) : (
               <ul className="divide-y divide-white/5">
@@ -231,15 +226,15 @@ export function NotificationCenter({ variant = 'light' }: { variant?: 'light' | 
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{s.label}</span>
+                            <span className="text-[10px] uppercase tracking-wider font-bold text-white/60">{s.label}</span>
                           </div>
                           <div className="text-[13px] font-semibold text-white leading-snug mt-0.5">{i.title}</div>
-                          <div className="text-xs text-slate-300 leading-relaxed mt-0.5">{i.message}</div>
+                          <div className="text-xs text-white/80 leading-relaxed mt-0.5">{i.message}</div>
                           <div className="mt-2 flex items-center gap-3">
                             {i.reminderId ? (
-                              <button type="button" onClick={() => dismiss(i)} className="text-xs font-semibold text-primary-400 hover:text-primary-300 hover:underline">
+                              <Button variant="link" onClick={() => dismiss(i)} className="!text-primary-400 hover:!text-primary-300">
                                 Mark done ✓
-                              </button>
+                              </Button>
                             ) : (
                               i.href && (
                                 <Link href={i.href} onClick={() => setOpen(false)} className="text-xs font-semibold text-primary-400 hover:text-primary-300 hover:underline">
@@ -249,14 +244,14 @@ export function NotificationCenter({ variant = 'light' }: { variant?: 'light' | 
                             )}
                           </div>
                         </div>
-                        <button
-                          type="button"
+                        <Button
+                          variant="ghost"
                           onClick={() => dismiss(i)}
                           aria-label={`Dismiss: ${i.title}`}
-                          className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-slate-500 hover:text-white transition-all p-1 rounded-md hover:bg-white/10"
+                          className="opacity-0 group-hover:opacity-100 focus:opacity-100 !min-w-0 !min-h-0 !p-1 !rounded-md !text-white/45 hover:!text-white hover:!bg-white/10"
                         >
                           ✕
-                        </button>
+                        </Button>
                       </div>
                     </li>
                   );
@@ -266,16 +261,16 @@ export function NotificationCenter({ variant = 'light' }: { variant?: 'light' | 
 
             {upcoming.length > 0 && filter !== 'goals' && (
               <div className="border-t border-white/10 px-4 py-3 bg-white/[0.02]">
-                <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2">Coming up · next 30 days</div>
+                <div className="text-[10px] uppercase tracking-wider font-bold text-white/60 mb-2">Coming up · next 30 days</div>
                 <ul className="space-y-1.5">
                   {upcoming.map(o => (
                     <li key={o.id}>
                       <Link href={o.href} onClick={() => setOpen(false)} className="flex items-center justify-between gap-3 text-xs hover:bg-white/5 rounded-lg px-2 py-1.5 -mx-2 transition-colors">
                         <span className="flex items-center gap-2 min-w-0">
                           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${o.daysUntil <= 3 ? 'bg-amber-400' : 'bg-primary-400'}`} />
-                          <span className="truncate text-slate-200">{o.label}</span>
+                          <span className="truncate text-white/90">{o.label}</span>
                         </span>
-                        <span className="text-slate-400 flex-shrink-0 num">{o.daysUntil === 0 ? 'Today' : o.daysUntil === 1 ? 'Tomorrow' : `in ${o.daysUntil}d`}</span>
+                        <span className="text-white/60 flex-shrink-0 num">{o.daysUntil === 0 ? 'Today' : o.daysUntil === 1 ? 'Tomorrow' : `in ${o.daysUntil}d`}</span>
                       </Link>
                     </li>
                   ))}

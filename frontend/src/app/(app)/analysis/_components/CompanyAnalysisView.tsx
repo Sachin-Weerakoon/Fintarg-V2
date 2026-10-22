@@ -135,7 +135,7 @@ export function CompanyAnalysisView({
               <div id="company-health-heading" className="text-xs uppercase tracking-wider font-bold text-primary-300">
                 Enterprise Health
               </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">{monthLabel(month)}</div>
+              <div className="text-[11px] text-white/60 mt-0.5">{monthLabel(month)}</div>
             </div>
           </div>
 
@@ -156,7 +156,7 @@ export function CompanyAnalysisView({
                 : `Cash-flow positive with ${(metrics.operatingMargin * 100).toFixed(0)}% margin. Expanding branch throughput will drive sustained profitability.`}
             </h2>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-white/80 leading-relaxed">
               {metrics.branchesCount === 0
                 ? 'No active branch registered under this company yet.'
                 : `${metrics.branchesCount} operating branch(es) generating ${formatRs(metrics.totalRevenue)} in gross commercial inflows.`}
@@ -167,11 +167,11 @@ export function CompanyAnalysisView({
           <div className="grid grid-cols-2 gap-2.5">
             {metrics.healthScore.factors.map(f => (
               <div key={f.name} className="p-3 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
-                <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold flex items-center justify-between">
+                <div className="text-[11px] uppercase tracking-wider text-white/60 font-semibold flex items-center justify-between">
                   <span>{f.name}</span>
                   <span className="font-mono text-white font-bold">{f.score}</span>
                 </div>
-                <div className="text-[11px] text-slate-300 mt-1 font-medium truncate">{f.hint}</div>
+                <div className="text-[11px] text-white/80 mt-1 font-medium truncate">{f.hint}</div>
               </div>
             ))}
           </div>

@@ -64,10 +64,8 @@ export function isValidCardNumber(numberStr: string): boolean {
   return sum % 10 === 0;
 }
 
-/** Amex prints a 4-digit security code; every other network uses 3. */
-export function cvvLength(network?: string): 3 | 4 {
-  return network === 'amex' ? 4 : 3;
-}
+/** Every card's security code (CVV) is exactly this many digits. */
+export const CVV_LENGTH = 3;
 
 /** 'MM/YY' -> null when valid and not expired, otherwise the reason. Cards stay valid through their expiry month. */
 export function expiryProblem(expiry: string, now: Date = new Date()): string | null {

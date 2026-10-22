@@ -447,7 +447,8 @@ function reducer(state: AppState, action: Action): AppState {
       const currentPrincipal = p.principalOutstanding !== undefined ? p.principalOutstanding : p.amountReceived;
       let payAmount = action.amount;
       if (!payAmount) {
-        if (pType === 'interest') payAmount = Math.max(1, Math.round(currentPrincipal * (p.interestRate / 100) / 12));
+        // Pawn rates are quoted per month.
+        if (pType === 'interest') payAmount = Math.max(1, Math.round(currentPrincipal * (p.interestRate / 100)));
         else if (pType === 'redemption') payAmount = currentPrincipal;
         else payAmount = 0;
       }

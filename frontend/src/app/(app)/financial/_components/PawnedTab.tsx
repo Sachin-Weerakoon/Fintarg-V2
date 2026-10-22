@@ -109,7 +109,7 @@ export function PawnedTab() {
     const principal = pawn.principalOutstanding !== undefined ? pawn.principalOutstanding : pawn.amountReceived;
     let initialAmount = '';
     if (type === 'interest') {
-      const monthlyInt = Math.max(1, Math.round(principal * (pawn.interestRate / 100) / 12));
+      const monthlyInt = Math.max(1, Math.round(principal * (pawn.interestRate / 100)));
       initialAmount = String(monthlyInt);
     } else if (type === 'redemption') {
       initialAmount = String(principal);
@@ -132,7 +132,7 @@ export function PawnedTab() {
     const principal = payingPawn.principalOutstanding !== undefined ? payingPawn.principalOutstanding : payingPawn.amountReceived;
     let newAmount = paymentForm.amount;
     if (newType === 'interest') {
-      const monthlyInt = Math.max(1, Math.round(principal * (payingPawn.interestRate / 100) / 12));
+      const monthlyInt = Math.max(1, Math.round(principal * (payingPawn.interestRate / 100)));
       newAmount = String(monthlyInt);
     } else if (newType === 'redemption') {
       newAmount = String(principal);
@@ -373,7 +373,7 @@ export function PawnedTab() {
             hasError={Boolean(errors.amountReceived)}
           />
         </Field>
-        <Field id="pawn-rate" label="Interest Rate %" required error={errors.interestRate}>
+        <Field id="pawn-rate" label="Monthly Interest Rate %" required error={errors.interestRate}>
           <Input
             type="number"
             min="0"

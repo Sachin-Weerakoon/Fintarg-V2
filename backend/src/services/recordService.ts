@@ -1081,8 +1081,9 @@ export async function recordPawnPayment(
   if (params.amount !== undefined && params.amount !== null && params.amount > 0) {
     amountCents = Math.round(params.amount * 100);
   } else if (paymentType === 'interest') {
+    // Pawn rates are quoted per month, so one interest payment is principal × monthly rate.
     const rate = item.interestRatePercent || 0;
-    amountCents = Math.max(1, Math.round(currentPrincipal * (rate / 100) / 12));
+    amountCents = Math.max(1, Math.round(currentPrincipal * (rate / 100)));
   } else if (paymentType === 'redemption') {
     amountCents = currentPrincipal;
   } else {

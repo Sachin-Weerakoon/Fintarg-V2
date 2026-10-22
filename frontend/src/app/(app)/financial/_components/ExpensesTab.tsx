@@ -3,7 +3,6 @@ import { useState, useMemo } from 'react';
 import {
   useApp,
   formatRs,
-  calcMonthlyExpenses,
   calcMonthlyIncome,
   calcFinancePayments,
   calcDailyExpenseBudget,
@@ -16,6 +15,7 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Checkbox } from '@/components/ui/Checkbox';
+import { Chip } from '@/components/ui/Chip';
 import { MoneyField } from '@/components/ui/MoneyField';
 import { DateField } from '@/components/ui/DateField';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -333,21 +333,12 @@ export function ExpensesTab({
                 const isSelected = catFilter === c;
                 const amt = c === 'All' ? rangeTotal : (catMap[c] || 0);
                 return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setCatFilter(c)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      isSelected
-                        ? 'bg-primary-500 text-white shadow-sm'
-                        : 'bg-surface hover:bg-surface-hover text-text border border-border'
-                    }`}
-                  >
+                  <Chip key={c} selected={isSelected} onClick={() => setCatFilter(c)} className="rounded-lg px-3 py-1.5 font-medium">
                     <span>{c}</span>
                     <span className={`text-[11px] num ${isSelected ? 'text-white/80' : 'text-muted'}`}>
                       {formatRs(amt)}
                     </span>
-                  </button>
+                  </Chip>
                 );
               })}
             </div>

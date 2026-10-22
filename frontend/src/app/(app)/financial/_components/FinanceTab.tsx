@@ -571,17 +571,20 @@ export function FinanceTab() {
           </Field>
 
           {['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(paymentForm.paymentMethod) && (
-            <Field id="pay-account" label="Debit Bank Account" required error={payErrors.errors.bankAccountId}>
+            <Field id="pay-account" label="Debit Current Account" required error={payErrors.errors.bankAccountId}>
               <Select
                 value={paymentForm.bankAccountId}
                 onChange={e => { setPaymentForm(f => ({ ...f, bankAccountId: e.target.value })); payErrors.clear('bankAccountId'); }}
               >
-                <option value="">Select Account...</option>
-                {state.bankAccounts.filter(b => !b.isArchived).map(b => (
-                  <option key={b.id} value={b.id}>
-                    {b.bankName} · {b.accountNumber} · {formatRs(b.currentBalance)}
-                  </option>
-                ))}
+                <option value="">Select current account</option>
+                {state.bankAccounts
+                  .filter(b => b.id === paymentForm.bankAccountId
+                    || (!b.isArchived && CHEQUE_ACCOUNT_TYPES.includes(b.accountType || 'savings')))
+                  .map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.bankName} · {b.accountNumber} · {formatRs(b.currentBalance)}
+                    </option>
+                  ))}
               </Select>
             </Field>
           )}
