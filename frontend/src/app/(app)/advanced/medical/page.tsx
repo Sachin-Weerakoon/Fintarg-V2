@@ -15,9 +15,9 @@ import { MoneyField } from '@/components/ui/MoneyField';
 import { DateField } from '@/components/ui/DateField';
 import { Badge } from '@/components/ui/Badge';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
-import { MonthPicker } from '@/components/ui/MonthPicker';
-import { useSelectedMonth } from '@/hooks/useSelectedMonth';
-import { formatMonth, getLocalDate, getLocalMonth } from '@/utils/date';
+import { DateRangePicker } from '@/components/ui/DateRangePicker';
+import { useSelectedRange } from '@/hooks/useSelectedRange';
+import { getLocalDate, isInRange } from '@/utils/date';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
@@ -29,7 +29,7 @@ export default function MedicalClient() {
   const { state, dispatch } = useApp();
   const confirm = useConfirm();
   const toast = useToast();
-  const [month, setMonth] = useSelectedMonth();
+  const [range, setRange] = useSelectedRange();
   const [form, setForm] = useState({ date: getLocalDate(), type: 'Consultation', amount: '', note: '' });
   const [error, setError] = useState('');
   const [fileError, setFileError] = useState('');
@@ -80,8 +80,8 @@ export default function MedicalClient() {
     }
   };
 
-  const monthExpenses = state.medicalExpenses.filter(m => m.date.startsWith(month));
-  const monthTotal = monthExpenses.reduce((s, m) => s + m.amount, 0);
+  const rangeExpenses = state.medicalExpenses.filter(m => isInRange(m.date, range));
+  const rangeTotal = rangeExpenses.reduce((s, m) => s + m.amount, 0);
   const allTimeTotal = state.medicalExpenses.reduce((s, m) => s + m.amount, 0);
 
   const submit = () => {
@@ -154,7 +154,6 @@ export default function MedicalClient() {
     <PageContainer width="narrow">
       <PageHeader
         title="Medical Vault"
-        description="Track medical costs, prescription documents, and clinic reminders."
         actions={
           <Link href="/advanced">
             <Button variant="secondary" size="sm" iconLeft={<Icon name="arrow-left" size={14} />}>
@@ -178,17 +177,16 @@ export default function MedicalClient() {
       {activeTab === 'expenses' && (
         <div className="grid md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-4">
-            {/* Month selector */}
+            {/* Date range selector */}
             <div className="flex items-center gap-2 no-print">
-              <span className="text-xs font-semibold text-muted">Month:</span>
-              <MonthPicker value={month} onChange={setMonth} size="sm" />
+              <DateRangePicker value={range} onChange={setRange} size="sm" />
             </div>
 
             {/* Totals */}
             <div className="grid grid-cols-2 gap-3">
               <Card className="text-center p-3">
-                <div className="text-xs text-muted mb-0.5">{month === getLocalMonth() ? 'This month' : formatMonth(month)}</div>
-                <div className="font-bold text-sm text-text num">{formatRs(monthTotal)}</div>
+                <div className="text-xs text-muted mb-0.5">Selected range</div>
+                <div className="font-bold text-sm text-text num">{formatRs(rangeTotal)}</div>
               </Card>
               <Card className="text-center p-3">
                 <div className="text-xs text-muted mb-0.5">All time</div>
@@ -197,11 +195,11 @@ export default function MedicalClient() {
             </div>
 
             {/* Expenses table */}
-            {state.medicalExpenses.length === 0 ? (
+            {rangeExpenses.length === 0 ? (
               <EmptyState
                 icon={<Icon name="heart" size={24} />}
                 title="No medical expenses recorded"
-                helper="Log doctor consultations, lab tests, and pharmacy bills."
+                helper={state.medicalExpenses.length === 0 ? 'Log doctor consultations, lab tests, and pharmacy bills.' : 'No medical expenses in this date range.'}
               />
             ) : (
               <Card className="p-0 overflow-hidden">
@@ -217,7 +215,7 @@ export default function MedicalClient() {
                       </tr>
                     </thead>
                     <tbody>
-                      {state.medicalExpenses
+                      {rangeExpenses
                         .slice()
                         .sort((a, b) => b.date.localeCompare(a.date))
                         .map(m => (
@@ -250,7 +248,6 @@ export default function MedicalClient() {
           <FormCard
             icon="heart"
             title="Add Medical Expense"
-            description="Track healthcare consultations, medicine, and hospital charges"
             className="h-fit sticky top-4"
           >
             <Field id="med-date" label="Date" required>
@@ -269,7 +266,7 @@ export default function MedicalClient() {
                 ))}
               </Select>
             </Field>
-            <Field id="med-amount" label="Amount (Rs.)" required error={error}>
+            <Field id="med-amount" label="Amount" required error={error}>
               <MoneyField
                 value={form.amount}
                 onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
@@ -302,7 +299,6 @@ export default function MedicalClient() {
         <div className="max-w-2xl space-y-4">
           <Card className="p-5">
             <h3 className="font-semibold text-sm mb-1 text-text">Upload medical document</h3>
-            <p className="text-xs text-muted mb-4">Store reports, prescriptions, and lab tests securely.</p>
             <Input
               ref={fileInputRef}
               type="file"
@@ -362,7 +358,7 @@ export default function MedicalClient() {
             <h3 className="font-semibold text-sm mb-4 text-text">Set appointment reminder</h3>
             {remError && <p className="text-xs text-danger-text mb-3">{remError}</p>}
             <div className="grid md:grid-cols-3 gap-3">
-              <Field id="rem-label" label="Appointment / Note">
+              <Field id="rem-label" label="Appointment">
                 <Input
                   value={remForm.label}
                   onChange={e => setRemForm(f => ({ ...f, label: e.target.value }))}

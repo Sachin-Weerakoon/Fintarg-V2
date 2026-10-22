@@ -322,9 +322,6 @@ export function BranchAnalysisView({
                     <Icon name="analysis" size={15} className="text-primary-text" />
                     Branch Unit Cash Flow Waterfall
                   </h3>
-                  <p className="text-xs text-muted mt-0.5">
-                    Operating margin flow from gross branch receipts to net cash contribution
-                  </p>
                 </div>
               </div>
               <WaterfallChart steps={branchWaterfall} />
@@ -339,9 +336,6 @@ export function BranchAnalysisView({
                       <Icon name="target" size={15} className="text-primary-text" />
                       Monthly Target Pacing Tracker
                     </h3>
-                    <p className="text-xs text-muted mt-0.5">
-                      Pacing velocity vs target quota for {monthLabel(month)}
-                    </p>
                   </div>
                   <Badge tone={targetTone}>
                     {metrics.targetPace.targetStatus.toUpperCase()}
@@ -424,9 +418,6 @@ export function BranchAnalysisView({
               <Icon name="calendar" size={15} className="text-primary-text" />
               Peak Weekday Sales Rhythm
             </h3>
-            <p className="text-xs text-muted mb-4">
-              Aggregate sales revenue distributed by day of the week (Sun – Sat)
-            </p>
             <div className="py-4">
               <WeekdayBars values={metrics.weekdayTotals} formatValue={compactNumber} />
             </div>
@@ -438,9 +429,6 @@ export function BranchAnalysisView({
               <Icon name="analysis" size={15} className="text-primary-text" />
               Daily Sales Heatmap
             </h3>
-            <p className="text-xs text-muted mb-4">
-              Daily revenue intensity across the month of {monthLabel(month)}
-            </p>
             <HeatCalendar cells={metrics.dailySales} formatValue={compactNumber} />
           </Card>
         </div>
@@ -451,9 +439,6 @@ export function BranchAnalysisView({
               <Icon name="credit-card" size={15} className="text-primary-text" />
               Utility Bills vs Operating Overheads
             </h3>
-            <p className="text-xs text-muted mb-4">
-              Distribution of cost drivers for {branch.name}
-            </p>
             <div className="flex items-center justify-center py-4">
               {donutSlices.length > 0 ? (
                 <DonutChart
@@ -469,7 +454,6 @@ export function BranchAnalysisView({
 
           <Card className="p-5">
             <h3 className="text-sm font-bold text-text mb-1">Cost Categories</h3>
-            <p className="text-xs text-muted mb-4">Breakdown of operational spend drivers</p>
             <div className="space-y-3">
               {metrics.costCategories.map((c, i) => (
                 <div key={c.category} className="space-y-1">
@@ -505,9 +489,6 @@ export function BranchAnalysisView({
                 <Icon name="bolt" size={15} className="text-primary-text" />
                 6-Month Branch Trend & 3-Month Projection
               </h3>
-              <p className="text-xs text-muted mt-0.5">
-                Revenue vs cost historical trends with damped growth forecast
-              </p>
             </div>
             <Badge tone="primary">Confidence Band: ±15%</Badge>
           </div>

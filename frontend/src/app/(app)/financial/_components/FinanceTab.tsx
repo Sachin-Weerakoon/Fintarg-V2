@@ -17,17 +17,24 @@ import { BankSelect } from '@/components/ui/BankSelect';
 import { Sheet } from '@/components/ui/Sheet';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
-import type { FinancePayment } from '@/types';
+import type { BankAccount, FinancePayment } from '@/types';
 import { getLocalDate } from '@/utils/date';
 import { addMonths, monthOf, todayISO, upcomingObligations } from '@/lib/insights';
 import { BillsCalendar } from './BillsCalendar';
+import { useFieldErrors } from '@/hooks/useFieldErrors';
+
+type FormErrorKey = 'label' | 'chequeNumber' | 'amount' | 'dueDay' | 'nextDueDate' | 'monthsRemaining' | 'bankAccountId';
+
+// Cheques and standing orders are drawn on a current account.
+const CHEQUE_ACCOUNT_TYPES: NonNullable<BankAccount['accountType']>[] = ['current', 'checking'];
 
 export function FinanceTab() {
-  const { state, dispatch } = useApp();
+  const { state, save } = useApp();
+  const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
 
-  const [form, setForm] = useState({
+  const emptyForm = {
     paymentKind: 'instalment' as NonNullable<FinancePayment['paymentKind']>,
     lender: '',
     payee: '',
@@ -39,8 +46,27 @@ export function FinanceTab() {
     frequency: 'monthly' as NonNullable<FinancePayment['frequency']>,
     bankAccountId: '',
     status: 'active' as NonNullable<FinancePayment['status']>,
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Partial<Record<FormErrorKey, string>>>({});
+
+  const updateForm = (patch: Partial<typeof emptyForm>, clears: FormErrorKey[] = []) => {
+    setForm(f => ({ ...f, ...patch }));
+    if (clears.some(k => errors[k])) {
+      setErrors(e => {
+        const next = { ...e };
+        for (const k of clears) delete next[k];
+        return next;
+      });
+    }
+  };
+
+  const resetForm = () => {
+    setEditId(null);
+    setForm(emptyForm);
+    setErrors({});
+  };
 
   // Bills calendar: 62 days covers the rest of this month and all of next month.
   const today = todayISO();
@@ -48,6 +74,7 @@ export function FinanceTab() {
   const [filterKind, setFilterKind] = useState<string>('all');
 
   // Mark as paid sheet state
+  const payErrors = useFieldErrors<'bankAccountId' | 'amount' | 'date'>();
   const [payingPayment, setPayingPayment] = useState<FinancePayment | null>(null);
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
@@ -57,61 +84,68 @@ export function FinanceTab() {
     note: '',
   });
 
-  const submit = () => {
-    if (!form.amount || Number(form.amount) <= 0) return;
-    const label = form.paymentKind === 'cheque' || form.paymentKind === 'standing_order'
-      ? form.payee
-      : form.lender;
-    if (!label) return;
-
-    let derivedDueDay = Number(form.dueDay);
-    if (!derivedDueDay && form.nextDueDate) {
-      derivedDueDay = Number(form.nextDueDate.slice(8, 10)) || 1;
+  const validate = () => {
+    const next: Partial<Record<FormErrorKey, string>> = {};
+    const kind = form.paymentKind;
+    const usesPayee = kind === 'cheque' || kind === 'standing_order';
+    if (!(usesPayee ? form.payee : form.lender).trim()) {
+      next.label = usesPayee ? 'Enter who this is paid to.' : 'Enter the lender.';
     }
-    if (!derivedDueDay) derivedDueDay = 1;
+    if (kind === 'cheque' && !form.chequeNumber.trim()) next.chequeNumber = 'Enter the cheque number.';
+    if (!(Number(form.amount) > 0)) next.amount = 'Enter an amount greater than zero.';
+    const dueDay = Number(form.dueDay);
+    if (!form.dueDay || !Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31) next.dueDay = 'Enter a day from 1 to 31.';
+    if (!form.nextDueDate) next.nextDueDate = 'Choose the next due date.';
+    if (kind !== 'cheque') {
+      const months = Number(form.monthsRemaining);
+      if (form.monthsRemaining.trim() === '' || !Number.isInteger(months) || months < 0 || months > 1200) {
+        next.monthsRemaining = 'Enter the number of months remaining.';
+      } else if (months === 0 && form.status === 'active') {
+        next.monthsRemaining = 'An active payment needs at least 1 month remaining.';
+      }
+    }
+    if (usesPayee && !form.bankAccountId) next.bankAccountId = 'Select the current account this is drawn from.';
+    return next;
+  };
+
+  const submit = async () => {
+    const found = validate();
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+
+    const kind = form.paymentKind;
+    const usesPayee = kind === 'cheque' || kind === 'standing_order';
+    const existing = editId ? state.financePayments.find(f => f.id === editId) : undefined;
 
     const entry: FinancePayment = {
       id: editId || 'fp_' + Date.now(),
-      lender: label,
-      payee: form.payee || undefined,
-      chequeNumber: form.chequeNumber || undefined,
+      lender: (usesPayee ? form.payee : form.lender).trim(),
+      payee: form.payee.trim() || undefined,
+      chequeNumber: kind === 'cheque' ? form.chequeNumber.trim() : undefined,
       amount: Number(form.amount),
-      dueDay: derivedDueDay,
-      nextDueDate: form.nextDueDate || undefined,
-      monthsRemaining: Number(form.monthsRemaining) || 0,
-      paymentKind: form.paymentKind,
-      frequency: form.frequency,
+      dueDay: Number(form.dueDay),
+      nextDueDate: form.nextDueDate,
+      // A cheque is a single payment: one left until it is marked paid.
+      monthsRemaining: kind === 'cheque' ? (existing?.monthsRemaining ?? 1) : Number(form.monthsRemaining),
+      paymentKind: kind,
+      frequency: kind === 'cheque' ? 'one-time' : kind === 'standing_order' ? form.frequency : 'monthly',
       bankAccountId: form.bankAccountId || undefined,
       status: form.status,
-      payments: editId ? (state.financePayments.find(f => f.id === editId)?.payments || []) : [],
+      payments: existing?.payments || [],
     };
 
-    if (editId) {
-      dispatch({ type: 'UPDATE_FINANCE_PAYMENT', entry });
-      toast.success('Payment updated');
-      setEditId(null);
-    } else {
-      dispatch({ type: 'ADD_FINANCE_PAYMENT', entry });
-      toast.success('Payment recorded');
-    }
-
-    setForm({
-      paymentKind: 'instalment',
-      lender: '',
-      payee: '',
-      chequeNumber: '',
-      amount: '',
-      dueDay: '',
-      nextDueDate: '',
-      monthsRemaining: '',
-      frequency: 'monthly',
-      bankAccountId: '',
-      status: 'active',
-    });
+    setSaving(true);
+    const ok = await save(editId ? { type: 'UPDATE_FINANCE_PAYMENT', entry } : { type: 'ADD_FINANCE_PAYMENT', entry });
+    setSaving(false);
+    // On failure the store has already rolled back and shown the server's reason; keep the input.
+    if (!ok) return;
+    toast.success(editId ? 'Payment updated' : 'Payment recorded');
+    resetForm();
   };
 
   const openPaySheet = (fp: FinancePayment) => {
     setPayingPayment(fp);
+    payErrors.reset();
     setPaymentForm({
       amount: String(fp.amount),
       paymentMethod: fp.paymentKind === 'cheque' ? 'cheque' : fp.paymentKind === 'standing_order' ? 'standing_order' : fp.bankAccountId ? 'bank_transfer' : 'cash',
@@ -121,18 +155,18 @@ export function FinanceTab() {
     });
   };
 
-  const handleRecordPayment = () => {
-    if (!payingPayment || !paymentForm.amount || Number(paymentForm.amount) <= 0) {
-      toast.error('Please enter a valid amount');
-      return;
-    }
-    const isBankMethod = ['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(paymentForm.paymentMethod);
-    if (isBankMethod && !paymentForm.bankAccountId) {
-      toast.error('Please select a bank account for this payment method');
-      return;
-    }
+  const handleRecordPayment = async () => {
+    if (!payingPayment) return;
+    const valid = payErrors.check({
+      bankAccountId: ['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(paymentForm.paymentMethod) && !paymentForm.bankAccountId
+        ? 'Select the account this is paid from.' : undefined,
+      amount: Number(paymentForm.amount) > 0 ? undefined : 'Enter the payment amount.',
+      date: paymentForm.date ? undefined : 'Choose the payment date.',
+    });
+    if (!valid) return;
 
-    dispatch({
+    setSaving(true);
+    const ok = await save({
       type: 'MARK_FINANCE_PAYMENT_PAID',
       id: payingPayment.id,
       amount: Number(paymentForm.amount),
@@ -141,6 +175,8 @@ export function FinanceTab() {
       date: paymentForm.date,
       note: paymentForm.note,
     });
+    setSaving(false);
+    if (!ok) return;
 
     toast.success(`Payment of ${formatRs(Number(paymentForm.amount))} logged`);
     setPayingPayment(null);
@@ -156,11 +192,11 @@ export function FinanceTab() {
     });
     if (!ok) return;
 
-    dispatch({
+    if (!(await save({
       type: 'DELETE_FINANCE_PAYMENT_PAYMENT',
       id: fpId,
       paymentId,
-    });
+    }))) return;
     toast.success(`Payment of ${formatRs(amount)} undone`);
   };
 
@@ -173,8 +209,7 @@ export function FinanceTab() {
       tone: 'danger',
     });
     if (ok) {
-      dispatch({ type: 'DELETE_FINANCE_PAYMENT', id });
-      toast.success('Payment removed');
+      if (await save({ type: 'DELETE_FINANCE_PAYMENT', id })) toast.success('Payment removed');
     }
   };
 
@@ -218,8 +253,6 @@ export function FinanceTab() {
                 ? 'success'
                 : status === 'cancelled'
                 ? 'danger'
-                : status === 'pending'
-                ? 'warning'
                 : 'primary';
 
               const isActive = status === 'active' && fp.monthsRemaining > 0;
@@ -271,6 +304,7 @@ export function FinanceTab() {
                         size="sm"
                         onClick={() => {
                           setEditId(fp.id);
+                          setErrors({});
                           setForm({
                             paymentKind: fp.paymentKind || 'instalment',
                             lender: fp.lender || '',
@@ -280,7 +314,7 @@ export function FinanceTab() {
                             dueDay: String(fp.dueDay),
                             nextDueDate: fp.nextDueDate || '',
                             monthsRemaining: String(fp.monthsRemaining),
-                            frequency: fp.frequency || 'monthly',
+                            frequency: fp.frequency === 'one-time' ? 'one-time' : 'monthly',
                             bankAccountId: fp.bankAccountId || '',
                             status: fp.status || 'active',
                           });
@@ -344,30 +378,10 @@ export function FinanceTab() {
       <FormCard
         icon="calendar"
         title={editId ? 'Edit Payment' : 'Add Finance Payment'}
-        description={editId ? 'Update scheduled commitment details' : 'Track leases, hire purchases, cheques, or standing orders'}
         badge={editId ? 'Editing' : undefined}
         actions={
           editId ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setEditId(null);
-                setForm({
-                  paymentKind: 'instalment',
-                  lender: '',
-                  payee: '',
-                  chequeNumber: '',
-                  amount: '',
-                  dueDay: '',
-                  nextDueDate: '',
-                  monthsRemaining: '',
-                  frequency: 'monthly',
-                  bankAccountId: '',
-                  status: 'active',
-                });
-              }}
-            >
+            <Button variant="ghost" size="sm" onClick={resetForm}>
               Cancel
             </Button>
           ) : undefined
@@ -377,9 +391,12 @@ export function FinanceTab() {
         <Field id="fp-kind" label="Payment Type" required>
           <Select
             value={form.paymentKind}
-            onChange={e => setForm(f => ({ ...f, paymentKind: e.target.value as any }))}
+            onChange={e => updateForm(
+              { paymentKind: e.target.value as NonNullable<FinancePayment['paymentKind']> },
+              ['label', 'chequeNumber', 'monthsRemaining', 'bankAccountId'],
+            )}
           >
-            <option value="instalment">Hire Purchase / Instalment</option>
+            <option value="instalment">Hire Purchase</option>
             <option value="lease">Vehicle Lease</option>
             <option value="cheque">Post-Dated Cheque</option>
             <option value="standing_order">Standing Order</option>
@@ -388,110 +405,125 @@ export function FinanceTab() {
 
         {form.paymentKind === 'cheque' ? (
           <>
-            <Field id="fp-payee" label="Payee" required>
+            <Field id="fp-payee" label="Payee" required error={errors.label}>
               <Input
                 value={form.payee}
-                onChange={e => setForm(f => ({ ...f, payee: e.target.value, lender: e.target.value }))}
+                onChange={e => updateForm({ payee: e.target.value, lender: e.target.value }, ['label'])}
                 placeholder="e.g. Landlord, Supplier Ltd."
+                hasError={Boolean(errors.label)}
               />
             </Field>
-            <Field id="fp-chequenum" label="Cheque Number" required>
+            <Field id="fp-chequenum" label="Cheque Number" required error={errors.chequeNumber}>
               <Input
                 value={form.chequeNumber}
-                onChange={e => setForm(f => ({ ...f, chequeNumber: e.target.value }))}
+                onChange={e => updateForm({ chequeNumber: e.target.value }, ['chequeNumber'])}
                 placeholder="e.g. 784512"
+                hasError={Boolean(errors.chequeNumber)}
               />
             </Field>
           </>
         ) : form.paymentKind === 'standing_order' ? (
           <>
-            <Field id="fp-payee" label="Beneficiary / Payee" required>
+            <Field id="fp-payee" label="Beneficiary" required error={errors.label}>
               <Input
                 value={form.payee}
-                onChange={e => setForm(f => ({ ...f, payee: e.target.value, lender: e.target.value }))}
+                onChange={e => updateForm({ payee: e.target.value, lender: e.target.value }, ['label'])}
                 placeholder="e.g. Insurance Premium, School Fee"
+                hasError={Boolean(errors.label)}
               />
             </Field>
+            {/* The server advances standing orders monthly, so only these two are supported. */}
             <Field id="fp-freq" label="Frequency" required>
               <Select
                 value={form.frequency}
-                onChange={e => setForm(f => ({ ...f, frequency: e.target.value as any }))}
+                onChange={e => updateForm({ frequency: e.target.value as NonNullable<FinancePayment['frequency']> })}
               >
                 <option value="monthly">Monthly</option>
-                <option value="weekly">Weekly</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="annually">Annually</option>
+                <option value="one-time">One-time</option>
               </Select>
             </Field>
           </>
         ) : (
-          <Field id="fp-lender" label="Lender / Institution" required>
+          <Field id="fp-lender" label="Lender" required error={errors.label}>
             <Input
               value={form.lender}
-              onChange={e => setForm(f => ({ ...f, lender: e.target.value, payee: e.target.value }))}
+              onChange={e => updateForm({ lender: e.target.value, payee: e.target.value }, ['label'])}
               placeholder="e.g. People's Bank, Singer"
+              hasError={Boolean(errors.label)}
             />
           </Field>
         )}
 
-        <Field id="fp-amount" label="Amount (Rs.)" required>
+        <Field id="fp-amount" label="Amount" required error={errors.amount}>
           <MoneyField
             value={form.amount}
-            onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
+            onChange={v => updateForm({ amount: String(v) }, ['amount'])}
             placeholder="e.g. 25,000"
+            hasError={Boolean(errors.amount)}
           />
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field id="fp-dueday" label="Due Day" hint="Day of month, 1–31" required>
+          <Field id="fp-dueday" label="Due Day" required error={errors.dueDay}>
             <Input
               type="number"
               min="1"
               max="31"
               value={form.dueDay}
-              onChange={e => setForm(f => ({ ...f, dueDay: e.target.value }))}
+              onChange={e => updateForm({ dueDay: e.target.value }, ['dueDay'])}
               placeholder="e.g. 10"
+              hasError={Boolean(errors.dueDay)}
             />
           </Field>
-          <Field id="fp-nextdue" label="Next Due Date" required>
+          <Field id="fp-nextdue" label="Next Due Date" required error={errors.nextDueDate}>
             <DateField
               value={form.nextDueDate}
               onChange={e => {
                 const val = e.target.value;
-                const day = val ? Number(val.slice(8, 10)) : '';
-                setForm(f => ({ ...f, nextDueDate: val, dueDay: day ? String(day) : f.dueDay }));
+                const day = val ? Number(val.slice(8, 10)) : 0;
+                updateForm(
+                  { nextDueDate: val, dueDay: day ? String(day) : form.dueDay },
+                  day ? ['nextDueDate', 'dueDay'] : ['nextDueDate'],
+                );
               }}
+              hasError={Boolean(errors.nextDueDate)}
             />
           </Field>
         </div>
 
         {form.paymentKind !== 'cheque' && (
-          <Field id="fp-months" label="Months Remaining">
+          <Field id="fp-months" label="Months Remaining" required error={errors.monthsRemaining}>
             <Input
               type="number"
               min="0"
+              step="1"
               value={form.monthsRemaining}
-              onChange={e => setForm(f => ({ ...f, monthsRemaining: e.target.value }))}
+              onChange={e => updateForm({ monthsRemaining: e.target.value }, ['monthsRemaining'])}
               placeholder="e.g. 18"
+              hasError={Boolean(errors.monthsRemaining)}
             />
           </Field>
         )}
 
         <BankSelect
+          id="fp-bank"
           value={form.bankAccountId}
-          onChange={id => setForm(f => ({ ...f, bankAccountId: id }))}
+          onChange={id => updateForm({ bankAccountId: id }, ['bankAccountId'])}
           bankAccounts={state.bankAccounts}
-          label="Linked Bank Account"
+          accountTypes={CHEQUE_ACCOUNT_TYPES}
+          placeholder="Select current account"
+          label="Linked Current Account"
+          required={form.paymentKind === 'cheque' || form.paymentKind === 'standing_order'}
+          error={errors.bankAccountId}
         />
 
         <Field id="fp-status" label="Status" required>
           <Select
             value={form.status}
-            onChange={e => setForm(f => ({ ...f, status: e.target.value as any }))}
+            onChange={e => updateForm({ status: e.target.value as NonNullable<FinancePayment['status']> }, ['monthsRemaining'])}
           >
             <option value="active">Active</option>
             <option value="completed">Completed</option>
-            <option value="pending">Pending</option>
             <option value="cleared">Cleared</option>
             <option value="cancelled">Cancelled</option>
           </Select>
@@ -503,29 +535,12 @@ export function FinanceTab() {
             className="flex-1 shadow-sm hover:shadow-primary-500/20"
             iconLeft={<Icon name={editId ? 'check' : 'plus'} size={15} />}
             onClick={submit}
+            loading={saving}
           >
             {editId ? 'Update Payment' : 'Save Payment'}
           </Button>
           {editId && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setEditId(null);
-                setForm({
-                  paymentKind: 'instalment',
-                  lender: '',
-                  payee: '',
-                  chequeNumber: '',
-                  amount: '',
-                  dueDay: '',
-                  nextDueDate: '',
-                  monthsRemaining: '',
-                  frequency: 'monthly',
-                  bankAccountId: '',
-                  status: 'active',
-                });
-              }}
-            >
+            <Button variant="secondary" onClick={resetForm}>
               Cancel
             </Button>
           )}
@@ -537,13 +552,13 @@ export function FinanceTab() {
         isOpen={Boolean(payingPayment)}
         onClose={() => setPayingPayment(null)}
         title="Mark Payment as Paid"
-        description={payingPayment ? `Record installment payment for ${payingPayment.lender || payingPayment.payee}` : ''}
+        description={payingPayment ? (payingPayment.lender || payingPayment.payee) : ''}
       >
         <div className="space-y-4 pt-2">
           <Field id="pay-method" label="Payment Method">
             <Select
               value={paymentForm.paymentMethod}
-              onChange={e => setPaymentForm(f => ({ ...f, paymentMethod: e.target.value }))}
+              onChange={e => { setPaymentForm(f => ({ ...f, paymentMethod: e.target.value })); payErrors.clear('bankAccountId'); }}
             >
               <option value="bank_transfer">Bank Transfer</option>
               <option value="standing_order">Standing Order</option>
@@ -556,37 +571,37 @@ export function FinanceTab() {
           </Field>
 
           {['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(paymentForm.paymentMethod) && (
-            <Field id="pay-account" label="Debit Bank Account">
+            <Field id="pay-account" label="Debit Bank Account" required error={payErrors.errors.bankAccountId}>
               <Select
                 value={paymentForm.bankAccountId}
-                onChange={e => setPaymentForm(f => ({ ...f, bankAccountId: e.target.value }))}
+                onChange={e => { setPaymentForm(f => ({ ...f, bankAccountId: e.target.value })); payErrors.clear('bankAccountId'); }}
               >
                 <option value="">Select Account...</option>
                 {state.bankAccounts.filter(b => !b.isArchived).map(b => (
                   <option key={b.id} value={b.id}>
-                    {b.bankName} - {b.accountNumber} ({formatRs(b.currentBalance)})
+                    {b.bankName} · {b.accountNumber} · {formatRs(b.currentBalance)}
                   </option>
                 ))}
               </Select>
             </Field>
           )}
 
-          <Field id="pay-amount" label="Payment Amount (Rs.)">
+          <Field id="pay-amount" label="Payment Amount" required error={payErrors.errors.amount}>
             <MoneyField
               value={paymentForm.amount}
-              onChange={v => setPaymentForm(f => ({ ...f, amount: String(v) }))}
+              onChange={v => { setPaymentForm(f => ({ ...f, amount: String(v) })); payErrors.clear('amount'); }}
               placeholder="e.g. 25,000"
             />
           </Field>
 
-          <Field id="pay-date" label="Payment Date">
+          <Field id="pay-date" label="Payment Date" required error={payErrors.errors.date}>
             <DateField
               value={paymentForm.date}
-              onChange={e => setPaymentForm(f => ({ ...f, date: e.target.value }))}
+              onChange={e => { setPaymentForm(f => ({ ...f, date: e.target.value })); payErrors.clear('date'); }}
             />
           </Field>
 
-          <Field id="pay-note" label="Notes (optional)">
+          <Field id="pay-note" label="Notes">
             <Input
               value={paymentForm.note}
               onChange={e => setPaymentForm(f => ({ ...f, note: e.target.value }))}
@@ -595,7 +610,7 @@ export function FinanceTab() {
           </Field>
 
           <div className="flex gap-2 pt-2">
-            <Button variant="primary" className="flex-1" onClick={handleRecordPayment}>
+            <Button variant="primary" className="flex-1" onClick={handleRecordPayment} loading={saving}>
               Confirm Payment
             </Button>
             <Button variant="secondary" onClick={() => setPayingPayment(null)}>

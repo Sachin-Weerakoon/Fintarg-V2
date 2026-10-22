@@ -1,4 +1,5 @@
 import type { AppState, IncomeEntry, ExpenseEntry, FinancePayment, Loan, SavingsGoal, EmploymentProfile } from '@/types';
+import { isInRange, monthCoverage, type DateRange } from '../utils/date';
 
 /**
  * Shared Money and Period Module
@@ -102,6 +103,22 @@ export function calcRecurringIncome(
 ): number {
   const recurringOnly = income.filter(i => i.frequency !== 'one-time');
   return calcMonthlyIncome(recurringOnly, month, employmentProfiles);
+}
+
+/**
+ * Computes income over an inclusive date range: recurring income prorated by how much of each
+ * month the range covers, plus one-time income dated inside the range.
+ */
+export function calcIncomeForRange(
+  income: IncomeEntry[],
+  range: DateRange,
+  employmentProfiles?: EmploymentProfile[]
+): number {
+  const oneTimeInRange = income.filter(i => i.frequency === 'one-time' && isInRange(i.date, range));
+  return monthCoverage(range).reduce((sum, { month, fraction }) =>
+    sum
+      + calcRecurringIncome(income, month, employmentProfiles) * fraction
+      + calcMonthlyIncome(oneTimeInRange, month, employmentProfiles), 0);
 }
 
 /**

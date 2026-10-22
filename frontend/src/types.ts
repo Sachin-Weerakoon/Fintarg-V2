@@ -147,8 +147,9 @@ export interface FinancePayment {
   chequeNumber?: string;
   bankAccountId?: string;
   payee?: string;
-  frequency?: 'monthly' | 'weekly' | 'quarterly' | 'annually' | 'one-time';
-  status?: 'active' | 'cleared' | 'cancelled' | 'pending' | 'completed';
+  /** Matches the server enums; the server advances every payment monthly. */
+  frequency?: 'monthly' | 'one-time';
+  status?: 'active' | 'cleared' | 'cancelled' | 'completed';
   payments?: FinancePaymentHistory[];
 }
 

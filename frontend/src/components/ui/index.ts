@@ -27,6 +27,7 @@ export * from './Alert';
 export * from './MoneyField';
 export * from './DateField';
 export * from './MonthPicker';
+export * from './DateRangePicker';
 export * from './Checkbox';
 export * from './RadioGroup';
 export * from './SettingRow';

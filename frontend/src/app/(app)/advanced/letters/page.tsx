@@ -228,7 +228,6 @@ function LettersClient() {
     <PageContainer>
       <PageHeader
         title="Formal Letters"
-        description="Draft, customize, and export Sri Lankan legal, enterprise, and banking correspondence."
         actions={
           <Link href="/advanced">
             <Button variant="secondary" size="sm" iconLeft={<Icon name="arrow-left" size={14} />}>
@@ -311,8 +310,8 @@ function LettersClient() {
           <Card className="p-5 space-y-3.5">
             <Field id="letter-template" label="Template">
               <Select value={template} onChange={e => setTemplate(e.target.value as Template)}>
-                <option value="bank">Bank Letter (Financial Enquiry / Request)</option>
-                <option value="offer">Commercial Proposal / Offer Letter</option>
+                <option value="bank">Bank Letter</option>
+                <option value="offer">Commercial Proposal</option>
                 <option value="general">Formal General Correspondence</option>
               </Select>
             </Field>
@@ -361,7 +360,7 @@ function LettersClient() {
               </Field>
             )}
 
-            <Field id="letter-purpose" label="Purpose / Subject">
+            <Field id="letter-purpose" label="Purpose">
               <Input
                 value={form.purpose}
                 onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))}
@@ -519,7 +518,7 @@ export default function LettersPage() {
   return (
     <Suspense fallback={
       <PageContainer>
-        <PageHeader title="Formal Letters" description="Loading letters generator..." />
+        <PageHeader title="Formal Letters" />
       </PageContainer>
     }>
       <LettersClient />

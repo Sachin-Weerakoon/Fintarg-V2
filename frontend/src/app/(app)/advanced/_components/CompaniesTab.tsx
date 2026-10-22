@@ -74,7 +74,6 @@ export function CompaniesTab() {
       <div className="space-y-4">
         <div>
           <h3 className="text-base font-bold text-text">Registered Companies</h3>
-          <p className="text-xs text-muted mt-0.5">Commercial legal entities and enterprise branches</p>
         </div>
 
         {state.companies.length === 0 ? (
@@ -271,11 +270,11 @@ export function CompaniesTab() {
                 value={form.entityType}
                 onChange={e => setForm(f => ({ ...f, entityType: e.target.value }))}
               >
-                <option value="pvt_ltd">Private Limited (Pvt Ltd)</option>
+                <option value="pvt_ltd">Private Limited</option>
                 <option value="sole_proprietorship">Sole Proprietorship</option>
                 <option value="partnership">Partnership</option>
-                <option value="public_ltd">Public Limited (PLC)</option>
-                <option value="other">Other / Association</option>
+                <option value="public_ltd">Public Limited</option>
+                <option value="other">Other</option>
               </Select>
             </FormField>
 
@@ -288,7 +287,7 @@ export function CompaniesTab() {
               />
             </FormField>
 
-            <FormField id="add-co-contact" label="Official Contact / Mobile">
+            <FormField id="add-co-contact" label="Official Contact">
               <Input
                 id="add-co-contact"
                 placeholder="+94 11 234 5678"

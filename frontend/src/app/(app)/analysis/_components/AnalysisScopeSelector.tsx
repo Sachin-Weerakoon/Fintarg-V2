@@ -69,7 +69,7 @@ export function AnalysisScopeSelector({
             }`}
           >
             <Icon name="briefcase" size={14} />
-            <span>By Business (Company)</span>
+            <span>By Business</span>
             {hasCompanies && (
               <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
                 scope === 'company' ? 'bg-white/20 text-white' : 'bg-surface-hover text-muted'

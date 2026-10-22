@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PasswordField } from '@/components/ui/PasswordField';
 import { BrandLogo } from '@/components/ui/BrandLogo';
+import { PasswordRules } from '@/components/ui/PasswordRules';
+import { passwordProblem } from '@/lib/passwordPolicy';
+import { apiErrorMessage } from '@/services/apiClient';
 
 export type WorkMode = 'salary' | 'business' | 'both';
 
@@ -24,14 +27,14 @@ const workModes: {
   {
     value: 'salary',
     title: 'Salary',
-    badge: 'Job / Employment',
+    badge: 'Employment',
     description: 'Track pay slips, deductions & household burn',
     icon: '💼',
   },
   {
     value: 'business',
     title: 'Business',
-    badge: 'Owner / Enterprise',
+    badge: 'Enterprise',
     description: 'Track daily sales, cash register & inventory costs',
     icon: '🏪',
   },
@@ -44,35 +47,53 @@ const workModes: {
   },
 ];
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type AuthField = 'name' | 'email' | 'password';
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return <p id={id} className="text-[11px] font-medium text-rose-300 mt-1">{message}</p>;
+}
+
 export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
   const router = useRouter();
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>(initialMode);
   const [workMode, setWorkMode] = useState<WorkMode>('salary');
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<AuthField, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  const updateField = (field: AuthField, value: string) => {
+    setForm(f => ({ ...f, [field]: value }));
+    if (fieldErrors[field]) setFieldErrors(e => ({ ...e, [field]: undefined }));
+  };
+
+  const switchMode = (mode: 'signin' | 'signup') => {
+    setAuthMode(mode);
+    setError('');
+    setFieldErrors({});
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
     setError('');
 
-    if (authMode === 'signup' && !form.name.trim()) {
-      setError('Please enter your full name.');
-      return;
-    }
-    if (!form.email.trim() || !form.email.includes('@')) {
-      setError('Please provide a valid email address.');
-      return;
-    }
+    const found: Partial<Record<AuthField, string>> = {};
+    if (authMode === 'signup' && !form.name.trim()) found.name = 'Enter your full name.';
+    if (!form.email.trim()) found.email = 'Enter your email address.';
+    else if (!EMAIL_PATTERN.test(form.email.trim())) found.email = 'Enter a valid email address.';
     if (!form.password) {
-      setError('Please enter your password.');
-      return;
+      found.password = 'Enter your password.';
+    } else if (authMode === 'signup') {
+      // New accounts only: existing passwords are accepted at sign-in whatever their strength.
+      const problem = passwordProblem(form.password);
+      if (problem) found.password = problem;
     }
-    if (authMode === 'signup' && form.password.length < 8) {
-      setError('Password must be at least 8 characters long.');
-      return;
-    }
+    setFieldErrors(found);
+    if (Object.keys(found).length > 0) return;
 
     setSubmitting(true);
     try {
@@ -90,7 +111,7 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
 
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        setError(data.error || (authMode === 'signup' ? 'Could not create account. Please try again.' : 'Invalid email or password.'));
+        setError(apiErrorMessage(data, authMode === 'signup' ? 'Could not create account. Please try again.' : 'Invalid email or password.'));
         return;
       }
 
@@ -188,10 +209,7 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
             <button
               type="button"
               id="tab-signin"
-              onClick={() => {
-                setAuthMode('signin');
-                setError('');
-              }}
+              onClick={() => switchMode('signin')}
               className={`py-2 px-3 rounded-lg transition-all text-center flex items-center justify-center gap-1.5 ${
                 authMode === 'signin'
                   ? 'bg-primary-600 text-white shadow-md'
@@ -203,10 +221,7 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
             <button
               type="button"
               id="tab-signup"
-              onClick={() => {
-                setAuthMode('signup');
-                setError('');
-              }}
+              onClick={() => switchMode('signup')}
               className={`py-2 px-3 rounded-lg transition-all text-center flex items-center justify-center gap-1.5 ${
                 authMode === 'signup'
                   ? 'bg-primary-600 text-white shadow-md'
@@ -222,15 +237,10 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
             <h2 className="text-2xl font-bold text-white tracking-tight">
               {authMode === 'signin' ? 'Welcome back' : 'Create your account'}
             </h2>
-            <p className="text-xs sm:text-sm mt-1 text-slate-400 leading-relaxed">
-              {authMode === 'signin'
-                ? 'Sign in to access your financial dashboard and ledger.'
-                : 'Set up your account to start managing cashflow and goals.'}
-            </p>
           </div>
 
           {/* Main Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             {authMode === 'signup' && (
               <div>
                 <label className="block text-xs font-semibold text-slate-200 mb-1.5" htmlFor="auth-name">
@@ -242,7 +252,10 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
                   autoComplete="name"
                   placeholder="e.g. Kasun Perera"
                   value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  onChange={e => updateField('name', e.target.value)}
+                hasError={Boolean(fieldErrors.name)}
+                aria-invalid={fieldErrors.name ? 'true' : undefined}
+                aria-describedby={fieldErrors.name ? 'auth-name-error' : undefined}
                   className="form-input-dark"
                   iconLeft={
                     <svg className="w-4 h-4 transition-colors group-focus-within:text-primary-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -252,6 +265,7 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
                   }
                   required={authMode === 'signup'}
                 />
+                <FieldError id="auth-name-error" message={fieldErrors.name} />
               </div>
             )}
 
@@ -265,7 +279,10 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
                 autoComplete="email"
                 placeholder="kasun@example.com"
                 value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                onChange={e => updateField('email', e.target.value)}
+                hasError={Boolean(fieldErrors.email)}
+                aria-invalid={fieldErrors.email ? 'true' : undefined}
+                aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
                 className="form-input-dark"
                 iconLeft={
                   <svg className="w-4 h-4 transition-colors group-focus-within:text-primary-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -275,6 +292,7 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
                 }
                 required
               />
+              <FieldError id="auth-email-error" message={fieldErrors.email} />
             </div>
 
             <div>
@@ -294,9 +312,12 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
               <PasswordField
                 id="auth-password"
                 autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
-                placeholder={authMode === 'signup' ? 'At least 8 characters' : 'Enter your password'}
+                placeholder={authMode === 'signup' ? 'Create a password' : 'Enter your password'}
                 value={form.password}
-                onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                onChange={e => updateField('password', e.target.value)}
+                hasError={Boolean(fieldErrors.password)}
+                aria-invalid={fieldErrors.password ? 'true' : undefined}
+                aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
                 className="form-input-dark"
                 iconLeft={
                   <svg className="w-4 h-4 transition-colors group-focus-within:text-primary-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -306,16 +327,15 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
                 }
                 required
               />
-              {authMode === 'signup' && (
-                <p className="text-[11px] text-slate-400 mt-1">Must contain at least 8 characters</p>
-              )}
+              <FieldError id="auth-password-error" message={fieldErrors.password} />
+              {authMode === 'signup' && <PasswordRules password={form.password} tone="dark" className="mt-1.5" />}
             </div>
 
             {/* Income Flow Selector for Sign Up */}
             {authMode === 'signup' && (
               <div className="pt-1">
                 <label className="block text-xs font-semibold text-slate-200 mb-1.5">
-                  Financial setup / Income flow
+                  Income Flow
                 </label>
                 <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Income flow">
                   {workModes.map(option => {
@@ -377,10 +397,7 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
             <button
               type="button"
               className="font-semibold text-primary-400 hover:text-primary-300 hover:underline transition-colors ml-1 cursor-pointer"
-              onClick={() => {
-                setAuthMode(a => (a === 'signup' ? 'signin' : 'signup'));
-                setError('');
-              }}
+              onClick={() => switchMode(authMode === 'signup' ? 'signin' : 'signup')}
             >
               {authMode === 'signup' ? 'Sign in' : 'Create account'}
             </button>

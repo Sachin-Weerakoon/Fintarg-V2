@@ -323,7 +323,7 @@ export function BusinessWorkspace() {
               </Select>
             </FormField>
 
-            <FormField id="branch-selector" label="Operating Branch / Unit">
+            <FormField id="branch-selector" label="Operating Branch">
               <Select
                 id="branch-selector"
                 value={branchId}
@@ -444,13 +444,13 @@ export function BusinessWorkspace() {
                   onChange={e => setBranchForm(f => ({ ...f, branchType: e.target.value }))}
                 >
                   <option value="Retail Outlet">Retail Outlet</option>
-                  <option value="Warehouse / Hub">Warehouse / Hub</option>
+                  <option value="Warehouse / Hub">Warehouse</option>
                   <option value="Service Center">Service Center</option>
-                  <option value="Online / E-Commerce">Online / E-Commerce</option>
+                  <option value="Online / E-Commerce">Online</option>
                 </Select>
               </FormField>
 
-              <FormField id="new-br-loc" label="Location / City">
+              <FormField id="new-br-loc" label="Location">
                 <Input
                   id="new-br-loc"
                   placeholder="e.g. Peradeniya Road, Kandy"
@@ -459,7 +459,7 @@ export function BusinessWorkspace() {
                 />
               </FormField>
 
-              <FormField id="new-br-target" label="Monthly Revenue Target (Rs.)">
+              <FormField id="new-br-target" label="Monthly Revenue Target">
                 <MoneyField
                   id="new-br-target"
                   value={branchForm.monthlyTarget}
@@ -566,7 +566,6 @@ export function BusinessWorkspace() {
             <StatCard
               label="Operational Costs"
               value={formatRs(monthlyCosts)}
-              detail="Total branch overheads"
               tone={monthlyCosts > monthlyRevenue ? 'danger' : 'warning'}
               icon={<Icon name="arrow-down" size={18} />}
             />
@@ -725,7 +724,7 @@ export function BusinessWorkspace() {
                       <FormField id="inc-date" label="Date">
                         <DateField id="inc-date" value={incomeDate} onChange={e => setIncomeDate(e.target.value)} />
                       </FormField>
-                      <FormField id="inc-amt" label="Amount (Rs.) *" required>
+                      <FormField id="inc-amt" label="Amount" required>
                         <MoneyField
                           id="inc-amt"
                           placeholder="e.g. 150,000"
@@ -733,7 +732,7 @@ export function BusinessWorkspace() {
                           onChange={v => setIncomeAmount(String(v))}
                         />
                       </FormField>
-                      <FormField id="inc-note" label="Customer / Order Note">
+                      <FormField id="inc-note" label="Customer Note">
                         <Input
                           id="inc-note"
                           placeholder="Invoice #048, Client payment"
@@ -784,17 +783,17 @@ export function BusinessWorkspace() {
                     <FormGrid columns={3}>
                       <FormField id="cost-cat" label="Expense Category">
                         <Select id="cost-cat" value={costCategory} onChange={e => setCostCategory(e.target.value)}>
-                          <option value="Electricity">Electricity Bill (CEB)</option>
-                          <option value="Water">Water Supply (NWSDB)</option>
-                          <option value="Rent">Shop / Facility Rent</option>
-                          <option value="Inventory">Raw Materials / Inventory</option>
+                          <option value="Electricity">Electricity Bill</option>
+                          <option value="Water">Water Supply</option>
+                          <option value="Rent">Shop Rent</option>
+                          <option value="Inventory">Raw Materials</option>
                           <option value="Salaries">Branch Staff Salaries</option>
                           <option value="Logistics">Logistics & Transport</option>
                           <option value="Marketing">Advertising & Marketing</option>
                           <option value="Other">Other Operating Cost</option>
                         </Select>
                       </FormField>
-                      <FormField id="cost-amt" label="Amount (Rs.) *" required>
+                      <FormField id="cost-amt" label="Amount" required>
                         <MoneyField
                           id="cost-amt"
                           placeholder="e.g. 35,000"
@@ -806,7 +805,7 @@ export function BusinessWorkspace() {
                         <DateField id="cost-date" value={costDate} onChange={e => setCostDate(e.target.value)} />
                       </FormField>
                       <div className="md:col-span-3">
-                        <FormField id="cost-note" label="Bill / Reference Note">
+                        <FormField id="cost-note" label="Bill Note">
                           <Input
                             id="cost-note"
                             placeholder="Account number, month, or receipt notes"
@@ -856,9 +855,6 @@ export function BusinessWorkspace() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-sm font-bold text-text">Cross-Ledger Business Expenses</h4>
-                      <p className="text-xs text-muted">
-                        Expenses paid out from {selectedCompany?.name}&apos;s operating cash logged via the Financial Hub.
-                      </p>
                     </div>
                     <Link href="/financial?tab=expenses&stream=business">
                       <Button variant="primary" size="sm" iconLeft={<Icon name="plus" size={13} />}>
@@ -967,9 +963,6 @@ export function BusinessWorkspace() {
                             : 'No Target'}
                         </Badge>
                       </h4>
-                      <p className="text-xs text-muted mt-0.5">
-                        Define monthly benchmark to monitor outlet sales throughput and run-rate pacing.
-                      </p>
                     </div>
 
                     <Link href={`/goals?domain=branch&companyId=${companyId}&branchId=${branch.id}`}>
@@ -1032,9 +1025,6 @@ export function BusinessWorkspace() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h4 className="text-base font-bold text-text">Branch Unit Milestones & Equipment Funds</h4>
-                      <p className="text-xs text-muted mt-0.5">
-                        Specific capital projects, equipment upgrades, and local sales milestones for {branch.name}
-                      </p>
                     </div>
 
                     <Button
@@ -1060,7 +1050,7 @@ export function BusinessWorkspace() {
                             onChange={e => setBranchGoalName(e.target.value)}
                           />
                         </FormField>
-                        <FormField id="br-goal-amt" label="Target Total (Rs.) *" required>
+                        <FormField id="br-goal-amt" label="Target Total" required>
                           <MoneyField
                             id="br-goal-amt"
                             placeholder="e.g. 350,000"
@@ -1143,9 +1133,6 @@ export function BusinessWorkspace() {
                             {(selectedCompany.monthlyRevenueTarget ?? 0) > 0 ? formatRs(selectedCompany.monthlyRevenueTarget!) : 'Not configured'}
                           </span>
                         </div>
-                        <p className="text-[11px] text-muted mt-0.5">
-                          Set company-wide revenue milestones and corporate reserve funds in the Goals Hub.
-                        </p>
                       </div>
                     </div>
 
@@ -1179,9 +1166,6 @@ export function BusinessWorkspace() {
                         <span>Corporate Formal Letters & Official Notices</span>
                         <Badge tone="primary" size="sm">{companyLetters.length} issued</Badge>
                       </h4>
-                      <p className="text-xs text-muted mt-1">
-                        Draft, export, and manage official business correspondence printed with {selectedCompany?.name || 'the enterprise'}&apos;s legal letterhead (BR: {selectedCompany?.brNumber || 'Pending'}, TIN: {selectedCompany?.tinNumber || 'Pending'}).
-                      </p>
                     </div>
 
                     <Link href={`/advanced/letters?companyId=${selectedCompany?.id}`}>

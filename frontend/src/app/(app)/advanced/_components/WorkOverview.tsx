@@ -42,9 +42,6 @@ export function WorkOverview({ onOpen }: WorkOverviewProps) {
           <h3 className="text-base font-bold text-text tracking-tight flex items-center gap-2">
             <span>Work & Enterprise Summary</span>
           </h3>
-          <p className="text-xs text-muted mt-0.5">
-            Combined monthly net position across salary and enterprise branches for {state.selectedMonth}
-          </p>
         </div>
         {hasBusiness && (
           <Link href="/analysis?scope=company">
@@ -70,14 +67,12 @@ export function WorkOverview({ onOpen }: WorkOverviewProps) {
             <StatCard
               label="Business Inflow"
               value={formatRs(businessRevenue)}
-              detail="Total enterprise revenue"
               tone="success"
               icon={<Icon name="arrow-up" size={18} />}
             />
             <StatCard
               label="Business Costs"
               value={formatRs(businessCosts)}
-              detail="Operating expenses & bills"
               tone={businessCosts > businessRevenue ? 'danger' : 'warning'}
               icon={<Icon name="arrow-down" size={18} />}
             />

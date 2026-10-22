@@ -168,7 +168,7 @@ export function AgreementsTab({ companyId }: { companyId?: string } = {}) {
               />
             </FormField>
 
-            <FormField id="agr-party" label="Other Party / Partner *" required>
+            <FormField id="agr-party" label="Other Party" required>
               <Input
                 id="agr-party"
                 placeholder="e.g. Prime Properties PLC"
@@ -185,7 +185,7 @@ export function AgreementsTab({ companyId }: { companyId?: string } = {}) {
               />
             </FormField>
 
-            <FormField id="agr-end" label="End / Renewal Date">
+            <FormField id="agr-end" label="End Date">
               <DateField
                 id="agr-end"
                 value={form.endDate}
@@ -193,7 +193,7 @@ export function AgreementsTab({ companyId }: { companyId?: string } = {}) {
               />
             </FormField>
 
-            <FormField id="agr-val" label="Agreement Value (Rs.)">
+            <FormField id="agr-val" label="Agreement Value">
               <MoneyField
                 id="agr-val"
                 value={form.value}
@@ -226,7 +226,7 @@ export function AgreementsTab({ companyId }: { companyId?: string } = {}) {
             </div>
 
             <div className="md:col-span-2">
-              <FormField id="agr-file" label="Attach Executed / Signed Document">
+              <FormField id="agr-file" label="Attach Signed Document">
                 <div className="flex items-center gap-3">
                   <Input
                     ref={fileInputRef}
@@ -328,7 +328,7 @@ export function AgreementsTab({ companyId }: { companyId?: string } = {}) {
                       />
                     </FormField>
 
-                    <FormField id="edit-agr-val" label="Value (Rs.)">
+                    <FormField id="edit-agr-val" label="Value">
                       <MoneyField
                         id="edit-agr-val"
                         value={editForm.value}

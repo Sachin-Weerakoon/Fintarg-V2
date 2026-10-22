@@ -9,7 +9,6 @@ export default function SalaryPage() {
       <PageHeader
         eyebrow="Personal Inflows"
         title="Salary & Payday Planning"
-        description="Monitor gross pay, pay slip deductions, statutory EPF/ETF contributions, and automated payday savings allocation."
       />
       <SalaryWorkspace />
     </PageContainer>

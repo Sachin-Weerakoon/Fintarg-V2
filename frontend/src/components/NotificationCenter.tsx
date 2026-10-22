@@ -186,7 +186,6 @@ export function NotificationCenter({ variant = 'light' }: { variant?: 'light' | 
                   Smart notifications
                   {unread.length > 0 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary-400/15 text-primary-300 border border-primary-400/30">{unread.length} new</span>}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">Predictions & reminders based on your records</div>
               </div>
               {visible.length > 0 && (
                 <button type="button" onClick={dismissAll} className="text-[11px] font-semibold text-slate-400 hover:text-white transition-colors">

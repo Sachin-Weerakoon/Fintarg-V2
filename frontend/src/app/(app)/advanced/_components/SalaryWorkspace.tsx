@@ -274,9 +274,6 @@ export function SalaryWorkspace({
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-base font-bold text-text">New Employment Profile</h4>
-                <p className="text-xs text-muted mt-0.5">
-                  Configure your primary monthly salary to build a dedicated payday plan.
-                </p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>
                 Cancel
@@ -284,7 +281,7 @@ export function SalaryWorkspace({
             </div>
 
             <FormGrid columns={2}>
-              <FormField id="emp-name" label="Employer / Company *" required>
+              <FormField id="emp-name" label="Employer" required>
                 <Input
                   id="emp-name"
                   placeholder="e.g. Acme Lanka Ltd"
@@ -293,7 +290,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-role" label="Job Title / Role">
+              <FormField id="emp-role" label="Job Title">
                 <Input
                   id="emp-role"
                   placeholder="e.g. Senior Software Engineer"
@@ -302,7 +299,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-gross" label="Gross Monthly Salary (Rs.) *" required>
+              <FormField id="emp-gross" label="Gross Monthly Salary" required>
                 <MoneyField
                   id="emp-gross"
                   value={form.monthlyGross}
@@ -311,7 +308,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-deductions" label="Monthly Deductions (Tax, EPF/ETF)">
+              <FormField id="emp-deductions" label="Monthly Deductions">
                 <MoneyField
                   id="emp-deductions"
                   value={form.monthlyDeductions}
@@ -320,7 +317,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-payday" label="Payday (Day of month)">
+              <FormField id="emp-payday" label="Payday">
                 <Input
                   id="emp-payday"
                   type="number"
@@ -332,7 +329,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-target" label="Monthly Savings Target (Rs.)">
+              <FormField id="emp-target" label="Monthly Savings Target">
                 <MoneyField
                   id="emp-target"
                   value={form.monthlySavingsTarget}
@@ -342,7 +339,7 @@ export function SalaryWorkspace({
               </FormField>
 
               <div className="col-span-1 sm:col-span-2">
-                <FormField id="emp-career" label="Career Target / Development Goal">
+                <FormField id="emp-career" label="Career Target">
                   <Input
                     id="emp-career"
                     placeholder="e.g. Complete AWS Certification, target annual promotion"
@@ -413,7 +410,7 @@ export function SalaryWorkspace({
           <div className="mt-6 pt-6 border-t border-border space-y-4">
             <h4 className="text-sm font-bold text-text">New Employment Profile</h4>
             <FormGrid columns={2}>
-              <FormField id="emp-name" label="Employer / Company *" required>
+              <FormField id="emp-name" label="Employer" required>
                 <Input
                   id="emp-name"
                   placeholder="e.g. Acme Lanka Ltd"
@@ -422,7 +419,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-role" label="Job Title / Role">
+              <FormField id="emp-role" label="Job Title">
                 <Input
                   id="emp-role"
                   placeholder="e.g. Senior Software Engineer"
@@ -431,7 +428,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-gross" label="Gross Monthly Salary (Rs.) *" required>
+              <FormField id="emp-gross" label="Gross Monthly Salary" required>
                 <MoneyField
                   id="emp-gross"
                   value={form.monthlyGross}
@@ -440,7 +437,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-deductions" label="Monthly Deductions (Tax, EPF/ETF)">
+              <FormField id="emp-deductions" label="Monthly Deductions">
                 <MoneyField
                   id="emp-deductions"
                   value={form.monthlyDeductions}
@@ -449,7 +446,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-payday" label="Payday (Day of month)">
+              <FormField id="emp-payday" label="Payday">
                 <Input
                   id="emp-payday"
                   type="number"
@@ -461,7 +458,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-target" label="Monthly Savings Target (Rs.)">
+              <FormField id="emp-target" label="Monthly Savings Target">
                 <MoneyField
                   id="emp-target"
                   value={form.monthlySavingsTarget}
@@ -471,7 +468,7 @@ export function SalaryWorkspace({
               </FormField>
 
               <div className="col-span-1 sm:col-span-2">
-                <FormField id="emp-career" label="Career Target / Development Goal">
+                <FormField id="emp-career" label="Career Target">
                   <Input
                     id="emp-career"
                     placeholder="e.g. Complete AWS Certification, target annual promotion"
@@ -533,14 +530,12 @@ export function SalaryWorkspace({
             <StatCard
               label="Gross Salary"
               value={formatRs(selected.monthlyGross)}
-              detail="Monthly gross"
               tone="default"
               icon={<Icon name="wallet" size={18} />}
             />
             <StatCard
               label="Deductions"
               value={formatRs(selected.monthlyDeductions)}
-              detail="Tax, EPF, loans & other"
               tone={selected.monthlyDeductions > 0 ? 'warning' : 'default'}
               icon={<Icon name="arrow-down" size={18} />}
             />
@@ -554,7 +549,6 @@ export function SalaryWorkspace({
             <StatCard
               label="After Savings"
               value={formatRs(afterSavings)}
-              detail="Available for monthly living"
               tone={afterSavings >= 0 ? 'success' : 'danger'}
               icon={<Icon name="target" size={18} />}
             />
@@ -564,12 +558,9 @@ export function SalaryWorkspace({
             <Card className="p-6 space-y-4">
               <div>
                 <h4 className="text-base font-bold text-text">Payday Savings Allocation</h4>
-                <p className="text-xs text-muted mt-0.5">
-                  Set aside savings first, then use the remainder as your living budget ceiling.
-                </p>
               </div>
 
-              <FormField id="savings-alloc-field" label="Monthly Savings Target (Rs.)">
+              <FormField id="savings-alloc-field" label="Monthly Savings Target">
                 <MoneyField
                   id="savings-alloc-field"
                   value={selected.monthlySavingsTarget}
@@ -589,9 +580,6 @@ export function SalaryWorkspace({
             <Card className="p-6 space-y-4">
               <div>
                 <h4 className="text-base font-bold text-text">Career Milestone</h4>
-                <p className="text-xs text-muted mt-0.5">
-                  Keep your next career growth milestone visible alongside your salary plan.
-                </p>
               </div>
 
               <FormField id="career-goal-field" label="Current Career Objective">
@@ -616,9 +604,6 @@ export function SalaryWorkspace({
                     <h4 className="text-base font-bold text-text">Director Draws & Profit Distributions</h4>
                     <Badge tone="primary" size="sm">Auto-Synced</Badge>
                   </div>
-                  <p className="text-xs text-muted mt-0.5">
-                    Draw profits directly from {companyName || 'this enterprise'} without statutory PAYE/EPF deductions. Automatically syncs as a business income credit in your personal ledger.
-                  </p>
                 </div>
               </div>
 
@@ -633,7 +618,7 @@ export function SalaryWorkspace({
                       onChange={e => setDrawDate(e.target.value)}
                     />
                   </FormField>
-                  <FormField id="draw-amount" label="Amount (Rs.) *" required>
+                  <FormField id="draw-amount" label="Amount" required>
                     <MoneyField
                       id="draw-amount"
                       placeholder="e.g. 250,000"

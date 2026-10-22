@@ -5,6 +5,7 @@ import {
   calcMonthlyIncome,
   calcRecurringIncome,
   calcOneTimeIncome,
+  calcIncomeForRange,
   calcMonthlyExpenses,
   calcPersonalSpent,
   calcFinancePayments,
@@ -475,6 +476,25 @@ describe('Shared Money & Period Module (lib/money.ts)', () => {
       expect(analysis.freeCash).toBe(64500);
       // Personal spent = 3,000
       expect(analysis.personalSpent).toBe(3000);
+    });
+  });
+
+  describe('calcIncomeForRange', () => {
+    const income: IncomeEntry[] = [
+      { id: 'i1', source: 'Salary', type: 'other', amount: 90000, frequency: 'monthly', date: '2026-01-01' },
+      { id: 'i2', source: 'Bonus', type: 'other', amount: 10000, frequency: 'one-time', date: '2026-10-20' },
+      { id: 'i3', source: 'Old bonus', type: 'other', amount: 5000, frequency: 'one-time', date: '2026-08-20' },
+    ];
+
+    it('matches calcMonthlyIncome for a whole month', () => {
+      const range = { from: '2026-10-01', to: '2026-10-31' };
+      expect(calcIncomeForRange(income, range)).toBe(calcMonthlyIncome(income, '2026-10'));
+    });
+
+    it('prorates recurring income and only counts one-time income inside the range', () => {
+      // Half of September (15/30) + all of October; the August bonus is outside.
+      const range = { from: '2026-09-16', to: '2026-10-31' };
+      expect(calcIncomeForRange(income, range)).toBe(90000 * 0.5 + 90000 + 10000);
     });
   });
 });

@@ -13,8 +13,9 @@ import { Icon } from '@/components/ui/Icon';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { fetchTransactionHistory } from '@/services/storeApi';
 import type { Transaction } from '@/types';
+import type { DateRange } from '@/utils/date';
 
-export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
+export function TransactionsHistoryTab({ range }: { range: DateRange }) {
   const { state } = useApp();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -102,6 +103,8 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
       if (methodFilter !== 'all') filters.paymentMethod = methodFilter;
       if (accountFilter !== 'all') filters.bankAccountId = accountFilter;
       if (search.trim()) filters.search = search.trim();
+      filters.startDate = range.from;
+      filters.endDate = range.to;
 
       const res = await fetchTransactionHistory(filters);
       setRemoteTransactions(res.transactions || res.data || []);
@@ -114,7 +117,12 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
     } finally {
       setLoading(false);
     }
-  }, [pageSize, typeFilter, methodFilter, accountFilter, search]);
+  }, [pageSize, typeFilter, methodFilter, accountFilter, search, range.from, range.to]);
+
+  // A new date range starts again from the first page.
+  useEffect(() => {
+    setPage(1);
+  }, [range.from, range.to]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -148,14 +156,14 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
           className="capitalize text-[11px]"
         >
           {t.type === 'transfer'
-            ? (t.transferDirection === 'incoming' ? 'Transfer (In)' : t.transferDirection === 'outgoing' ? 'Transfer (Out)' : 'Transfer')
+            ? (t.transferDirection === 'incoming' ? 'Transfer In' : t.transferDirection === 'outgoing' ? 'Transfer Out' : 'Transfer')
             : t.type}
         </Badge>
       ),
     },
     {
       key: 'description',
-      header: 'Category / Description',
+      header: 'Category',
       render: t => (
         <div>
           <div className="font-medium text-text">{t.category || t.description || 'General'}</div>
@@ -273,8 +281,8 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
             className="!py-1.5 !text-xs"
           >
             <option value="all">All Types</option>
-            <option value="income">Inflow (Income)</option>
-            <option value="expense">Outflow (Expense)</option>
+            <option value="income">Inflow</option>
+            <option value="expense">Outflow</option>
             <option value="transfer">Transfer</option>
           </Select>
           <Select
@@ -330,7 +338,7 @@ export function TransactionsHistoryTab({ month: _month }: { month?: string }) {
             helper={
               hasActiveFilters
                 ? 'No transactions matched the selected filters. Try clearing filters.'
-                : 'Transactions recorded from expenses and income appear here automatically.'
+                : 'No transactions in the selected date range.'
             }
             action={
               hasActiveFilters ? (
