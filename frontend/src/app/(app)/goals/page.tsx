@@ -396,13 +396,13 @@ function GoalsContent() {
     },
     {
       id: 'business',
-      label: 'Business Goals (Company)',
+      label: 'Business Goals',
       icon: <Icon name="briefcase" size={14} />,
       badge: businessGoals.length > 0 ? `${businessGoals.length}` : undefined,
     },
     {
       id: 'branch',
-      label: 'Branch Goals (Outlet)',
+      label: 'Branch Goals',
       icon: <Icon name="bank" size={14} />,
       badge: branchGoals.length > 0 ? `${branchGoals.length}` : undefined,
     },
@@ -414,13 +414,6 @@ function GoalsContent() {
       <PageHeader
         eyebrow={domain === 'business' ? 'Enterprise' : domain === 'branch' ? 'Outlet' : 'Personal Finance'}
         title={domain === 'business' ? 'Corporate Business Goals' : domain === 'branch' ? 'Branch Outlet Goals' : 'Savings & Goals'}
-        description={
-          domain === 'business'
-            ? 'Set enterprise revenue benchmarks, monitor monthly corporate run-rates, and allocate capital to strategic goals.'
-            : domain === 'branch'
-            ? 'Define outlet revenue benchmarks, monitor daily run-rate pacing, and track branch milestone funds.'
-            : 'Automate daily targets, track contributions, and ensure personal target feasibility.'
-        }
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <MonthPicker value={month} onChange={setMonth} size="sm" />
@@ -487,13 +480,6 @@ function GoalsContent() {
               ? `Create Branch Outlet Goal — ${selectedBranch?.name || 'Operating Unit'}`
               : 'Create New Savings Goal'
           }
-          description={
-            domain === 'business'
-              ? 'Define a corporate reserve fund, equipment expansion, or strategic revenue milestone'
-              : domain === 'branch'
-              ? 'Define a branch facility upgrade, equipment fund, or local sales milestone'
-              : 'Define a target balance, completion date, and daily pace plan'
-          }
           actions={
             <Button variant="ghost" size="sm" onClick={() => setShowAddGoal(false)}>
               Cancel
@@ -524,7 +510,7 @@ function GoalsContent() {
             )}
 
             {domain === 'branch' && (
-              <Field id="goal-branch" label="Target Branch / Outlet">
+              <Field id="goal-branch" label="Target Branch">
                 <Select
                   value={goalForm.branchId || selectedBranch?.id || ''}
                   onChange={e => setGoalForm(f => ({ ...f, branchId: e.target.value }))}
@@ -545,7 +531,7 @@ function GoalsContent() {
                   onChange={e => setGoalForm(f => ({ ...f, targetType: e.target.value }))}
                 >
                   <option value="reserve">Cash Reserve & Tax Buffer</option>
-                  <option value="expansion">Facility & Business Expansion (CapEx)</option>
+                  <option value="expansion">Facility & Business Expansion</option>
                   <option value="revenue">Commercial Revenue Milestone</option>
                   <option value="profit">Retained Surplus Target</option>
                   <option value="other">General Operational Goal</option>
@@ -567,7 +553,7 @@ function GoalsContent() {
               />
             </Field>
 
-            <Field id="goal-targetamt" label="Target Total Amount (Rs.)" required>
+            <Field id="goal-targetamt" label="Target Total Amount" required>
               <MoneyField
                 value={goalForm.targetAmount}
                 onChange={v => setGoalForm(f => ({ ...f, targetAmount: String(v) }))}
@@ -632,7 +618,7 @@ function GoalsContent() {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <div className="p-3 rounded-xl border border-border bg-surface-hover/50">
-                <Field id="personal-budget" label="Budget (Rs.)" className="mb-0">
+                <Field id="personal-budget" label="Budget" className="mb-0">
                   <Input
                     id="personal-budget"
                     className="w-full"
@@ -828,7 +814,7 @@ function GoalsContent() {
 
               {editingCompTarget ? (
                 <div className="max-w-md pt-2">
-                  <Field id="comp-target-input" label="Set Monthly Corporate Revenue Target (Rs.)">
+                  <Field id="comp-target-input" label="Set Monthly Corporate Revenue Target">
                     <MoneyField
                       id="comp-target-input"
                       value={compTargetInput}
@@ -1039,7 +1025,7 @@ function GoalsContent() {
 
               {editingBranchTarget ? (
                 <div className="max-w-md pt-2">
-                  <Field id="branch-target-input" label="Set Monthly Branch Target Ceiling (Rs.)">
+                  <Field id="branch-target-input" label="Set Monthly Branch Target Ceiling">
                     <MoneyField
                       id="branch-target-input"
                       value={branchTargetInput}
@@ -1358,7 +1344,7 @@ function GoalCardItem({
         <div className="p-4 rounded-xl mb-3 border border-border bg-surface-hover/70">
           <div className="font-semibold text-xs mb-2 text-text">Adjust goal</div>
           <div className="flex gap-2 items-end">
-            <Field id={`adjust-daily-${goal.id}`} label="New daily amount (Rs.)" className="flex-1">
+            <Field id={`adjust-daily-${goal.id}`} label="New Daily Amount" className="flex-1">
               <Input
                 id={`adjust-daily-${goal.id}`}
                 type="number"
@@ -1397,7 +1383,7 @@ function GoalCardItem({
               onChange={e => setSaving(prev => ({ ...prev, [goal.id]: { ...sv, date: e.target.value } }))}
             />
           </Field>
-          <Field id={`contrib-note-${goal.id}`} label="Reference / Note">
+          <Field id={`contrib-note-${goal.id}`} label="Reference">
             <Input
               id={`contrib-note-${goal.id}`}
               placeholder="e.g. Month-end profit allocation"
@@ -1493,7 +1479,7 @@ export default function Goals() {
   return (
     <Suspense fallback={
       <PageContainer>
-        <PageHeader title="Savings Goals & Daily Target" description="Loading goals..." />
+        <PageHeader title="Savings Goals & Daily Target" />
       </PageContainer>
     }>
       <GoalsContent />

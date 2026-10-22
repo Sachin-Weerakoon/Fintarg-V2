@@ -52,7 +52,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
       ) : (
         iconLeft && <span className="flex-shrink-0">{iconLeft}</span>
       )}
-      {children && <span>{children}</span>}
+      {/* display: contents lets an inline <Icon /> + text child pick up the button's flex gap. */}
+      {children && <span className="contents">{children}</span>}
       {!loading && iconRight && <span className="flex-shrink-0">{iconRight}</span>}
     </button>
   );

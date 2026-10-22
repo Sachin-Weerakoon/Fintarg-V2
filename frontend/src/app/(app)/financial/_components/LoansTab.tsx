@@ -207,7 +207,7 @@ export function LoansTab() {
           icon={<Icon name="arrow-down" size={18} />}
         />
         <StatCard
-          label="Monthly Outflow (EMI)"
+          label="Monthly Outflow"
           value={formatRs(totalMonthlyEMI)}
           tone="warning"
           icon={<Icon name="calendar" size={18} />}
@@ -365,7 +365,6 @@ export function LoansTab() {
         <FormCard
           icon="financial"
           title={editId ? 'Edit Loan' : 'Add Loan'}
-          description={editId ? 'Update loan parameters and rate' : 'Configure personal, business, or bank borrowing terms'}
           badge={editId ? 'Editing' : undefined}
           actions={
             editId ? (
@@ -392,14 +391,14 @@ export function LoansTab() {
           }
           className="h-fit sticky top-4"
         >
-          <Field id="loan-lender" label="Lender / Institution" required>
+          <Field id="loan-lender" label="Lender" required>
             <Input
               value={form.lender}
               onChange={e => setForm(f => ({ ...f, lender: e.target.value }))}
               placeholder="e.g. Commercial Bank, Mortgage Ltd."
             />
           </Field>
-          <Field id="loan-principal" label="Principal Amount (Rs.)" required>
+          <Field id="loan-principal" label="Principal Amount" required>
             <MoneyField
               value={form.amount}
               onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
@@ -407,7 +406,7 @@ export function LoansTab() {
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field id="loan-rate" label="Interest rate (%)" required>
+            <Field id="loan-rate" label="Interest Rate %" required>
               <Input
                 type="number"
                 step="0.1"
@@ -427,7 +426,7 @@ export function LoansTab() {
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field id="loan-tenure" label="Tenure (Months)" required>
+            <Field id="loan-tenure" label="Tenure in Months" required>
               <Input
                 type="number"
                 value={form.tenureMonths}
@@ -441,7 +440,7 @@ export function LoansTab() {
                 onChange={e => setForm(f => ({ ...f, method: e.target.value as any }))}
               >
                 <option value="reducing_balance">Reducing Balance</option>
-                <option value="simple">Simple / Flat</option>
+                <option value="simple">Simple</option>
                 <option value="compound">Compound</option>
               </Select>
             </Field>
@@ -453,7 +452,7 @@ export function LoansTab() {
                 onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
               />
             </Field>
-            <Field id="loan-due" label="Due Date (optional)">
+            <Field id="loan-due" label="Due Date">
               <DateField
                 value={form.dueDate}
                 onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
@@ -557,7 +556,7 @@ export function LoansTab() {
               </Select>
             </Field>
           )}
-          <Field id="repay-amount" label="Repayment Amount (Rs.)">
+          <Field id="repay-amount" label="Repayment Amount">
             <MoneyField
               value={repaymentForm.amount}
               onChange={v => setRepaymentForm(f => ({ ...f, amount: String(v) }))}
@@ -570,7 +569,7 @@ export function LoansTab() {
               onChange={e => setRepaymentForm(f => ({ ...f, date: e.target.value }))}
             />
           </Field>
-          <Field id="repay-note" label="Notes (optional)">
+          <Field id="repay-note" label="Notes">
             <Input
               value={repaymentForm.note}
               onChange={e => setRepaymentForm(f => ({ ...f, note: e.target.value }))}

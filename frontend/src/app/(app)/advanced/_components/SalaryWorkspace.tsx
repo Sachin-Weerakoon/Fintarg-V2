@@ -284,7 +284,7 @@ export function SalaryWorkspace({
             </div>
 
             <FormGrid columns={2}>
-              <FormField id="emp-name" label="Employer / Company *" required>
+              <FormField id="emp-name" label="Employer" required>
                 <Input
                   id="emp-name"
                   placeholder="e.g. Acme Lanka Ltd"
@@ -293,7 +293,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-role" label="Job Title / Role">
+              <FormField id="emp-role" label="Job Title">
                 <Input
                   id="emp-role"
                   placeholder="e.g. Senior Software Engineer"
@@ -302,7 +302,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-gross" label="Gross Monthly Salary (Rs.) *" required>
+              <FormField id="emp-gross" label="Gross Monthly Salary" required>
                 <MoneyField
                   id="emp-gross"
                   value={form.monthlyGross}
@@ -311,7 +311,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-deductions" label="Monthly Deductions (Tax, EPF/ETF)">
+              <FormField id="emp-deductions" label="Monthly Deductions">
                 <MoneyField
                   id="emp-deductions"
                   value={form.monthlyDeductions}
@@ -320,7 +320,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-payday" label="Payday (Day of month)">
+              <FormField id="emp-payday" label="Payday">
                 <Input
                   id="emp-payday"
                   type="number"
@@ -332,7 +332,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-target" label="Monthly Savings Target (Rs.)">
+              <FormField id="emp-target" label="Monthly Savings Target">
                 <MoneyField
                   id="emp-target"
                   value={form.monthlySavingsTarget}
@@ -342,7 +342,7 @@ export function SalaryWorkspace({
               </FormField>
 
               <div className="col-span-1 sm:col-span-2">
-                <FormField id="emp-career" label="Career Target / Development Goal">
+                <FormField id="emp-career" label="Career Target">
                   <Input
                     id="emp-career"
                     placeholder="e.g. Complete AWS Certification, target annual promotion"
@@ -413,7 +413,7 @@ export function SalaryWorkspace({
           <div className="mt-6 pt-6 border-t border-border space-y-4">
             <h4 className="text-sm font-bold text-text">New Employment Profile</h4>
             <FormGrid columns={2}>
-              <FormField id="emp-name" label="Employer / Company *" required>
+              <FormField id="emp-name" label="Employer" required>
                 <Input
                   id="emp-name"
                   placeholder="e.g. Acme Lanka Ltd"
@@ -422,7 +422,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-role" label="Job Title / Role">
+              <FormField id="emp-role" label="Job Title">
                 <Input
                   id="emp-role"
                   placeholder="e.g. Senior Software Engineer"
@@ -431,7 +431,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-gross" label="Gross Monthly Salary (Rs.) *" required>
+              <FormField id="emp-gross" label="Gross Monthly Salary" required>
                 <MoneyField
                   id="emp-gross"
                   value={form.monthlyGross}
@@ -440,7 +440,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-deductions" label="Monthly Deductions (Tax, EPF/ETF)">
+              <FormField id="emp-deductions" label="Monthly Deductions">
                 <MoneyField
                   id="emp-deductions"
                   value={form.monthlyDeductions}
@@ -449,7 +449,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-payday" label="Payday (Day of month)">
+              <FormField id="emp-payday" label="Payday">
                 <Input
                   id="emp-payday"
                   type="number"
@@ -461,7 +461,7 @@ export function SalaryWorkspace({
                 />
               </FormField>
 
-              <FormField id="emp-target" label="Monthly Savings Target (Rs.)">
+              <FormField id="emp-target" label="Monthly Savings Target">
                 <MoneyField
                   id="emp-target"
                   value={form.monthlySavingsTarget}
@@ -471,7 +471,7 @@ export function SalaryWorkspace({
               </FormField>
 
               <div className="col-span-1 sm:col-span-2">
-                <FormField id="emp-career" label="Career Target / Development Goal">
+                <FormField id="emp-career" label="Career Target">
                   <Input
                     id="emp-career"
                     placeholder="e.g. Complete AWS Certification, target annual promotion"
@@ -569,7 +569,7 @@ export function SalaryWorkspace({
                 </p>
               </div>
 
-              <FormField id="savings-alloc-field" label="Monthly Savings Target (Rs.)">
+              <FormField id="savings-alloc-field" label="Monthly Savings Target">
                 <MoneyField
                   id="savings-alloc-field"
                   value={selected.monthlySavingsTarget}
@@ -633,7 +633,7 @@ export function SalaryWorkspace({
                       onChange={e => setDrawDate(e.target.value)}
                     />
                   </FormField>
-                  <FormField id="draw-amount" label="Amount (Rs.) *" required>
+                  <FormField id="draw-amount" label="Amount" required>
                     <MoneyField
                       id="draw-amount"
                       placeholder="e.g. 250,000"

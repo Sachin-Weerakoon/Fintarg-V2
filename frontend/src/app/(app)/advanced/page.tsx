@@ -77,30 +77,15 @@ function AdvancedContent() {
   const getPageMeta = () => {
     switch (activeTab) {
       case 'businesses':
-        return {
-          title: 'Enterprise & Branch Workspaces',
-          description: 'Manage shop outlets, daily sales revenue, operating overheads, and branch growth targets.',
-        };
+        return { title: 'Enterprise & Branch Workspaces' };
       case 'salary':
-        return {
-          title: 'Salary & Payday Planning',
-          description: 'Monitor gross pay, pay slip deductions, and automated payday savings allocation.',
-        };
+        return { title: 'Salary & Payday Planning' };
       case 'agreements':
-        return {
-          title: 'Commercial Agreements & Contracts',
-          description: 'Track contracts, expiration dates, renewal timelines, and executed documents.',
-        };
+        return { title: 'Commercial Agreements & Contracts' };
       case 'companies':
-        return {
-          title: 'Enterprise Corporate Entities',
-          description: 'Register corporate legal entities with official Sri Lankan BR and TIN credentials.',
-        };
+        return { title: 'Enterprise Corporate Entities' };
       default:
-        return {
-          title: 'Advanced Features',
-          description: 'Specialized enterprise modules, legal letter generator, health records, and contract vaults.',
-        };
+        return { title: 'Advanced Features' };
     }
   };
 
@@ -112,7 +97,6 @@ function AdvancedContent() {
       <PageHeader
         eyebrow="Toolkit Suite"
         title={meta.title}
-        description={meta.description}
         actions={
           activeTab !== 'hub' ? (
             <Button

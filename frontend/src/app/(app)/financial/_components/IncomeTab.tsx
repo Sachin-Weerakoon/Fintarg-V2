@@ -15,14 +15,15 @@ import { PaymentMethodField, PaymentMethod } from '@/components/ui/PaymentMethod
 import { BankSelect } from '@/components/ui/BankSelect';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
-import { getLocalDate } from '@/utils/date';
+import { getLocalDate, isInRange, type DateRange } from '@/utils/date';
+import { calcIncomeForRange } from '@/lib/money';
 
 export function IncomeTab({
-  month,
+  range,
   streamScope = 'all',
   companyId: _companyId,
 }: {
-  month: string;
+  range: DateRange;
   streamScope?: 'all' | 'salary' | 'business';
   companyId?: string;
 }) {
@@ -53,10 +54,16 @@ export function IncomeTab({
   });
   const [editId, setEditId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [bankError, setBankError] = useState('');
 
   const submit = () => {
     if (!form.source || !form.amount || Number(form.amount) <= 0) {
       setError('Source and amount are required.');
+      return;
+    }
+    // Mirrors the server rule: bank-backed methods must name the account they land in.
+    if (['bank_transfer', 'cheque', 'standing_order'].includes(form.paymentMethod) && !form.bankAccountId) {
+      setBankError('Select the bank account this is paid into.');
       return;
     }
     const entry = {
@@ -86,6 +93,7 @@ export function IncomeTab({
       bankAccountId: '',
     });
     setError('');
+    setBankError('');
   };
 
   const handleDelete = async (id: string, source: string) => {
@@ -102,23 +110,20 @@ export function IncomeTab({
     }
   };
 
+  // Recurring sources always apply; one-time income only shows when dated inside the range.
   const streamFilteredIncome = useMemo(() => {
     return state.income.filter(i => {
+      if (i.frequency === 'one-time' && !isInRange(i.date, range)) return false;
       if (streamScope === 'salary') return i.type === 'salary' || i.type === 'other';
       if (streamScope === 'business') return i.type === 'business';
       return true;
     });
-  }, [state.income, streamScope]);
+  }, [state.income, streamScope, range]);
 
-  const totalMonthly = useMemo(() => {
-    return streamFilteredIncome.reduce((s, i) => {
-      if (i.frequency === 'monthly') return s + i.amount;
-      if (i.frequency === 'weekly') return s + i.amount * 4;
-      if (i.frequency === 'daily') return s + i.amount * 30;
-      if (i.frequency === 'one-time' && i.date.startsWith(month)) return s + i.amount;
-      return s;
-    }, 0);
-  }, [streamFilteredIncome, month]);
+  const rangeTotal = useMemo(
+    () => calcIncomeForRange(streamFilteredIncome, range, state.employmentProfiles),
+    [streamFilteredIncome, range, state.employmentProfiles],
+  );
 
   return (
     <div className="grid md:grid-cols-2 gap-6">
@@ -128,7 +133,7 @@ export function IncomeTab({
             {streamScope === 'business' ? 'Business Operating Inflows' : streamScope === 'salary' ? 'Job Salary Inflows' : 'Consolidated Inflow Sources'}
           </div>
           <div className="text-sm text-muted">
-            Monthly total: <span className="font-semibold text-text num">{formatRs(totalMonthly)}</span>
+            Total: <span className="font-semibold text-text num">{formatRs(rangeTotal)}</span>
           </div>
         </div>
         {streamFilteredIncome.length === 0 ? (
@@ -192,7 +197,6 @@ export function IncomeTab({
       <FormCard
         icon="arrow-up"
         title={editId ? 'Edit Income' : 'Record Income'}
-        description={editId ? 'Update this income source details' : 'Log an earnings stream or salary credit for this month'}
         badge={editId ? 'Editing' : undefined}
         actions={
           editId ? (
@@ -211,6 +215,7 @@ export function IncomeTab({
                   bankAccountId: '',
                 });
                 setError('');
+                setBankError('');
               }}
             >
               Cancel
@@ -236,7 +241,7 @@ export function IncomeTab({
             <option value="other">Other Inflow</option>
           </Select>
         </Field>
-        <Field id="income-amount" label="Amount (Rs.)" required>
+        <Field id="income-amount" label="Amount" required>
           <MoneyField
             value={form.amount}
             onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
@@ -266,8 +271,13 @@ export function IncomeTab({
         {['bank_transfer', 'cheque', 'standing_order'].includes(form.paymentMethod) && (
           <BankSelect
             value={form.bankAccountId}
-            onChange={id => setForm(f => ({ ...f, bankAccountId: id }))}
+            onChange={id => {
+              setForm(f => ({ ...f, bankAccountId: id }));
+              setBankError('');
+            }}
             bankAccounts={state.bankAccounts}
+            required
+            error={bankError}
           />
         )}
         <Button

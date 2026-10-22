@@ -10,6 +10,8 @@ export interface BankSelectProps {
   value: string;
   onChange: (bankAccountId: string) => void;
   bankAccounts?: BankAccount[];
+  /** Only list accounts of these types (e.g. current accounts for cheques and standing orders). */
+  accountTypes?: NonNullable<BankAccount['accountType']>[];
   placeholder?: string;
   hasError?: boolean;
   hint?: string;
@@ -25,6 +27,7 @@ export function BankSelect({
   value,
   onChange,
   bankAccounts = [],
+  accountTypes,
   placeholder = 'Select bank account',
   hasError = false,
   hint,
@@ -33,10 +36,12 @@ export function BankSelect({
   required = false,
   className = '',
 }: BankSelectProps) {
-  // Archived accounts accept no new activity; keep one only if it is already the selected value.
-  const selectable = bankAccounts.filter(account => !account.isArchived || account.id === value);
+  // Archived or off-type accounts accept no new links; keep one only if it is already the selected value.
+  const selectable = bankAccounts.filter(account => account.id === value || (
+    !account.isArchived && (!accountTypes || accountTypes.includes(account.accountType || 'savings'))
+  ));
   return (
-    <Field id={id} label={label} hint={hint} error={error} className={className}>
+    <Field id={id} label={label} hint={hint} error={error} required={required} className={className}>
       <Select
         id={id}
         value={value}

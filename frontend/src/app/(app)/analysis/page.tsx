@@ -326,19 +326,11 @@ function AnalysisContent() {
       ? `${selectedBranch.name} Analytics`
       : 'Financial Analysis';
 
-  const pageDescription =
-    scope === 'company' && selectedCompany
-      ? 'Consolidated enterprise performance, cross-branch comparison, cash flow waterfall, and forward projections.'
-      : scope === 'branch' && selectedBranch
-      ? `Unit economics, sales rhythm, target pacing, and utility cost drivers for ${selectedBranch.location || 'this operating outlet'}.`
-      : 'Live health score, spending patterns, forecasts and a personalised plan — all computed from your own records.';
-
   return (
     <PageContainer>
       <PageHeader
         eyebrow={scope === 'company' ? 'Enterprise' : scope === 'branch' ? 'Branch Unit' : 'Intelligence'}
         title={pageTitle}
-        description={pageDescription}
         actions={
           <>
             <MonthPicker value={month} onChange={setMonth} size="sm" className="no-print" />
@@ -954,7 +946,7 @@ export default function Analysis() {
   return (
     <Suspense fallback={
       <PageContainer>
-        <PageHeader eyebrow="Intelligence" title="Financial Analysis" description="Loading analysis..." />
+        <PageHeader eyebrow="Intelligence" title="Financial Analysis" />
       </PageContainer>
     }>
       <AnalysisContent />

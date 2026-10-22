@@ -18,6 +18,8 @@ import { useToast } from '@/components/ui/ToastProvider';
 import type { PawnedItem } from '@/types';
 import { getLocalDate } from '@/utils/date';
 
+type PawnErrorKey = 'description' | 'ticketNumber' | 'amountReceived' | 'interestRate' | 'nextDue';
+
 export function PawnedTab() {
   const { state, dispatch } = useApp();
   const confirm = useConfirm();
@@ -31,6 +33,12 @@ export function PawnedTab() {
     nextDue: getLocalDate(),
     redemptionDate: '',
   });
+  const [errors, setErrors] = useState<Partial<Record<PawnErrorKey, string>>>({});
+
+  const updateForm = (patch: Partial<typeof form>, key?: PawnErrorKey) => {
+    setForm(f => ({ ...f, ...patch }));
+    if (key && errors[key]) setErrors(e => ({ ...e, [key]: undefined }));
+  };
 
   // Payment sheet state
   const [payingPawn, setPayingPawn] = useState<PawnedItem | null>(null);
@@ -44,8 +52,17 @@ export function PawnedTab() {
   });
 
   const submit = () => {
-    if (!form.description || !form.amountReceived) return;
-    const nextDue = form.nextDue || getLocalDate();
+    const found: Partial<Record<PawnErrorKey, string>> = {};
+    if (!form.description.trim()) found.description = 'Describe the pawned item.';
+    if (!form.ticketNumber.trim()) found.ticketNumber = 'Enter the receipt number.';
+    if (!(Number(form.amountReceived) > 0)) found.amountReceived = 'Enter the amount received.';
+    const rate = Number(form.interestRate);
+    if (form.interestRate.trim() === '' || !Number.isFinite(rate) || rate < 0) found.interestRate = 'Enter the interest rate.';
+    if (!form.nextDue) found.nextDue = 'Choose the next due date.';
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+
+    const nextDue = form.nextDue;
     const defaultRedemption = new Date();
     defaultRedemption.setMonth(defaultRedemption.getMonth() + 6);
     const redemptionDate = form.redemptionDate || defaultRedemption.toISOString().slice(0, 10);
@@ -55,12 +72,12 @@ export function PawnedTab() {
       type: 'ADD_PAWNED',
       entry: {
         id: 'pw_' + Date.now(),
-        description: form.description,
+        description: form.description.trim(),
         ticketNumber: form.ticketNumber.trim(),
         amountReceived: amount,
         principalOutstanding: amount,
         interestPaid: 0,
-        interestRate: Number(form.interestRate) || 0,
+        interestRate: rate,
         nextDue,
         redemptionDate,
         status: 'active',
@@ -313,50 +330,56 @@ export function PawnedTab() {
       <FormCard
         icon="financial"
         title="Add Pawned Item"
-        description="Track pawn receipts, advance amounts, monthly rates, and redemption dates"
         className="h-fit sticky top-4"
       >
-        <Field id="pawn-desc" label="Description" required>
+        <Field id="pawn-desc" label="Description" required error={errors.description}>
           <Input
             value={form.description}
-            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-            placeholder="e.g. Gold chain (22g), Sovereign coin"
+            onChange={e => updateForm({ description: e.target.value }, 'description')}
+            placeholder="e.g. Gold chain, Sovereign coin"
+            hasError={Boolean(errors.description)}
           />
         </Field>
-        <Field id="pawn-ticket" label="Ticket / Receipt # (optional)">
+        <Field id="pawn-ticket" label="Receipt Number" required error={errors.ticketNumber}>
           <Input
             value={form.ticketNumber}
-            onChange={e => setForm(f => ({ ...f, ticketNumber: e.target.value }))}
+            onChange={e => updateForm({ ticketNumber: e.target.value }, 'ticketNumber')}
             placeholder="e.g. TKT-90412"
+            hasError={Boolean(errors.ticketNumber)}
           />
         </Field>
-        <Field id="pawn-amount" label="Amount received (Rs.)" required>
+        <Field id="pawn-amount" label="Amount Received" required error={errors.amountReceived}>
           <MoneyField
             value={form.amountReceived}
-            onChange={v => setForm(f => ({ ...f, amountReceived: String(v) }))}
+            onChange={v => updateForm({ amountReceived: String(v) }, 'amountReceived')}
             placeholder="e.g. 50,000"
+            hasError={Boolean(errors.amountReceived)}
           />
         </Field>
-        <Field id="pawn-rate" label="Interest rate (% per month)" required>
+        <Field id="pawn-rate" label="Interest Rate %" required error={errors.interestRate}>
           <Input
             type="number"
+            min="0"
             step="0.1"
             value={form.interestRate}
-            onChange={e => setForm(f => ({ ...f, interestRate: e.target.value }))}
+            onChange={e => updateForm({ interestRate: e.target.value }, 'interestRate')}
             placeholder="e.g. 2.0"
+            hasError={Boolean(errors.interestRate)}
           />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field id="pawn-due" label="Next due date" required>
+          <Field id="pawn-due" label="Next Due Date" required error={errors.nextDue}>
             <DateField
               value={form.nextDue}
-              onChange={e => setForm(f => ({ ...f, nextDue: e.target.value }))}
+              onChange={e => updateForm({ nextDue: e.target.value }, 'nextDue')}
+              hasError={Boolean(errors.nextDue)}
             />
           </Field>
-          <Field id="pawn-redemption" label="Redemption date">
+          <Field id="pawn-redemption" label="Redemption Date">
             <DateField
               value={form.redemptionDate}
-              onChange={e => setForm(f => ({ ...f, redemptionDate: e.target.value }))}
+              min={form.nextDue || undefined}
+              onChange={e => updateForm({ redemptionDate: e.target.value })}
             />
           </Field>
         </div>
@@ -377,7 +400,7 @@ export function PawnedTab() {
         isOpen={Boolean(payingPawn)}
         onClose={() => setPayingPawn(null)}
         title="Record Pawn Payment"
-        description={payingPawn ? `Payment for ${payingPawn.description}` : ''}
+        description={payingPawn ? payingPawn.description : ''}
       >
         <div className="space-y-4 pt-2">
           <Field id="pawn-pay-type" label="Payment Type">
@@ -387,7 +410,7 @@ export function PawnedTab() {
             >
               <option value="interest">Interest Payment</option>
               <option value="part_principal">Part-Principal Payment</option>
-              <option value="redemption">Full Redemption (Settle Principal)</option>
+              <option value="redemption">Full Redemption</option>
             </Select>
           </Field>
           <Field id="pawn-pay-method" label="Payment Method">
@@ -419,7 +442,7 @@ export function PawnedTab() {
               </Select>
             </Field>
           )}
-          <Field id="pawn-pay-amount" label="Payment Amount (Rs.)">
+          <Field id="pawn-pay-amount" label="Payment Amount">
             <MoneyField
               value={paymentForm.amount}
               onChange={v => setPaymentForm(f => ({ ...f, amount: String(v) }))}
@@ -432,7 +455,7 @@ export function PawnedTab() {
               onChange={e => setPaymentForm(f => ({ ...f, date: e.target.value }))}
             />
           </Field>
-          <Field id="pawn-pay-note" label="Notes (optional)">
+          <Field id="pawn-pay-note" label="Notes">
             <Input
               value={paymentForm.note}
               onChange={e => setPaymentForm(f => ({ ...f, note: e.target.value }))}

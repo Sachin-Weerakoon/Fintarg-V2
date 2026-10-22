@@ -157,7 +157,6 @@ export default function DashboardClient() {
       <PageHeader
         eyebrow={`Finance Dashboard · ${selectedMonth}`}
         title={`${greeting}${userName ? `, ${userName}` : ''}`}
-        description="Here is your financial pulse and priority items for this month."
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <MonthPicker value={selectedMonth} onChange={setSelectedMonth} size="sm" />

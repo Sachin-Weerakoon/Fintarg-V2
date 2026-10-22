@@ -546,7 +546,7 @@ function ProfileTab() {
           />
         </FormField>
 
-        <FormField id="prof-portfolio" label="Portfolio / Website Link">
+        <FormField id="prof-portfolio" label="Portfolio Link">
           <Input
             id="prof-portfolio"
             value={form.portfolioLink || ''}
@@ -566,9 +566,9 @@ function ProfileTab() {
                 setForm(f => ({ ...f, workMode: newMode, plan: newPlan }));
               }}
             >
-              <option value="salary">Salary Earner (Pay slips & deductions)</option>
-              <option value="business">Business Owner (Outlets & branches)</option>
-              <option value="both">Both (Salary + Enterprise Business)</option>
+              <option value="salary">Salary Earner</option>
+              <option value="business">Business Owner</option>
+              <option value="both">Both</option>
             </Select>
           </FormField>
         </div>
@@ -958,7 +958,7 @@ function AccountTab() {
                 autoComplete="current-password"
               />
             </FormField>
-            <FormField id="pwd-new" label="New Password" required hint="Min 8 characters">
+            <FormField id="pwd-new" label="New Password" required>
               <Input
                 id="pwd-new"
                 type="password"
@@ -1142,7 +1142,6 @@ function SettingsContent() {
       <PageHeader
         eyebrow="Preferences"
         title="Account Settings"
-        description="Customize appearance, personal identity parameters, document vault, and notifications."
       />
 
       <div className="grid md:grid-cols-[220px_1fr] gap-6">
