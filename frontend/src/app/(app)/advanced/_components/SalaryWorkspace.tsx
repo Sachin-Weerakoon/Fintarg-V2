@@ -274,9 +274,6 @@ export function SalaryWorkspace({
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-base font-bold text-text">New Employment Profile</h4>
-                <p className="text-xs text-muted mt-0.5">
-                  Configure your primary monthly salary to build a dedicated payday plan.
-                </p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>
                 Cancel
@@ -533,14 +530,12 @@ export function SalaryWorkspace({
             <StatCard
               label="Gross Salary"
               value={formatRs(selected.monthlyGross)}
-              detail="Monthly gross"
               tone="default"
               icon={<Icon name="wallet" size={18} />}
             />
             <StatCard
               label="Deductions"
               value={formatRs(selected.monthlyDeductions)}
-              detail="Tax, EPF, loans & other"
               tone={selected.monthlyDeductions > 0 ? 'warning' : 'default'}
               icon={<Icon name="arrow-down" size={18} />}
             />
@@ -554,7 +549,6 @@ export function SalaryWorkspace({
             <StatCard
               label="After Savings"
               value={formatRs(afterSavings)}
-              detail="Available for monthly living"
               tone={afterSavings >= 0 ? 'success' : 'danger'}
               icon={<Icon name="target" size={18} />}
             />
@@ -564,9 +558,6 @@ export function SalaryWorkspace({
             <Card className="p-6 space-y-4">
               <div>
                 <h4 className="text-base font-bold text-text">Payday Savings Allocation</h4>
-                <p className="text-xs text-muted mt-0.5">
-                  Set aside savings first, then use the remainder as your living budget ceiling.
-                </p>
               </div>
 
               <FormField id="savings-alloc-field" label="Monthly Savings Target">
@@ -589,9 +580,6 @@ export function SalaryWorkspace({
             <Card className="p-6 space-y-4">
               <div>
                 <h4 className="text-base font-bold text-text">Career Milestone</h4>
-                <p className="text-xs text-muted mt-0.5">
-                  Keep your next career growth milestone visible alongside your salary plan.
-                </p>
               </div>
 
               <FormField id="career-goal-field" label="Current Career Objective">
@@ -616,9 +604,6 @@ export function SalaryWorkspace({
                     <h4 className="text-base font-bold text-text">Director Draws & Profit Distributions</h4>
                     <Badge tone="primary" size="sm">Auto-Synced</Badge>
                   </div>
-                  <p className="text-xs text-muted mt-0.5">
-                    Draw profits directly from {companyName || 'this enterprise'} without statutory PAYE/EPF deductions. Automatically syncs as a business income credit in your personal ledger.
-                  </p>
                 </div>
               </div>
 

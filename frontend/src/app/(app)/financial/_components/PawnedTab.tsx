@@ -17,11 +17,13 @@ import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import type { PawnedItem } from '@/types';
 import { getLocalDate } from '@/utils/date';
+import { useFieldErrors } from '@/hooks/useFieldErrors';
 
 type PawnErrorKey = 'description' | 'ticketNumber' | 'amountReceived' | 'interestRate' | 'nextDue';
 
 export function PawnedTab() {
-  const { state, dispatch } = useApp();
+  const { state, save } = useApp();
+  const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -41,6 +43,7 @@ export function PawnedTab() {
   };
 
   // Payment sheet state
+  const payErrors = useFieldErrors<'bankAccountId' | 'amount' | 'date'>();
   const [payingPawn, setPayingPawn] = useState<PawnedItem | null>(null);
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
@@ -51,7 +54,7 @@ export function PawnedTab() {
     note: '',
   });
 
-  const submit = () => {
+  const submit = async () => {
     const found: Partial<Record<PawnErrorKey, string>> = {};
     if (!form.description.trim()) found.description = 'Describe the pawned item.';
     if (!form.ticketNumber.trim()) found.ticketNumber = 'Enter the receipt number.';
@@ -65,10 +68,11 @@ export function PawnedTab() {
     const nextDue = form.nextDue;
     const defaultRedemption = new Date();
     defaultRedemption.setMonth(defaultRedemption.getMonth() + 6);
-    const redemptionDate = form.redemptionDate || defaultRedemption.toISOString().slice(0, 10);
+    const redemptionDate = form.redemptionDate || getLocalDate(defaultRedemption);
 
     const amount = Number(form.amountReceived);
-    dispatch({
+    setSaving(true);
+    const ok = await save({
       type: 'ADD_PAWNED',
       entry: {
         id: 'pw_' + Date.now(),
@@ -84,6 +88,9 @@ export function PawnedTab() {
         payments: [],
       },
     });
+    setSaving(false);
+    // On failure the store has already rolled back and shown the server's reason; keep the input.
+    if (!ok) return;
     toast.success('Pawned item recorded');
     setForm({
       description: '',
@@ -109,6 +116,7 @@ export function PawnedTab() {
     }
 
     setPayingPawn(pawn);
+    payErrors.reset();
     setPaymentForm({
       amount: initialAmount,
       paymentType: type,
@@ -132,20 +140,28 @@ export function PawnedTab() {
       newAmount = '';
     }
     setPaymentForm(f => ({ ...f, paymentType: newType, amount: newAmount }));
+    payErrors.clear('amount');
   };
 
-  const handleRecordPayment = () => {
-    if (!payingPawn || !paymentForm.amount || Number(paymentForm.amount) <= 0) {
-      toast.error('Please enter a valid payment amount');
-      return;
-    }
-    const isBankMethod = ['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(paymentForm.paymentMethod);
-    if (isBankMethod && !paymentForm.bankAccountId) {
-      toast.error('Please select a bank account for this payment method');
-      return;
-    }
+  const handleRecordPayment = async () => {
+    if (!payingPawn) return;
+    const amount = Number(paymentForm.amount);
+    const principal = payingPawn.principalOutstanding !== undefined ? payingPawn.principalOutstanding : payingPawn.amountReceived;
+    // Same limits the server applies to principal payments.
+    let amountError: string | undefined;
+    if (!(amount > 0)) amountError = 'Enter the payment amount.';
+    else if (paymentForm.paymentType === 'part_principal' && amount > principal) amountError = `Cannot exceed the outstanding principal of ${formatRs(principal)}.`;
+    else if (paymentForm.paymentType === 'redemption' && amount < principal) amountError = `Redemption must cover the outstanding principal of ${formatRs(principal)}.`;
+    const valid = payErrors.check({
+      bankAccountId: ['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(paymentForm.paymentMethod) && !paymentForm.bankAccountId
+        ? 'Select the account this is paid from.' : undefined,
+      amount: amountError,
+      date: paymentForm.date ? undefined : 'Choose the payment date.',
+    });
+    if (!valid) return;
 
-    dispatch({
+    setSaving(true);
+    const ok = await save({
       type: 'RECORD_PAWN_PAYMENT',
       id: payingPawn.id,
       amount: Number(paymentForm.amount),
@@ -155,6 +171,8 @@ export function PawnedTab() {
       date: paymentForm.date,
       note: paymentForm.note,
     });
+    setSaving(false);
+    if (!ok) return;
 
     const typeLabel = paymentForm.paymentType === 'interest' ? 'Interest' : paymentForm.paymentType === 'redemption' ? 'Redemption' : 'Part-principal';
     toast.success(`${typeLabel} payment of ${formatRs(Number(paymentForm.amount))} logged`);
@@ -171,11 +189,11 @@ export function PawnedTab() {
     });
     if (!ok) return;
 
-    dispatch({
+    if (!(await save({
       type: 'DELETE_PAWN_PAYMENT',
       id: pawnId,
       paymentId,
-    });
+    }))) return;
     toast.success(`Payment of ${formatRs(amount)} undone`);
   };
 
@@ -188,8 +206,7 @@ export function PawnedTab() {
       tone: 'danger',
     });
     if (ok) {
-      dispatch({ type: 'DELETE_PAWNED', id });
-      toast.success('Pawned item record deleted');
+      if (await save({ type: 'DELETE_PAWNED', id })) toast.success('Pawned item record deleted');
     }
   };
 
@@ -389,6 +406,7 @@ export function PawnedTab() {
             className="w-full shadow-sm hover:shadow-primary-500/20"
             iconLeft={<Icon name="plus" size={15} />}
             onClick={submit}
+            loading={saving}
           >
             Save Pawned Item
           </Button>
@@ -416,7 +434,7 @@ export function PawnedTab() {
           <Field id="pawn-pay-method" label="Payment Method">
             <Select
               value={paymentForm.paymentMethod}
-              onChange={e => setPaymentForm(f => ({ ...f, paymentMethod: e.target.value }))}
+              onChange={e => { setPaymentForm(f => ({ ...f, paymentMethod: e.target.value })); payErrors.clear('bankAccountId'); }}
             >
               <option value="cash">Cash</option>
               <option value="bank_transfer">Bank Transfer</option>
@@ -428,31 +446,31 @@ export function PawnedTab() {
             </Select>
           </Field>
           {['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(paymentForm.paymentMethod) && (
-            <Field id="pawn-pay-account" label="Debit Bank Account">
+            <Field id="pawn-pay-account" label="Debit Bank Account" required error={payErrors.errors.bankAccountId}>
               <Select
                 value={paymentForm.bankAccountId}
-                onChange={e => setPaymentForm(f => ({ ...f, bankAccountId: e.target.value }))}
+                onChange={e => { setPaymentForm(f => ({ ...f, bankAccountId: e.target.value })); payErrors.clear('bankAccountId'); }}
               >
                 <option value="">Select Account...</option>
                 {state.bankAccounts.filter(b => !b.isArchived).map(b => (
                   <option key={b.id} value={b.id}>
-                    {b.bankName} - {b.accountNumber} ({formatRs(b.currentBalance)})
+                    {b.bankName} · {b.accountNumber} · {formatRs(b.currentBalance)}
                   </option>
                 ))}
               </Select>
             </Field>
           )}
-          <Field id="pawn-pay-amount" label="Payment Amount">
+          <Field id="pawn-pay-amount" label="Payment Amount" required error={payErrors.errors.amount}>
             <MoneyField
               value={paymentForm.amount}
-              onChange={v => setPaymentForm(f => ({ ...f, amount: String(v) }))}
+              onChange={v => { setPaymentForm(f => ({ ...f, amount: String(v) })); payErrors.clear('amount'); }}
               placeholder="e.g. 5,000"
             />
           </Field>
-          <Field id="pawn-pay-date" label="Payment Date">
+          <Field id="pawn-pay-date" label="Payment Date" required error={payErrors.errors.date}>
             <DateField
               value={paymentForm.date}
-              onChange={e => setPaymentForm(f => ({ ...f, date: e.target.value }))}
+              onChange={e => { setPaymentForm(f => ({ ...f, date: e.target.value })); payErrors.clear('date'); }}
             />
           </Field>
           <Field id="pawn-pay-note" label="Notes">
@@ -463,7 +481,7 @@ export function PawnedTab() {
             />
           </Field>
           <div className="flex gap-2 pt-2">
-            <Button variant="primary" className="flex-1" onClick={handleRecordPayment}>
+            <Button variant="primary" className="flex-1" onClick={handleRecordPayment} loading={saving}>
               Save Payment
             </Button>
             <Button variant="secondary" onClick={() => setPayingPawn(null)}>

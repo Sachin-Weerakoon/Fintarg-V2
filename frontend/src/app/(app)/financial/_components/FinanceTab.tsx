@@ -21,6 +21,7 @@ import type { BankAccount, FinancePayment } from '@/types';
 import { getLocalDate } from '@/utils/date';
 import { addMonths, monthOf, todayISO, upcomingObligations } from '@/lib/insights';
 import { BillsCalendar } from './BillsCalendar';
+import { useFieldErrors } from '@/hooks/useFieldErrors';
 
 type FormErrorKey = 'label' | 'chequeNumber' | 'amount' | 'dueDay' | 'nextDueDate' | 'monthsRemaining' | 'bankAccountId';
 
@@ -28,7 +29,8 @@ type FormErrorKey = 'label' | 'chequeNumber' | 'amount' | 'dueDay' | 'nextDueDat
 const CHEQUE_ACCOUNT_TYPES: NonNullable<BankAccount['accountType']>[] = ['current', 'checking'];
 
 export function FinanceTab() {
-  const { state, dispatch } = useApp();
+  const { state, save } = useApp();
+  const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -72,6 +74,7 @@ export function FinanceTab() {
   const [filterKind, setFilterKind] = useState<string>('all');
 
   // Mark as paid sheet state
+  const payErrors = useFieldErrors<'bankAccountId' | 'amount' | 'date'>();
   const [payingPayment, setPayingPayment] = useState<FinancePayment | null>(null);
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
@@ -105,7 +108,7 @@ export function FinanceTab() {
     return next;
   };
 
-  const submit = () => {
+  const submit = async () => {
     const found = validate();
     setErrors(found);
     if (Object.keys(found).length > 0) return;
@@ -131,18 +134,18 @@ export function FinanceTab() {
       payments: existing?.payments || [],
     };
 
-    if (editId) {
-      dispatch({ type: 'UPDATE_FINANCE_PAYMENT', entry });
-      toast.success('Payment updated');
-    } else {
-      dispatch({ type: 'ADD_FINANCE_PAYMENT', entry });
-      toast.success('Payment recorded');
-    }
+    setSaving(true);
+    const ok = await save(editId ? { type: 'UPDATE_FINANCE_PAYMENT', entry } : { type: 'ADD_FINANCE_PAYMENT', entry });
+    setSaving(false);
+    // On failure the store has already rolled back and shown the server's reason; keep the input.
+    if (!ok) return;
+    toast.success(editId ? 'Payment updated' : 'Payment recorded');
     resetForm();
   };
 
   const openPaySheet = (fp: FinancePayment) => {
     setPayingPayment(fp);
+    payErrors.reset();
     setPaymentForm({
       amount: String(fp.amount),
       paymentMethod: fp.paymentKind === 'cheque' ? 'cheque' : fp.paymentKind === 'standing_order' ? 'standing_order' : fp.bankAccountId ? 'bank_transfer' : 'cash',
@@ -152,18 +155,18 @@ export function FinanceTab() {
     });
   };
 
-  const handleRecordPayment = () => {
-    if (!payingPayment || !paymentForm.amount || Number(paymentForm.amount) <= 0) {
-      toast.error('Please enter a valid amount');
-      return;
-    }
-    const isBankMethod = ['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(paymentForm.paymentMethod);
-    if (isBankMethod && !paymentForm.bankAccountId) {
-      toast.error('Please select a bank account for this payment method');
-      return;
-    }
+  const handleRecordPayment = async () => {
+    if (!payingPayment) return;
+    const valid = payErrors.check({
+      bankAccountId: ['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(paymentForm.paymentMethod) && !paymentForm.bankAccountId
+        ? 'Select the account this is paid from.' : undefined,
+      amount: Number(paymentForm.amount) > 0 ? undefined : 'Enter the payment amount.',
+      date: paymentForm.date ? undefined : 'Choose the payment date.',
+    });
+    if (!valid) return;
 
-    dispatch({
+    setSaving(true);
+    const ok = await save({
       type: 'MARK_FINANCE_PAYMENT_PAID',
       id: payingPayment.id,
       amount: Number(paymentForm.amount),
@@ -172,6 +175,8 @@ export function FinanceTab() {
       date: paymentForm.date,
       note: paymentForm.note,
     });
+    setSaving(false);
+    if (!ok) return;
 
     toast.success(`Payment of ${formatRs(Number(paymentForm.amount))} logged`);
     setPayingPayment(null);
@@ -187,11 +192,11 @@ export function FinanceTab() {
     });
     if (!ok) return;
 
-    dispatch({
+    if (!(await save({
       type: 'DELETE_FINANCE_PAYMENT_PAYMENT',
       id: fpId,
       paymentId,
-    });
+    }))) return;
     toast.success(`Payment of ${formatRs(amount)} undone`);
   };
 
@@ -204,8 +209,7 @@ export function FinanceTab() {
       tone: 'danger',
     });
     if (ok) {
-      dispatch({ type: 'DELETE_FINANCE_PAYMENT', id });
-      toast.success('Payment removed');
+      if (await save({ type: 'DELETE_FINANCE_PAYMENT', id })) toast.success('Payment removed');
     }
   };
 
@@ -531,6 +535,7 @@ export function FinanceTab() {
             className="flex-1 shadow-sm hover:shadow-primary-500/20"
             iconLeft={<Icon name={editId ? 'check' : 'plus'} size={15} />}
             onClick={submit}
+            loading={saving}
           >
             {editId ? 'Update Payment' : 'Save Payment'}
           </Button>
@@ -553,7 +558,7 @@ export function FinanceTab() {
           <Field id="pay-method" label="Payment Method">
             <Select
               value={paymentForm.paymentMethod}
-              onChange={e => setPaymentForm(f => ({ ...f, paymentMethod: e.target.value }))}
+              onChange={e => { setPaymentForm(f => ({ ...f, paymentMethod: e.target.value })); payErrors.clear('bankAccountId'); }}
             >
               <option value="bank_transfer">Bank Transfer</option>
               <option value="standing_order">Standing Order</option>
@@ -566,33 +571,33 @@ export function FinanceTab() {
           </Field>
 
           {['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(paymentForm.paymentMethod) && (
-            <Field id="pay-account" label="Debit Bank Account">
+            <Field id="pay-account" label="Debit Bank Account" required error={payErrors.errors.bankAccountId}>
               <Select
                 value={paymentForm.bankAccountId}
-                onChange={e => setPaymentForm(f => ({ ...f, bankAccountId: e.target.value }))}
+                onChange={e => { setPaymentForm(f => ({ ...f, bankAccountId: e.target.value })); payErrors.clear('bankAccountId'); }}
               >
                 <option value="">Select Account...</option>
                 {state.bankAccounts.filter(b => !b.isArchived).map(b => (
                   <option key={b.id} value={b.id}>
-                    {b.bankName} - {b.accountNumber} ({formatRs(b.currentBalance)})
+                    {b.bankName} · {b.accountNumber} · {formatRs(b.currentBalance)}
                   </option>
                 ))}
               </Select>
             </Field>
           )}
 
-          <Field id="pay-amount" label="Payment Amount">
+          <Field id="pay-amount" label="Payment Amount" required error={payErrors.errors.amount}>
             <MoneyField
               value={paymentForm.amount}
-              onChange={v => setPaymentForm(f => ({ ...f, amount: String(v) }))}
+              onChange={v => { setPaymentForm(f => ({ ...f, amount: String(v) })); payErrors.clear('amount'); }}
               placeholder="e.g. 25,000"
             />
           </Field>
 
-          <Field id="pay-date" label="Payment Date">
+          <Field id="pay-date" label="Payment Date" required error={payErrors.errors.date}>
             <DateField
               value={paymentForm.date}
-              onChange={e => setPaymentForm(f => ({ ...f, date: e.target.value }))}
+              onChange={e => { setPaymentForm(f => ({ ...f, date: e.target.value })); payErrors.clear('date'); }}
             />
           </Field>
 
@@ -605,7 +610,7 @@ export function FinanceTab() {
           </Field>
 
           <div className="flex gap-2 pt-2">
-            <Button variant="primary" className="flex-1" onClick={handleRecordPayment}>
+            <Button variant="primary" className="flex-1" onClick={handleRecordPayment} loading={saving}>
               Confirm Payment
             </Button>
             <Button variant="secondary" onClick={() => setPayingPayment(null)}>

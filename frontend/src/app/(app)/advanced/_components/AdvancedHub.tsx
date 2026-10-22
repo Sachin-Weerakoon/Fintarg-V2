@@ -15,7 +15,6 @@ export function AdvancedHub({ hasBusiness, onOpen }: AdvancedHubProps) {
   const hubCards: {
     id: string;
     title: string;
-    description: string;
     icon: IconName;
     badge?: string;
     isExternalRoute?: boolean;
@@ -24,7 +23,6 @@ export function AdvancedHub({ hasBusiness, onOpen }: AdvancedHubProps) {
     {
       id: 'letters',
       title: 'Formal Letters',
-      description: 'Generate formatted letters for banks, employment verification, and official inquiries.',
       icon: 'file-text',
       badge: 'Templates',
       isExternalRoute: true,
@@ -33,7 +31,6 @@ export function AdvancedHub({ hasBusiness, onOpen }: AdvancedHubProps) {
     {
       id: 'medical',
       title: 'Medical Vault',
-      description: 'Track healthcare expenditures, lab reports, doctor consultations, and appointment reminders.',
       icon: 'heart',
       badge: 'Health',
       isExternalRoute: true,
@@ -42,21 +39,18 @@ export function AdvancedHub({ hasBusiness, onOpen }: AdvancedHubProps) {
     {
       id: 'agreements',
       title: 'Commercial Agreements',
-      description: 'Maintain contracts, office leases, renewal deadlines, and signed PDF documentation.',
       icon: 'documents',
       badge: 'Contracts',
     },
     {
       id: 'businesses',
       title: 'Multi-Branch Operations',
-      description: 'Enterprise branches, daily sales logs, operational overheads, and monthly targets.',
       icon: 'bank',
       badge: 'Enterprise',
     },
     {
       id: 'salary',
       title: 'Salary & Payday Plan',
-      description: 'Multi-job pay slip deductions, EPF/ETF tracking, and automatic payday savings allocation.',
       icon: 'wallet',
       badge: 'Income',
       isExternalRoute: true,
@@ -65,7 +59,6 @@ export function AdvancedHub({ hasBusiness, onOpen }: AdvancedHubProps) {
     {
       id: 'companies',
       title: 'Enterprise Entities',
-      description: 'Register corporate entities with Sri Lankan BR numbers, TIN IDs, and registered offices.',
       icon: 'briefcase',
       badge: 'Registry',
     },
@@ -85,16 +78,13 @@ export function AdvancedHub({ hasBusiness, onOpen }: AdvancedHubProps) {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-base font-bold text-text">Specialized Toolkits</h3>
-            <p className="text-xs text-muted mt-0.5">
-              Enterprise management, legal automation, and personal wellness tools
-            </p>
           </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visibleCards.map(card => {
             const cardContent = (
-              <div className="p-5 flex flex-col justify-between h-full min-h-[170px] space-y-4">
+              <div className="p-5 flex flex-col justify-between h-full min-h-[120px] space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary-tint text-primary-text group-hover:scale-105 transition-transform">
                     <Icon name={card.icon} size={20} />
@@ -115,9 +105,6 @@ export function AdvancedHub({ hasBusiness, onOpen }: AdvancedHubProps) {
                       className="text-muted group-hover:text-primary-text group-hover:translate-x-0.5 transition-all"
                     />
                   </h4>
-                  <p className="text-xs text-muted mt-1 leading-relaxed line-clamp-2">
-                    {card.description}
-                  </p>
                 </div>
               </div>
             );

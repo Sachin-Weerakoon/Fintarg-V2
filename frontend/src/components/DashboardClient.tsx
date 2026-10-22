@@ -283,7 +283,6 @@ export default function DashboardClient() {
                     <Badge tone="danger" size="sm" dot>Needs Attention</Badge>
                   )}
                 </div>
-                <p className="text-xs text-muted mt-0.5">Automated cashflow forecast & risk assessment</p>
               </div>
               <Link href="/financial?tab=expenses">
                 <Button variant="secondary" size="sm" iconRight={<Icon name="arrow-right" size={14} />}>

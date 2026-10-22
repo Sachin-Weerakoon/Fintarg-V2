@@ -33,6 +33,17 @@ describe('Auth Validation Schemas', () => {
       assert.strictEqual(parsed.success, false);
     });
 
+    it('rejects passwords missing a letter, number or special character', () => {
+      for (const password of ['Password123', 'Password!!!', '12345678!', 'Pass@1234']) {
+        const parsed = registerSchema.safeParse({ name: 'A', email: 'a@b.com', password, workMode: 'salary' });
+        assert.strictEqual(parsed.success, password === 'Pass@1234', password);
+      }
+    });
+
+    it('still lets older simple passwords sign in', () => {
+      assert.strictEqual(loginSchema.safeParse({ email: 'a@b.com', password: 'oldpassword' }).success, true);
+    });
+
     it('rejects invalid email formats', () => {
       const input = {
         name: 'Sachin',

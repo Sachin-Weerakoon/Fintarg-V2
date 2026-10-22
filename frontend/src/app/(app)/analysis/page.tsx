@@ -513,7 +513,6 @@ function AnalysisContent() {
                 <SectionTitle
                   icon="analysis"
                   title="Income vs outflow — history & forecast"
-                  hint="Solid lines are your actuals. Dashed lines project the next 3 months from your recent trend; the shaded band is the likely range of spending."
                   right={
                     <div className="hidden sm:flex items-center gap-4 text-[11px] text-muted flex-shrink-0">
                       <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-success-solid" /> Income</span>
@@ -526,18 +525,18 @@ function AnalysisContent() {
 
               <div className="grid lg:grid-cols-5 gap-5">
                 <Card className="lg:col-span-3">
-                  <SectionTitle icon="wallet" title={`Where ${monthLabel(month)} went`} hint="From income down to what you keep." />
+                  <SectionTitle icon="wallet" title={`Where ${monthLabel(month)} went`} />
                   <WaterfallChart steps={waterfall} formatValue={compactNumber} />
                 </Card>
                 <Card className="lg:col-span-2">
-                  <SectionTitle icon="heart" title="Health profile" hint="The bigger the shape, the stronger the money habits." />
+                  <SectionTitle icon="heart" title="Health profile" />
                   <RadarChart axes={health.factors.map(f => ({ label: FACTOR_SHORT[f.key] || f.label, value: f.score }))} />
                 </Card>
               </div>
 
               <div className="grid lg:grid-cols-2 gap-5">
                 <Card>
-                  <SectionTitle icon="target" title="Your path to financial success" hint="Ranked actions with the biggest impact on your situation right now." />
+                  <SectionTitle icon="target" title="Your path to financial success" />
                   <ol className="space-y-3">
                     {plan.map((s, idx) => (
                       <li key={s.id}>
@@ -561,7 +560,7 @@ function AnalysisContent() {
                 </Card>
 
                 <Card>
-                  <SectionTitle icon="shield" title="Financial independence ladder" hint="Six milestones from stability to full resilience." />
+                  <SectionTitle icon="shield" title="Financial independence ladder" />
                   <ul className="space-y-3.5">
                     {ladder.map(r => (
                       <li key={r.id}>
@@ -587,7 +586,7 @@ function AnalysisContent() {
             <div className="space-y-5 animate-rise-in">
               <div className="grid lg:grid-cols-5 gap-5">
                 <Card className="lg:col-span-2">
-                  <SectionTitle icon="credit-card" title="Spending mix" hint="Hover a slice to isolate a category." />
+                  <SectionTitle icon="credit-card" title="Spending mix" />
                   {donut.length === 0 ? (
                     <EmptyState title="No expenses recorded" helper="Add expenses for this month to see your spending mix." action={<Link href="/financial?tab=expenses"><Button variant="secondary" size="sm">Record expense</Button></Link>} />
                   ) : (
@@ -607,7 +606,7 @@ function AnalysisContent() {
                 </Card>
 
                 <Card className="lg:col-span-3">
-                  <SectionTitle icon="analysis" title="Category movement" hint="Compared with your 3‑month average — spikes are flagged so nothing creeps up unnoticed." />
+                  <SectionTitle icon="analysis" title="Category movement" />
                   {cats.length === 0 ? (
                     <p className="text-xs text-muted">No category data yet.</p>
                   ) : (
@@ -649,12 +648,12 @@ function AnalysisContent() {
 
               <div className="grid lg:grid-cols-5 gap-5">
                 <Card className="lg:col-span-2">
-                  <SectionTitle icon="calendar" title="Daily spending heat map" hint="Darker days = bigger spend." />
+                  <SectionTitle icon="calendar" title="Daily spending heat map" />
                   <HeatCalendar cells={daily} formatValue={formatRs} />
                 </Card>
                 <div className="lg:col-span-3 space-y-5">
                   <Card>
-                    <SectionTitle icon="bolt" title="Month-end pace" hint={pace.isCurrent ? `Day ${pace.elapsed} of ${pace.daysInMonth}. Here is where today’s habits lead.` : 'Completed month summary.'} />
+                    <SectionTitle icon="bolt" title="Month-end pace" hint={pace.isCurrent ? `Day ${pace.elapsed} of ${pace.daysInMonth}` : undefined} />
                     <div className="grid grid-cols-3 gap-3 mb-4">
                       <div className="p-3 rounded-xl bg-surface-hover border border-border">
                         <div className="text-[10px] uppercase tracking-wider text-muted font-semibold">Spent</div>
@@ -748,7 +747,7 @@ function AnalysisContent() {
 
               <div className="grid lg:grid-cols-2 gap-5">
                 <Card>
-                  <SectionTitle icon="bolt" title="What if I trim discretionary spending?" hint="Drag to see the monthly and yearly effect on your forecast. Essentials like rent and utilities are left untouched." />
+                  <SectionTitle icon="bolt" title="What if I trim discretionary spending?" />
                   <div className="flex items-center gap-4 mb-5">
                     <input
                       type="range"
@@ -780,7 +779,7 @@ function AnalysisContent() {
                 </Card>
 
                 <Card>
-                  <SectionTitle icon="shield" title="How fast can I build a 3‑month cushion?" hint="Set aside an extra amount each month and see when your emergency fund is complete." />
+                  <SectionTitle icon="shield" title="How fast can I build a 3‑month cushion?" />
                   <div className="flex items-center gap-4 mb-5">
                     <input
                       type="range"
@@ -823,7 +822,7 @@ function AnalysisContent() {
           {tab === 'goals' && (
             <div className="space-y-5 animate-rise-in">
               <Card>
-                <SectionTitle icon="target" title="Goal projections" hint="Based on what you actually contributed over the last 30 days." right={<Link href="/goals" className="no-print"><Button variant="secondary" size="sm">Manage goals</Button></Link>} />
+                <SectionTitle icon="target" title="Goal projections" right={<Link href="/goals" className="no-print"><Button variant="secondary" size="sm">Manage goals</Button></Link>} />
                 {goals.length === 0 ? (
                   <EmptyState title="No goals yet" helper="Create a savings goal and Fintarg will track your pace and project the finish date." action={<Link href="/goals"><Button variant="primary" size="sm">Create goal</Button></Link>} />
                 ) : (
@@ -865,7 +864,7 @@ function AnalysisContent() {
 
               <div className="grid lg:grid-cols-5 gap-5">
                 <Card className="lg:col-span-3">
-                  <SectionTitle icon="bank" title="Debt overview" hint="Pay the item with the highest cost per rupee owed first (avalanche method) to free cash fastest." />
+                  <SectionTitle icon="bank" title="Debt overview" />
                   {debt.items.length === 0 ? (
                     <div className="flex items-center gap-3 p-4 rounded-xl bg-success-tint/40 border border-success-solid/25 text-xs text-success-text">
                       <Icon name="check" size={18} /> You have no active debt. Brilliant.
@@ -910,7 +909,7 @@ function AnalysisContent() {
                 </Card>
 
                 <Card className="lg:col-span-2">
-                  <SectionTitle icon="calendar" title="Coming up" hint="Bills, instalments and reminders over the next 30 days." />
+                  <SectionTitle icon="calendar" title="Coming up" />
                   {obligations.length === 0 ? (
                     <p className="text-xs text-muted">Nothing due in the next 30 days.</p>
                   ) : (

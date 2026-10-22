@@ -22,6 +22,9 @@ import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { THEME_COLORS, LIGHT_DEFAULTS, validateCustomOverrides, SIDEBAR_PRESETS } from '@/lib/theme';
 import { getLocalDate } from '@/utils/date';
+import { PasswordRules } from '@/components/ui/PasswordRules';
+import { passwordProblem } from '@/lib/passwordPolicy';
+import { apiErrorMessage } from '@/services/apiClient';
 
 type Tab = 'appearance' | 'profile' | 'contacts' | 'reminders' | 'account';
 
@@ -35,7 +38,6 @@ const SETTING_TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 function ColorPickerRow({
   label,
-  description,
   value,
   defaultValue,
   onChange,
@@ -43,7 +45,6 @@ function ColorPickerRow({
   warning,
 }: {
   label: string;
-  description: string;
   value: string;
   defaultValue: string;
   onChange: (v: string) => void;
@@ -57,7 +58,6 @@ function ColorPickerRow({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex-1 min-w-0 pr-2">
           <div className="text-xs font-semibold text-text">{label}</div>
-          <p className="text-[11px] text-muted mt-0.5">{description}</p>
         </div>
 
         <div className="flex items-center gap-2.5 flex-shrink-0 self-end sm:self-center">
@@ -140,9 +140,6 @@ function AppearanceTab() {
       {/* Accent Brand Color */}
       <Card className="p-6">
         <h3 className="text-sm font-bold text-text mb-1">Brand Accent Color</h3>
-        <p className="text-xs text-muted mb-4">
-          Select your primary brand color. High-contrast accessible tones will automatically be derived.
-        </p>
 
         <div className="flex gap-3 flex-wrap mb-2">
           {THEME_COLORS.map(c => (
@@ -162,9 +159,6 @@ function AppearanceTab() {
         <div className="flex items-center justify-between gap-3 mb-1">
           <div>
             <h3 className="text-sm font-bold text-text">Sidebar Navigation Theme</h3>
-            <p className="text-xs text-muted mt-0.5">
-              Personalize the background and accent tone of the main navigation sidebar.
-            </p>
           </div>
           {profile.sidebarColor && (
             <Button
@@ -242,7 +236,6 @@ function AppearanceTab() {
 
         <SettingRow
           label="Dark Mode Theme"
-          description="High-contrast dark navy palette optimized for low-light environments. Turn off to switch to light mode."
           control={
             <Switch
               checked={profile.darkMode !== undefined ? Boolean(profile.darkMode) : true}
@@ -254,7 +247,6 @@ function AppearanceTab() {
 
         <SettingRow
           label="Interface Text Size"
-          description="Adjust base type scaling across the entire application interface."
           control={
             <SegmentedTabs
               size="sm"
@@ -275,9 +267,6 @@ function AppearanceTab() {
         <div className="flex items-center justify-between gap-3 mb-1">
           <div>
             <h3 className="text-sm font-bold text-text">Light Theme Custom Palette</h3>
-            <p className="text-xs text-muted mt-0.5">
-              Personalize surfaces and text tokens in light mode with real-time WCAG AA contrast validation.
-            </p>
           </div>
           {hasCustomColors && (
             <Button variant="ghost" size="sm" onClick={resetAllColors}>
@@ -289,7 +278,6 @@ function AppearanceTab() {
         <div className="mt-4">
           <ColorPickerRow
             label="Primary Text"
-            description="Headings, labels, and primary numeric figures"
             value={profile.colorText || ''}
             defaultValue={LIGHT_DEFAULTS.colorText}
             onChange={v => update({ colorText: v })}
@@ -298,7 +286,6 @@ function AppearanceTab() {
           />
           <ColorPickerRow
             label="Secondary Muted Text"
-            description="Timestamps, hints, and table captions"
             value={profile.colorMuted || ''}
             defaultValue={LIGHT_DEFAULTS.colorMuted}
             onChange={v => update({ colorMuted: v })}
@@ -307,7 +294,6 @@ function AppearanceTab() {
           />
           <ColorPickerRow
             label="Page Background Fill"
-            description="The outer canvas page background"
             value={profile.colorBg || ''}
             defaultValue={LIGHT_DEFAULTS.colorBg}
             onChange={v => update({ colorBg: v })}
@@ -316,7 +302,6 @@ function AppearanceTab() {
           />
           <ColorPickerRow
             label="Card Surface Surface"
-            description="Card containers, modal surfaces, and table backgrounds"
             value={profile.colorSurface || ''}
             defaultValue={LIGHT_DEFAULTS.colorSurface}
             onChange={v => update({ colorSurface: v })}
@@ -330,7 +315,6 @@ function AppearanceTab() {
       <Card className="p-6 space-y-4">
         <div>
           <h3 className="text-sm font-bold text-text">Live Theme Preview</h3>
-          <p className="text-xs text-muted mt-0.5">Instant sample of your selected palette in action.</p>
         </div>
 
         <div
@@ -444,7 +428,6 @@ function ProfileTab() {
     <Card className="p-6 space-y-6">
       <div>
         <h3 className="text-base font-bold text-text">Profile Information</h3>
-        <p className="text-xs text-muted mt-0.5">Manage your identity and earning profile credentials.</p>
       </div>
 
       {/* Avatar Section */}
@@ -617,7 +600,6 @@ function ContactsTab() {
     <Card className="p-6 space-y-6">
       <div>
         <h3 className="text-base font-bold text-text">Emergency & Trusted Contacts</h3>
-        <p className="text-xs text-muted mt-0.5">Family members, business partners, or legal representatives.</p>
       </div>
 
       {state.profile.contacts.length === 0 ? (
@@ -725,9 +707,6 @@ function RemindersTab() {
     <Card className="p-6 space-y-6">
       <div>
         <h3 className="text-base font-bold text-text">Scheduled Reminders & Alerts</h3>
-        <p className="text-xs text-muted mt-0.5">
-          Active alerts for upcoming lease payments, loan due dates, and doctor appointments.
-        </p>
       </div>
 
       {reminders.length === 0 ? (
@@ -812,23 +791,21 @@ function AccountTab() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwdErrors, setPwdErrors] = useState<{ current?: string; next?: string; confirm?: string }>({});
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentPassword) {
-      showToast('Please enter your current password.', 'error');
-      return;
-    }
-    if (newPassword.length < 8) {
-      showToast('New password must be at least 8 characters long.', 'error');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      showToast('New passwords do not match.', 'error');
-      return;
-    }
+    const found: typeof pwdErrors = {};
+    if (!currentPassword) found.current = 'Enter your current password.';
+    const problem = passwordProblem(newPassword);
+    if (problem) found.next = problem;
+    else if (newPassword === currentPassword) found.next = 'Choose a password different from the current one.';
+    if (!confirmPassword) found.confirm = 'Re-enter the new password.';
+    else if (newPassword !== confirmPassword) found.confirm = 'Passwords do not match.';
+    setPwdErrors(found);
+    if (Object.keys(found).length > 0) return;
 
     setIsChangingPassword(true);
     try {
@@ -839,12 +816,13 @@ function AccountTab() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to change password');
+        throw new Error(apiErrorMessage(data, 'Failed to change password'));
       }
       showToast('Password updated successfully.', 'success');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setPwdErrors({});
     } catch (err: any) {
       showToast(err.message || 'Failed to change password', 'error');
     } finally {
@@ -941,44 +919,51 @@ function AccountTab() {
     <div className="space-y-6">
       {/* Change Password */}
       <Card className="p-6 space-y-6">
-        <div>
-          <h3 className="text-base font-bold text-text">Security & Password</h3>
-          <p className="text-xs text-muted mt-0.5">Ensure your account uses a secure password of at least 8 characters.</p>
-        </div>
+        <h3 className="text-base font-bold text-text">Security & Password</h3>
 
-        <form onSubmit={handleChangePassword} className="space-y-4">
+        <form onSubmit={handleChangePassword} noValidate className="space-y-4">
           <FormGrid columns={3}>
-            <FormField id="pwd-curr" label="Current Password" required>
+            <FormField id="pwd-curr" label="Current Password" required error={pwdErrors.current}>
               <Input
                 id="pwd-curr"
                 type="password"
                 placeholder="••••••••"
                 value={currentPassword}
-                onChange={e => setCurrentPassword(e.target.value)}
+                onChange={e => {
+                  setCurrentPassword(e.target.value);
+                  setPwdErrors(er => ({ ...er, current: undefined }));
+                }}
                 autoComplete="current-password"
               />
             </FormField>
-            <FormField id="pwd-new" label="New Password" required>
+            <FormField id="pwd-new" label="New Password" required error={pwdErrors.next}>
               <Input
                 id="pwd-new"
                 type="password"
                 placeholder="••••••••"
                 value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
+                onChange={e => {
+                  setNewPassword(e.target.value);
+                  setPwdErrors(er => ({ ...er, next: undefined }));
+                }}
                 autoComplete="new-password"
               />
             </FormField>
-            <FormField id="pwd-confirm" label="Confirm New Password" required>
+            <FormField id="pwd-confirm" label="Confirm New Password" required error={pwdErrors.confirm}>
               <Input
                 id="pwd-confirm"
                 type="password"
                 placeholder="••••••••"
                 value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
+                onChange={e => {
+                  setConfirmPassword(e.target.value);
+                  setPwdErrors(er => ({ ...er, confirm: undefined }));
+                }}
                 autoComplete="new-password"
               />
             </FormField>
           </FormGrid>
+          {newPassword && <PasswordRules password={newPassword} />}
 
           <div className="flex justify-end pt-2">
             <Button type="submit" variant="primary" loading={isChangingPassword}>
@@ -992,7 +977,6 @@ function AccountTab() {
       <Card className="p-6 space-y-4">
         <div>
           <h3 className="text-base font-bold text-text">Session Management</h3>
-          <p className="text-xs text-muted mt-0.5">Control active logins across mobile devices and browsers.</p>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
@@ -1016,15 +1000,11 @@ function AccountTab() {
       <Card className="p-6 space-y-4">
         <div>
           <h3 className="text-base font-bold text-text">Data Portability & Privacy</h3>
-          <p className="text-xs text-muted mt-0.5">
-            Download a complete machine-readable archive (JSON) of all your personal profile, transaction, and financial records.
-          </p>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
           <div>
             <div className="text-sm font-bold text-text">Download My Data Archive</div>
-            <div className="text-xs text-muted">Includes account info, bank accounts, cards, transactions, and agreements.</div>
           </div>
           <Button
             variant="secondary"
@@ -1042,9 +1022,6 @@ function AccountTab() {
       <Card className="p-6 space-y-6">
         <div>
           <h3 className="text-base font-bold text-text">Account Deletion & Data Privacy</h3>
-          <p className="text-xs text-muted mt-0.5">
-            Permanent data removal and account decommissioning in accordance with international privacy guidelines.
-          </p>
         </div>
 
         <div className="p-4 rounded-xl border border-danger-solid/30 bg-danger-tint/30 space-y-2">

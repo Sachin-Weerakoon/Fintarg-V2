@@ -684,6 +684,8 @@ export interface LoadErrorInfo {
 const AppContext = createContext<{
   state: AppState;
   dispatch: (action: Action) => Promise<string | undefined>;
+  /** Like dispatch, but resolves true only once the server has accepted the change. */
+  save: (action: Action) => Promise<boolean>;
   showToast: (message: string, tone?: 'success' | 'error' | 'info') => void;
   loadError?: string | null;
   loadErrorInfo?: LoadErrorInfo | null;
@@ -711,19 +713,37 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadErrorInfo, setLoadErrorInfo] = useState<LoadErrorInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Saves made while a full load is in flight; that load's snapshot may predate them.
+  const loadInFlight = useRef(false);
+  const writesDuringLoad = useRef(new Set<Promise<unknown>>());
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
     setLoadErrorInfo(null);
+    loadInFlight.current = true;
+    writesDuringLoad.current.clear();
     try {
       const currentPlan = (stateRef.current?.profile?.plan || initialProfile?.plan || 'basic') as UserPlan;
       const data = await loadPersistedData(currentPlan);
       reduce({ type: 'HYDRATE', data });
+      loadInFlight.current = false;
+      // Without this, a record saved in the first moments after opening a page vanished from view
+      // until the next reload: the older snapshot above overwrote it.
+      if (writesDuringLoad.current.size > 0) {
+        await Promise.allSettled([...writesDuringLoad.current]);
+        writesDuringLoad.current.clear();
+        try {
+          reduce({ type: 'HYDRATE', data: await loadPersistedData(currentPlan) });
+        } catch (e) {
+          console.warn('[store] Failed to refresh records saved during the initial load:', e);
+        }
+      }
       setIsLoading(false);
     } catch (error: any) {
       console.error('Unable to load account records', error);
       const msg = error?.message || 'Unable to connect to the backend server. Please verify your connection and retry.';
+      loadInFlight.current = false;
       setLoadError(msg);
       setLoadErrorInfo({
         message: msg,
@@ -743,12 +763,15 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
     reduce({ type: 'HYDRATE', data: await loadPersistedData(currentPlan) });
   };
 
-  const dispatch = async (action: Action): Promise<string | undefined> => {
+  // Applies the action optimistically, persists it, and reports whether the server accepted it.
+  const run = async (action: Action): Promise<{ ok: boolean; serverId?: string }> => {
     const prevState = stateRef.current;
     reduce(action);
-    if (action.type === 'HYDRATE' || action.type === 'REPLACE_RECORD_ID' || action.type === 'ROLLBACK') return undefined;
+    if (action.type === 'HYDRATE' || action.type === 'REPLACE_RECORD_ID' || action.type === 'ROLLBACK') return { ok: true };
     try {
-      const serverId = await persistStoreAction(action);
+      const persisting = persistStoreAction(action);
+      if (loadInFlight.current) writesDuringLoad.current.add(persisting.catch(() => undefined));
+      const serverId = await persisting;
       const collectionByAction: Record<string, PersistedCollection> = {
         ADD_INCOME: 'income', ADD_EXPENSE: 'expenses', ADD_FINANCE_PAYMENT: 'financePayments', ADD_LOAN: 'loans',
         ADD_BANK_ACCOUNT: 'bankAccounts', ADD_CARD: 'cards', ADD_TRANSACTION: 'transactions',
@@ -795,7 +818,7 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
         void refreshFromServer().catch(e => console.warn('[store] Failed to refresh records after save:', e));
       }
 
-      return serverId;
+      return { ok: true, serverId };
     } catch (error: any) {
       console.error('Unable to save account change', error);
       try {
@@ -804,9 +827,12 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
         reduce({ type: 'ROLLBACK', previousState: prevState });
       }
       toast.error(error?.message || 'Failed to save changes. Reverting...');
-      return undefined;
+      return { ok: false };
     }
   };
+
+  const dispatch = async (action: Action) => (await run(action)).serverId;
+  const save = async (action: Action) => (await run(action)).ok;
 
   if (loadError) {
     return (
@@ -844,7 +870,7 @@ export function AppProvider({ children, initialProfile = {} }: { children: React
   }
 
   return (
-    <AppContext.Provider value={{ state, dispatch, showToast, loadError, loadErrorInfo, isLoading, retryLoad: loadData }}>
+    <AppContext.Provider value={{ state, dispatch, save, showToast, loadError, loadErrorInfo, isLoading, retryLoad: loadData }}>
       {children}
     </AppContext.Provider>
   );

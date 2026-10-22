@@ -17,6 +17,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import { getLocalDate, isInRange, type DateRange } from '@/utils/date';
 import { calcIncomeForRange } from '@/lib/money';
+import { useFieldErrors } from '@/hooks/useFieldErrors';
 
 export function IncomeTab({
   range,
@@ -27,7 +28,8 @@ export function IncomeTab({
   streamScope?: 'all' | 'salary' | 'business';
   companyId?: string;
 }) {
-  const { state, dispatch } = useApp();
+  const { state, save } = useApp();
+  const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -53,21 +55,20 @@ export function IncomeTab({
     bankAccountId: '',
   });
   const [editId, setEditId] = useState<string | null>(null);
-  const [error, setError] = useState('');
-  const [bankError, setBankError] = useState('');
+  const { errors, check, clear, reset: resetErrors } = useFieldErrors<'source' | 'amount' | 'date' | 'bankAccountId'>();
 
-  const submit = () => {
-    if (!form.source || !form.amount || Number(form.amount) <= 0) {
-      setError('Source and amount are required.');
-      return;
-    }
-    // Mirrors the server rule: bank-backed methods must name the account they land in.
-    if (['bank_transfer', 'cheque', 'standing_order'].includes(form.paymentMethod) && !form.bankAccountId) {
-      setBankError('Select the bank account this is paid into.');
-      return;
-    }
+  const submit = async () => {
+    const valid = check({
+      source: form.source.trim() ? undefined : 'Enter where this income comes from.',
+      amount: Number(form.amount) > 0 ? undefined : 'Enter an amount greater than zero.',
+      date: form.date ? undefined : 'Choose the date.',
+      // Mirrors the server rule: bank-backed methods must name the account they land in.
+      bankAccountId: ['bank_transfer', 'cheque', 'standing_order'].includes(form.paymentMethod) && !form.bankAccountId
+        ? 'Select the bank account this is paid into.' : undefined,
+    });
+    if (!valid) return;
     const entry = {
-      source: form.source,
+      source: form.source.trim(),
       type: form.type,
       amount: Number(form.amount),
       frequency: form.frequency,
@@ -75,14 +76,15 @@ export function IncomeTab({
       paymentMethod: form.paymentMethod,
       bankAccountId: form.bankAccountId || undefined,
     };
-    if (editId) {
-      dispatch({ type: 'UPDATE_INCOME', entry: { ...entry, id: editId } });
-      toast.success('Income source updated');
-      setEditId(null);
-    } else {
-      dispatch({ type: 'ADD_INCOME', entry: { ...entry, id: 'i_' + Date.now() } });
-      toast.success('Income source added');
-    }
+    setSaving(true);
+    const ok = await save(editId
+      ? { type: 'UPDATE_INCOME', entry: { ...entry, id: editId } }
+      : { type: 'ADD_INCOME', entry: { ...entry, id: 'i_' + Date.now() } });
+    setSaving(false);
+    // On failure the store has already rolled back and shown the server's reason; keep the input.
+    if (!ok) return;
+    toast.success(editId ? 'Income source updated' : 'Income source added');
+    setEditId(null);
     setForm({
       source: '',
       type: defaultType,
@@ -92,8 +94,7 @@ export function IncomeTab({
       paymentMethod: 'bank_transfer',
       bankAccountId: '',
     });
-    setError('');
-    setBankError('');
+    resetErrors();
   };
 
   const handleDelete = async (id: string, source: string) => {
@@ -105,8 +106,7 @@ export function IncomeTab({
       tone: 'danger',
     });
     if (ok) {
-      dispatch({ type: 'DELETE_INCOME', id });
-      toast.success('Income source deleted');
+      if (await save({ type: 'DELETE_INCOME', id })) toast.success('Income source deleted');
     }
   };
 
@@ -161,6 +161,7 @@ export function IncomeTab({
                       size="sm"
                       onClick={() => {
                         setEditId(i.id);
+                        resetErrors();
                         setForm({
                           source: i.source,
                           type: i.type,
@@ -214,8 +215,7 @@ export function IncomeTab({
                   paymentMethod: 'bank_transfer',
                   bankAccountId: '',
                 });
-                setError('');
-                setBankError('');
+                resetErrors();
               }}
             >
               Cancel
@@ -224,10 +224,14 @@ export function IncomeTab({
         }
         className="h-fit sticky top-4"
       >
-        <Field id="income-source" label="Source" required error={error}>
+        <Field id="income-source" label="Source" required error={errors.source}>
           <Input
             value={form.source}
-            onChange={e => setForm(f => ({ ...f, source: e.target.value }))}
+            onChange={e => {
+              setForm(f => ({ ...f, source: e.target.value }));
+              clear('source');
+            }}
+            hasError={Boolean(errors.source)}
             placeholder={streamScope === 'business' ? 'e.g. Client retainer, Wholesale sales' : 'e.g. Tech Corp Salary, Freelance'}
           />
         </Field>
@@ -241,10 +245,14 @@ export function IncomeTab({
             <option value="other">Other Inflow</option>
           </Select>
         </Field>
-        <Field id="income-amount" label="Amount" required>
+        <Field id="income-amount" label="Amount" required error={errors.amount}>
           <MoneyField
             value={form.amount}
-            onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
+            onChange={v => {
+              setForm(f => ({ ...f, amount: String(v) }));
+              clear('amount');
+            }}
+            hasError={Boolean(errors.amount)}
           />
         </Field>
         <Field id="income-frequency" label="Frequency" required>
@@ -258,26 +266,33 @@ export function IncomeTab({
             <option value="one-time">One-time</option>
           </Select>
         </Field>
-        <Field id="income-date" label="Date" required>
+        <Field id="income-date" label="Date" required error={errors.date}>
           <DateField
             value={form.date}
-            onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+            onChange={e => {
+              setForm(f => ({ ...f, date: e.target.value }));
+              clear('date');
+            }}
+            hasError={Boolean(errors.date)}
           />
         </Field>
         <PaymentMethodField
           value={form.paymentMethod}
-          onChange={method => setForm(f => ({ ...f, paymentMethod: method }))}
+          onChange={method => {
+            setForm(f => ({ ...f, paymentMethod: method }));
+            clear('bankAccountId');
+          }}
         />
         {['bank_transfer', 'cheque', 'standing_order'].includes(form.paymentMethod) && (
           <BankSelect
             value={form.bankAccountId}
             onChange={id => {
               setForm(f => ({ ...f, bankAccountId: id }));
-              setBankError('');
+              clear('bankAccountId');
             }}
             bankAccounts={state.bankAccounts}
             required
-            error={bankError}
+            error={errors.bankAccountId}
           />
         )}
         <Button
@@ -285,6 +300,7 @@ export function IncomeTab({
           className="w-full mt-2 shadow-sm hover:shadow-primary-500/20"
           iconLeft={<Icon name={editId ? 'check' : 'plus'} size={15} />}
           onClick={submit}
+          loading={saving}
         >
           {editId ? 'Update Income Source' : 'Save Income Source'}
         </Button>

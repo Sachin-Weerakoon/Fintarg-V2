@@ -27,6 +27,7 @@ import {
 } from '@/utils/bankData';
 import type { BankAccount, Card as CardType } from '@/types';
 import { getLocalDate } from '@/utils/date';
+import { useFieldErrors } from '@/hooks/useFieldErrors';
 
 const OTHER_BANK = 'Other Bank';
 
@@ -36,7 +37,8 @@ type CardErrorKey = 'name' | 'cardNumber' | 'expiryDate' | 'cvv' | 'bankAccountI
 const isDayOfMonth = (value: string) => /^\d{1,2}$/.test(value) && Number(value) >= 1 && Number(value) <= 31;
 
 export function AccountsTab() {
-  const { state, dispatch } = useApp();
+  const { state, save } = useApp();
+  const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
   const [activeSubTab, setActiveSubTab] = useState<'accounts' | 'cards'>('accounts');
@@ -96,30 +98,20 @@ export function AccountsTab() {
     description: '',
   });
   const [transferError, setTransferError] = useState('');
+  const transferErrors = useFieldErrors<'fromEntity' | 'toEntity' | 'amount' | 'date'>();
   const [isTransferring, setIsTransferring] = useState(false);
 
   const submitTransfer = async () => {
-    if (!transferForm.fromEntity) {
-      setTransferError('Please select a source account, card, or cash wallet.');
-      return;
-    }
-    if (!transferForm.toEntity) {
-      setTransferError('Please select a destination account, card, or cash wallet.');
-      return;
-    }
-    if (transferForm.fromEntity === transferForm.toEntity) {
-      setTransferError('Source and destination accounts must be different.');
-      return;
-    }
     const numAmount = Number(transferForm.amount);
-    if (!numAmount || numAmount <= 0) {
-      setTransferError('Please enter a valid positive transfer amount.');
-      return;
-    }
-    if (!transferForm.date) {
-      setTransferError('Please enter a valid transfer date.');
-      return;
-    }
+    const valid = transferErrors.check({
+      fromEntity: transferForm.fromEntity ? undefined : 'Select where the money comes from.',
+      toEntity: !transferForm.toEntity
+        ? 'Select where the money goes.'
+        : transferForm.toEntity === transferForm.fromEntity ? 'Choose a different destination.' : undefined,
+      amount: numAmount > 0 ? undefined : 'Enter an amount greater than zero.',
+      date: transferForm.date ? undefined : 'Choose the transfer date.',
+    });
+    if (!valid) return;
 
     let fromAccountId: string | null = null;
     let fromCardId: string | null = null;
@@ -135,8 +127,8 @@ export function AccountsTab() {
 
     setIsTransferring(true);
     setTransferError('');
-    try {
-      await dispatch({
+    // On failure the store rolls back and shows the server's reason; the modal stays open.
+    const ok = await save({
         type: 'TRANSFER_FUNDS',
         fromAccountId,
         fromCardId,
@@ -145,25 +137,22 @@ export function AccountsTab() {
         amount: numAmount,
         date: transferForm.date,
         description: transferForm.description.trim() || undefined,
-      });
-      toast.success(`Transferred ${formatRs(numAmount)} successfully`);
-      setIsTransferOpen(false);
-      setTransferForm({
-        fromEntity: '',
-        toEntity: '',
-        amount: '',
-        date: getLocalDate(),
-        description: '',
-      });
-    } catch (err: any) {
-      setTransferError(err?.message || 'Transfer failed. Please try again.');
-    } finally {
-      setIsTransferring(false);
-    }
+    });
+    setIsTransferring(false);
+    if (!ok) return;
+    toast.success(`Transferred ${formatRs(numAmount)} successfully`);
+    setIsTransferOpen(false);
+    setTransferForm({
+      fromEntity: '',
+      toEntity: '',
+      amount: '',
+      date: getLocalDate(),
+      description: '',
+    });
   };
 
-  const setAccountArchived = (acc: BankAccount, isArchived: boolean) => {
-    dispatch({ type: 'UPDATE_BANK_ACCOUNT', entry: { ...acc, isArchived } });
+  const setAccountArchived = async (acc: BankAccount, isArchived: boolean) => {
+    if (!(await save({ type: 'UPDATE_BANK_ACCOUNT', entry: { ...acc, isArchived } }))) return;
     toast.success(isArchived ? `"${acc.name}" archived` : `"${acc.name}" restored`);
   };
 
@@ -202,8 +191,7 @@ export function AccountsTab() {
       tone: 'danger',
     });
     if (ok) {
-      dispatch({ type: 'DELETE_BANK_ACCOUNT', id: acc.id });
-      toast.success(`Bank account "${acc.name}" deleted`);
+      if (await save({ type: 'DELETE_BANK_ACCOUNT', id: acc.id })) toast.success(`Bank account "${acc.name}" deleted`);
     }
   };
 
@@ -216,8 +204,7 @@ export function AccountsTab() {
       tone: 'danger',
     });
     if (ok) {
-      dispatch({ type: 'DELETE_CARD', id });
-      toast.success(`Payment card "${name}" deleted`);
+      if (await save({ type: 'DELETE_CARD', id })) toast.success(`Payment card "${name}" deleted`);
     }
   };
 
@@ -252,7 +239,7 @@ export function AccountsTab() {
     clearAccountError('bankName');
   };
 
-  const submitAccount = () => {
+  const submitAccount = async () => {
     const errors: Partial<Record<AccountErrorKey, string>> = {};
     const sanitizedNumber = accountForm.accountNumber.replace(/\s+/g, '');
     if (!accountForm.name.trim()) errors.name = 'Enter a nickname for this account.';
@@ -299,12 +286,13 @@ export function AccountsTab() {
       notes: accountForm.notes.trim(),
     };
 
-    if (editAccountId) {
-      dispatch({ type: 'UPDATE_BANK_ACCOUNT', entry });
-      setEditAccountId(null);
-    } else {
-      dispatch({ type: 'ADD_BANK_ACCOUNT', entry });
-    }
+    setSaving(true);
+    const ok = await save(editAccountId ? { type: 'UPDATE_BANK_ACCOUNT', entry } : { type: 'ADD_BANK_ACCOUNT', entry });
+    setSaving(false);
+    // On failure the store has already rolled back and shown the server's reason; keep the input.
+    if (!ok) return;
+    toast.success(editAccountId ? 'Bank account updated' : 'Bank account added');
+    setEditAccountId(null);
     setAccountForm({
       name: '',
       bankName: '',
@@ -319,7 +307,7 @@ export function AccountsTab() {
     setAccountErrors({});
   };
 
-  const submitCard = () => {
+  const submitCard = async () => {
     const errors: Partial<Record<CardErrorKey, string>> = {};
     const cleanNumber = cardForm.cardNumber.replace(/\s+/g, '');
     // When editing, the full number is never stored, so the masked one stands for "unchanged".
@@ -362,12 +350,12 @@ export function AccountsTab() {
       dueDay: cardForm.dueDay ? Number(cardForm.dueDay) : undefined,
     };
 
-    if (editCardId) {
-      dispatch({ type: 'UPDATE_CARD', entry });
-      setEditCardId(null);
-    } else {
-      dispatch({ type: 'ADD_CARD', entry });
-    }
+    setSaving(true);
+    const ok = await save(editCardId ? { type: 'UPDATE_CARD', entry } : { type: 'ADD_CARD', entry });
+    setSaving(false);
+    if (!ok) return;
+    toast.success(editCardId ? 'Card updated' : 'Card added');
+    setEditCardId(null);
     setCardForm({
       name: '',
       bankAccountId: '',
@@ -426,6 +414,7 @@ export function AccountsTab() {
           onClick={() => {
             setIsTransferOpen(true);
             setTransferError('');
+            transferErrors.reset();
           }}
           className="flex items-center gap-1.5 shrink-0"
         >
@@ -721,7 +710,7 @@ export function AccountsTab() {
               </Field>
 
               <div className="flex gap-2 pt-1">
-                <Button variant="primary" className="flex-1" onClick={submitAccount}>
+                <Button variant="primary" className="flex-1" onClick={submitAccount} loading={saving}>
                   {editAccountId ? 'Update Account' : 'Save Account'}
                 </Button>
                 {editAccountId && (
@@ -1101,7 +1090,7 @@ export function AccountsTab() {
               )}
 
               <div className="flex gap-2 pt-1">
-                <Button variant="primary" className="flex-1" onClick={submitCard}>
+                <Button variant="primary" className="flex-1" onClick={submitCard} loading={saving}>
                   {editCardId ? 'Update Card' : 'Save Card'}
                 </Button>
                 {editCardId && (
@@ -1467,11 +1456,11 @@ export function AccountsTab() {
             )}
 
             <div className="grid sm:grid-cols-2 gap-3">
-              <Field id="transfer-from-select" label="From" required>
+              <Field id="transfer-from-select" label="From" required error={transferErrors.errors.fromEntity}>
                 <Select
                   id="transfer-from-select"
                   value={transferForm.fromEntity}
-                  onChange={e => setTransferForm(f => ({ ...f, fromEntity: e.target.value }))}
+                  onChange={e => { setTransferForm(f => ({ ...f, fromEntity: e.target.value })); transferErrors.clear('fromEntity', 'toEntity'); }}
                 >
                   <option value="">Select source...</option>
                   <option value="cash">Cash Wallet</option>
@@ -1488,11 +1477,11 @@ export function AccountsTab() {
                 </Select>
               </Field>
 
-              <Field id="transfer-to-select" label="To" required>
+              <Field id="transfer-to-select" label="To" required error={transferErrors.errors.toEntity}>
                 <Select
                   id="transfer-to-select"
                   value={transferForm.toEntity}
-                  onChange={e => setTransferForm(f => ({ ...f, toEntity: e.target.value }))}
+                  onChange={e => { setTransferForm(f => ({ ...f, toEntity: e.target.value })); transferErrors.clear('toEntity'); }}
                 >
                   <option value="">Select destination...</option>
                   <option value="cash">Cash Wallet</option>
@@ -1511,7 +1500,7 @@ export function AccountsTab() {
             </div>
 
             <div className="grid sm:grid-cols-2 gap-3">
-              <Field id="transfer-amount-input" label="Amount" required>
+              <Field id="transfer-amount-input" label="Amount" required error={transferErrors.errors.amount}>
                 <Input
                   id="transfer-amount-input"
                   type="number"
@@ -1519,16 +1508,16 @@ export function AccountsTab() {
                   step="any"
                   placeholder="e.g. 5000"
                   value={transferForm.amount}
-                  onChange={e => setTransferForm(f => ({ ...f, amount: e.target.value }))}
+                  onChange={e => { setTransferForm(f => ({ ...f, amount: e.target.value })); transferErrors.clear('amount'); }}
                 />
               </Field>
 
-              <Field id="transfer-date-input" label="Transfer Date" required>
+              <Field id="transfer-date-input" label="Transfer Date" required error={transferErrors.errors.date}>
                 <Input
                   id="transfer-date-input"
                   type="date"
                   value={transferForm.date}
-                  onChange={e => setTransferForm(f => ({ ...f, date: e.target.value }))}
+                  onChange={e => { setTransferForm(f => ({ ...f, date: e.target.value })); transferErrors.clear('date'); }}
                 />
               </Field>
             </div>

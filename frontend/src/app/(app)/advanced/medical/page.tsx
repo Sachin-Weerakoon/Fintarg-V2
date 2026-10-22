@@ -299,7 +299,6 @@ export default function MedicalClient() {
         <div className="max-w-2xl space-y-4">
           <Card className="p-5">
             <h3 className="font-semibold text-sm mb-1 text-text">Upload medical document</h3>
-            <p className="text-xs text-muted mb-4">Store reports, prescriptions, and lab tests securely.</p>
             <Input
               ref={fileInputRef}
               type="file"

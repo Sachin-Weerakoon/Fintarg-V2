@@ -786,9 +786,6 @@ function GoalsContent() {
                       {companyMonthlyTarget === 0 ? 'No target set' : `${companyTargetPct}% Achieved`}
                     </Badge>
                   </h4>
-                  <p className="text-xs text-muted mt-0.5">
-                    Aggregated commercial revenue across all {companyBranches.length} branch outlet(s) for {month}
-                  </p>
                 </div>
 
                 {!editingCompTarget ? (
@@ -867,7 +864,6 @@ function GoalsContent() {
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-sm font-bold text-text">Strategic Enterprise Milestones & Reserves</h4>
-                <p className="text-xs text-muted mt-0.5">Capital reserves, tax buffers, expansion funds, and corporate targets</p>
               </div>
               <Button
                 variant="secondary"
@@ -1078,7 +1074,6 @@ function GoalsContent() {
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-sm font-bold text-text">Branch Unit Milestones & Equipment Funds</h4>
-                <p className="text-xs text-muted mt-0.5">Storefront renovations, hardware upgrades, and outlet growth targets</p>
               </div>
               <Button
                 variant="secondary"

@@ -74,7 +74,6 @@ export function CompaniesTab() {
       <div className="space-y-4">
         <div>
           <h3 className="text-base font-bold text-text">Registered Companies</h3>
-          <p className="text-xs text-muted mt-0.5">Commercial legal entities and enterprise branches</p>
         </div>
 
         {state.companies.length === 0 ? (

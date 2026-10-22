@@ -566,7 +566,6 @@ export function BusinessWorkspace() {
             <StatCard
               label="Operational Costs"
               value={formatRs(monthlyCosts)}
-              detail="Total branch overheads"
               tone={monthlyCosts > monthlyRevenue ? 'danger' : 'warning'}
               icon={<Icon name="arrow-down" size={18} />}
             />
@@ -856,9 +855,6 @@ export function BusinessWorkspace() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-sm font-bold text-text">Cross-Ledger Business Expenses</h4>
-                      <p className="text-xs text-muted">
-                        Expenses paid out from {selectedCompany?.name}&apos;s operating cash logged via the Financial Hub.
-                      </p>
                     </div>
                     <Link href="/financial?tab=expenses&stream=business">
                       <Button variant="primary" size="sm" iconLeft={<Icon name="plus" size={13} />}>
@@ -967,9 +963,6 @@ export function BusinessWorkspace() {
                             : 'No Target'}
                         </Badge>
                       </h4>
-                      <p className="text-xs text-muted mt-0.5">
-                        Define monthly benchmark to monitor outlet sales throughput and run-rate pacing.
-                      </p>
                     </div>
 
                     <Link href={`/goals?domain=branch&companyId=${companyId}&branchId=${branch.id}`}>
@@ -1032,9 +1025,6 @@ export function BusinessWorkspace() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h4 className="text-base font-bold text-text">Branch Unit Milestones & Equipment Funds</h4>
-                      <p className="text-xs text-muted mt-0.5">
-                        Specific capital projects, equipment upgrades, and local sales milestones for {branch.name}
-                      </p>
                     </div>
 
                     <Button
@@ -1143,9 +1133,6 @@ export function BusinessWorkspace() {
                             {(selectedCompany.monthlyRevenueTarget ?? 0) > 0 ? formatRs(selectedCompany.monthlyRevenueTarget!) : 'Not configured'}
                           </span>
                         </div>
-                        <p className="text-[11px] text-muted mt-0.5">
-                          Set company-wide revenue milestones and corporate reserve funds in the Goals Hub.
-                        </p>
                       </div>
                     </div>
 
@@ -1179,9 +1166,6 @@ export function BusinessWorkspace() {
                         <span>Corporate Formal Letters & Official Notices</span>
                         <Badge tone="primary" size="sm">{companyLetters.length} issued</Badge>
                       </h4>
-                      <p className="text-xs text-muted mt-1">
-                        Draft, export, and manage official business correspondence printed with {selectedCompany?.name || 'the enterprise'}&apos;s legal letterhead (BR: {selectedCompany?.brNumber || 'Pending'}, TIN: {selectedCompany?.tinNumber || 'Pending'}).
-                      </p>
                     </div>
 
                     <Link href={`/advanced/letters?companyId=${selectedCompany?.id}`}>
