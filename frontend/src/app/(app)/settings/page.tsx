@@ -17,6 +17,7 @@ import type { UserPlan } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { ColorSwatch } from '@/components/ui/ColorSwatch';
+import { Chip } from '@/components/ui/Chip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Icon } from '@/components/ui/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -176,22 +177,18 @@ function AppearanceTab() {
             const isSelected = (!profile.sidebarColor && preset.id === 'default') || profile.sidebarColor === preset.color;
             const swatchBg = preset.color === 'brand' ? (profile.themeColor || '#0FA3B1') : preset.color;
             return (
-              <button
+              <Chip
                 key={preset.id}
-                type="button"
+                selected={isSelected}
                 onClick={() => update({ sidebarColor: preset.id === 'default' ? '' : preset.color })}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
-                  isSelected
-                    ? 'border-primary-500 bg-primary-500/10 text-primary-text shadow-sm'
-                    : 'border-border bg-surface hover:bg-surface-hover text-text'
-                }`}
+                className={`gap-2.5 rounded-xl px-3 py-2 ${isSelected ? '!bg-primary-500/10 !border-primary-500 !text-primary-text' : ''}`}
               >
                 <span
                   className="w-4 h-4 rounded-full border border-white/20 shadow-sm flex-shrink-0"
                   style={{ backgroundColor: swatchBg }}
                 />
                 <span>{preset.label}</span>
-              </button>
+              </Chip>
             );
           })}
         </div>

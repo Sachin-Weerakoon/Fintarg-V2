@@ -47,6 +47,7 @@
   --color-chrome-text: var(--color-chrome-text);
   --color-chrome-active: var(--color-chrome-active);
   --color-chrome-accent: var(--color-chrome-accent);
+  --color-on-dark-success: var(--color-on-dark-success);
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -111,6 +112,8 @@
   --color-chrome-text: #C3CCD9;
   --color-chrome-active: #FFFFFF;
   --color-chrome-accent: #35C2D0;
+  /* Success text on always-dark surfaces (hero panels, notification panel, auth pages). */
+  --color-on-dark-success: #6EE7B7;
 
   /* Elevation */
   --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
@@ -355,6 +358,25 @@ body:has(.dark-mode) {
   cursor: not-allowed;
 }
 
+.btn-link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--color-primary-text);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+}
+.btn-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+.btn-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .btn-ghost {
   background: transparent;
   border: 1px solid transparent;

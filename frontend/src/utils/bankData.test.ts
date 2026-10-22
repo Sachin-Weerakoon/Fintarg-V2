@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cvvLength, expiryProblem, isValidCardNumber } from './bankData';
+import { expiryProblem, isValidCardNumber } from './bankData';
 
 describe('bank card rules', () => {
   it('isValidCardNumber accepts Luhn-valid numbers with or without spaces', () => {
@@ -12,12 +12,6 @@ describe('bank card rules', () => {
     expect(isValidCardNumber('4111 1111 1111 1112')).toBe(false);
     expect(isValidCardNumber('41111111111')).toBe(false);
     expect(isValidCardNumber('•••• •••• •••• 1111')).toBe(false);
-  });
-
-  it('cvvLength is 4 only for Amex', () => {
-    expect(cvvLength('amex')).toBe(4);
-    expect(cvvLength('visa')).toBe(3);
-    expect(cvvLength(undefined)).toBe(3);
   });
 
   it('expiryProblem keeps a card valid through its expiry month', () => {

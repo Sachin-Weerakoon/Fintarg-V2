@@ -61,7 +61,7 @@ export default function ResetPassword({ params }: { params: Promise<{ token: str
         <h2 className="text-2xl font-bold tracking-tight text-white mb-6">Set a new password</h2>
 
         <form onSubmit={submit} noValidate className="space-y-4">
-          <Field id="password" label={<span className="text-slate-200">New password</span>} error={error}>
+          <Field id="password" label={<span className="text-white/90">New password</span>} error={error}>
             <PasswordField
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -87,7 +87,7 @@ export default function ResetPassword({ params }: { params: Promise<{ token: str
           </Button>
         </form>
 
-        <p className="text-center text-xs mt-6 text-slate-400">
+        <p className="text-center text-xs mt-6 text-white/60">
           <Link href="/welcome?tab=signin" className="text-primary-400 font-semibold hover:text-primary-300 hover:underline">
             ← Back to sign in
           </Link>

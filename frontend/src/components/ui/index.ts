@@ -44,3 +44,5 @@ export * from './ColorSwatch';
 export * from './BrandLogo';
 export * from './FormCard';
 export * from './FormalLetterSheet';
+export * from './Chip';
+export * from './RangeSlider';

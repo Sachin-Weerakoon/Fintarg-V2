@@ -42,15 +42,15 @@ export default function ForgotPassword() {
           <BrandLogo variant="full" height={32} />
         </div>
 
-        <h2 className="text-2xl font-bold tracking-tight text-white mb-2">Reset your password</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-white mb-6">Reset your password</h2>
 
         {sent ? (
-          <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-sm">
+          <div className="p-4 rounded-xl border border-on-dark-success/30 bg-on-dark-success/10 text-on-dark-success text-sm">
             Check your email! If an account exists, a password reset link has been dispatched.
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
-            <Field id="email" label={<span className="text-slate-200">Email address</span>} error={error}>
+            <Field id="email" label={<span className="text-white/90">Email address</span>} error={error}>
               <Input
                 type="email"
                 value={email}
@@ -78,7 +78,7 @@ export default function ForgotPassword() {
           </form>
         )}
 
-        <p className="text-center text-xs mt-6 text-slate-400">
+        <p className="text-center text-xs mt-6 text-white/60">
           <Link href="/welcome?tab=signin" className="text-primary-400 font-semibold hover:text-primary-300 hover:underline">
             ← Back to sign in
           </Link>

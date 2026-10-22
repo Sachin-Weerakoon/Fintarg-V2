@@ -18,7 +18,7 @@ import { Alert } from '@/components/ui/Alert';
 import {
   SRI_LANKAN_BANKS,
   SRI_LANKAN_BANK_DETAILS,
-  cvvLength,
+  CVV_LENGTH,
   detectCardNetwork,
   expiryProblem,
   formatCardNumberInput,
@@ -319,8 +319,10 @@ export function AccountsTab() {
     }
     const expiryIssue = cardForm.expiryDate ? expiryProblem(cardForm.expiryDate) : 'Enter the expiry date.';
     if (expiryIssue) errors.expiryDate = expiryIssue;
-    const codeLength = cvvLength(cardForm.cardNetwork);
-    if (cardForm.cvv && cardForm.cvv.length !== codeLength) errors.cvv = `CVV must be ${codeLength} digits.`;
+    // The server never stores the CVV, so when editing it is only asked for again if the number changes.
+    const cvvNeeded = !editCardId || !numberUnchanged;
+    if (cvvNeeded && !cardForm.cvv) errors.cvv = 'Enter the 3-digit CVV.';
+    else if (cardForm.cvv && cardForm.cvv.length !== CVV_LENGTH) errors.cvv = `CVV must be exactly ${CVV_LENGTH} digits.`;
     if (cardForm.cardType === 'debit' && !cardForm.bankAccountId) {
       errors.bankAccountId = 'Select the bank account this debit card draws from.';
     }
@@ -953,7 +955,6 @@ export function AccountsTab() {
                         cardNumber: formatted,
                         lastFourDigits: cleanDigits.length >= 4 ? cleanDigits.slice(-4) : f.lastFourDigits,
                         cardNetwork,
-                        cvv: f.cvv.slice(0, cvvLength(cardNetwork)),
                       };
                     });
                     clearCardError('cardNumber');
@@ -980,19 +981,19 @@ export function AccountsTab() {
                     hasError={Boolean(cardErrors.expiryDate)}
                   />
                 </Field>
-                <Field id="card-cvv" label="CVV" error={cardErrors.cvv}>
+                <Field id="card-cvv" label="CVV" required={!editCardId || !cardForm.cardNumber.includes('•')} error={cardErrors.cvv}>
                   <Input
                     type="password"
                     inputMode="numeric"
                     autoComplete="cc-csc"
-                    maxLength={cvvLength(cardForm.cardNetwork)}
+                    maxLength={CVV_LENGTH}
                     value={cardForm.cvv}
                     onChange={e => {
-                      const digits = e.target.value.replace(/\D/g, '').slice(0, cvvLength(cardForm.cardNetwork));
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, CVV_LENGTH);
                       setCardForm(f => ({ ...f, cvv: digits }));
                       clearCardError('cvv');
                     }}
-                    placeholder={cvvLength(cardForm.cardNetwork) === 4 ? '••••' : '•••'}
+                    placeholder="•••"
                     hasError={Boolean(cardErrors.cvv)}
                   />
                 </Field>
@@ -1016,8 +1017,7 @@ export function AccountsTab() {
                     value={cardForm.cardNetwork}
                     onChange={e => {
                       const cardNetwork = e.target.value as CardType['cardNetwork'];
-                      setCardForm(f => ({ ...f, cardNetwork, cvv: f.cvv.slice(0, cvvLength(cardNetwork)) }));
-                      clearCardError('cvv');
+                      setCardForm(f => ({ ...f, cardNetwork }));
                     }}
                   >
                     <option value="visa">Visa</option>
