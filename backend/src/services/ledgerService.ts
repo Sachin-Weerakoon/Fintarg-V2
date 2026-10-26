@@ -54,14 +54,18 @@ export async function withLedgerSession<T>(
 /**
  * Ensures that a built-in non-deletable 'cash' account exists for the user.
  */
-export async function ensureCashWallet(userId: string | mongoose.Types.ObjectId): Promise<IBankAccount> {
+export async function ensureCashWallet(
+  userId: string | mongoose.Types.ObjectId,
+  session?: mongoose.ClientSession,
+): Promise<IBankAccount> {
   const uId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
-  const existing = await BankAccountModel.findOne({ userId: uId, accountType: 'cash' });
+  const opts = session ? { session } : {};
+  const existing = await BankAccountModel.findOne({ userId: uId, accountType: 'cash' }, null, opts);
   if (existing) {
     return existing;
   }
 
-  const created = await BankAccountModel.create({
+  const doc = new BankAccountModel({
     userId: uId,
     bankName: 'Cash',
     accountName: 'Cash Wallet',
@@ -70,10 +74,10 @@ export async function ensureCashWallet(userId: string | mongoose.Types.ObjectId)
     balanceCents: 0,
     openingBalanceCents: 0,
     currency: 'LKR',
-    isDefault: false,
+    isDefault: true,
   });
-
-  return created;
+  await doc.save(opts);
+  return doc;
 }
 
 /**

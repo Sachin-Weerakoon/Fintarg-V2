@@ -718,7 +718,9 @@ describe('Backend API Integration Tests', () => {
       });
       assert.strictEqual(bAccountsRes.status, 200);
       const bAccounts = (await bAccountsRes.json()).data;
-      assert.strictEqual(bAccounts.length, 0);
+      assert.strictEqual(bAccounts.length, 1);
+      assert.strictEqual(bAccounts[0].accountType, 'cash');
+      assert.strictEqual(bAccounts.some((a: any) => a._id === userABankAccountId), false);
 
       // 2. User B tries to update User A loan -> 404
       const bPatchLoanRes = await fetch(`${baseUrl}/api/records/loans/${userALoanId}`, {

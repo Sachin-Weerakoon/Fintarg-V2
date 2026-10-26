@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { randomBytes } from 'node:crypto';
 import { ProfileModel } from '../models/Profile';
-import { UserModel } from '../models/User';
+import { UserModel, type IUser } from '../models/User';
 import { BankAccountModel } from '../models/BankAccount';
 import { CardModel } from '../models/Card';
 import { TransactionModel } from '../models/Transaction';
@@ -28,7 +28,7 @@ import { AuditLogModel } from '../models/AuditLog';
 import { SessionModel } from '../models/Session';
 import { HttpError } from '../middleware/errors';
 import { hashPassword, verifyPassword } from '../utils/password';
-import { withLedgerSession } from './ledgerService';
+import { ensureCashWallet, withLedgerSession } from './ledgerService';
 
 export type RegisterInput = { name: string; email: string; password: string; workMode: 'salary' | 'business' | 'both' };
 
@@ -38,10 +38,12 @@ export async function registerUser(input: RegisterInput) {
 
   const credentials = await hashPassword(input.password, randomBytes(16).toString('hex'));
   const plan = input.workMode === 'salary' ? 'basic' : 'business';
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-  let user;
-  try {
-    user = await UserModel.create({
+  return await withLedgerSession(async (session) => {
+    const opts = session ? { session } : {};
+    const userDoc: IUser = new UserModel({
       email,
       name: input.name.trim(),
       passwordHash: credentials.hash,
@@ -50,20 +52,52 @@ export async function registerUser(input: RegisterInput) {
       workMode: input.workMode,
       tokenVersion: 0,
     });
-  } catch (err: unknown) {
-    if (err && typeof err === 'object' && ('code' in err) && (err as { code: unknown }).code === 11000) {
-      throw new HttpError(409, 'Email already registered');
-    }
-    throw err;
-  }
 
-  try {
-    const profile = await ProfileModel.create({ userId: user._id, name: user.name, email: user.email, plan, workMode: user.workMode });
-    return { user, profile };
-  } catch (error) {
-    await UserModel.deleteOne({ _id: user._id });
-    throw error;
-  }
+    try {
+      // Layer 1: User Account Document
+      await userDoc.save(opts);
+
+      // Layer 2: User Profile Document with Defaults
+      const profileDoc = new ProfileModel({
+        userId: userDoc._id,
+        name: userDoc.name,
+        email: userDoc.email,
+        plan,
+        workMode: userDoc.workMode,
+        themeColor: '#0FA3B1',
+        darkMode: true,
+        textSize: 'medium',
+      });
+      await profileDoc.save(opts);
+
+      // Layer 3: Built-in Non-Deletable Cash Wallet
+      const cashWallet = await ensureCashWallet(userDoc._id, session);
+
+      // Layer 4: Initial Personal Budget Document for Current Month
+      const budgetDoc = new PersonalBudgetModel({
+        userId: userDoc._id,
+        month: currentMonth,
+        budgetCents: 0,
+      });
+      await budgetDoc.save(opts);
+
+      return { user: userDoc, profile: profileDoc, cashWallet, personalBudget: budgetDoc };
+    } catch (err: unknown) {
+      // Compensating cleanup for standalone environments without replica set transactions
+      if (!session) {
+        await Promise.allSettled([
+          UserModel.deleteOne({ _id: userDoc._id }),
+          ProfileModel.deleteMany({ userId: userDoc._id }),
+          BankAccountModel.deleteMany({ userId: userDoc._id }),
+          PersonalBudgetModel.deleteMany({ userId: userDoc._id }),
+        ]);
+      }
+      if (err && typeof err === 'object' && ('code' in err) && (err as { code: unknown }).code === 11000) {
+        throw new HttpError(409, 'Email already registered');
+      }
+      throw err;
+    }
+  });
 }
 
 const DUMMY_SALT = '0123456789abcdef0123456789abcdef';

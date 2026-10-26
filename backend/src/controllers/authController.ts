@@ -17,9 +17,13 @@ function setSessionCookie(response: Parameters<RequestHandler>[1], userId: strin
 }
 
 export const register: RequestHandler = asyncHandler(async (request, response) => {
-  const { user, profile } = await registerUser(request.body);
+  const { user, profile, cashWallet } = await registerUser(request.body);
   setSessionCookie(response, user.id, user.tokenVersion ?? 0);
-  response.status(201).json({ ok: true, user: { id: user.id, name: user.name, email: user.email, plan: user.plan, workMode: user.workMode, profile } });
+  response.status(201).json({
+    ok: true,
+    user: { id: user.id, name: user.name, email: user.email, plan: user.plan, workMode: user.workMode, profile },
+    cashWallet: cashWallet ? { id: cashWallet.id, accountName: cashWallet.accountName, balanceCents: cashWallet.balanceCents } : undefined,
+  });
 });
 
 export const login: RequestHandler = asyncHandler(async (request, response) => {
