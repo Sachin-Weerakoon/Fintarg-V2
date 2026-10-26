@@ -23,6 +23,8 @@ export interface IFinancePayment extends Document {
   payee?: string;
   frequency?: 'monthly' | 'one-time';
   status?: 'active' | 'completed' | 'cleared' | 'cancelled';
+  sourceType: 'salary' | 'business';
+  companyId?: mongoose.Types.ObjectId | null;
   payments: IFinancePaymentHistory[];
   createdAt: Date;
   updatedAt: Date;
@@ -50,6 +52,8 @@ const FinancePaymentSchema = new Schema<IFinancePayment>({
   payee: { type: String, default: '', trim: true },
   frequency: { type: String, enum: ['monthly', 'one-time'], default: 'monthly' },
   status: { type: String, enum: ['active', 'completed', 'cleared', 'cancelled'], default: 'active' },
+  sourceType: { type: String, enum: ['salary', 'business'], default: 'salary' },
+  companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null },
   payments: [FinancePaymentHistorySchema],
 }, { timestamps: true });
 

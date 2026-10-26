@@ -24,6 +24,8 @@ export interface IPawnedItem extends Document {
   interestRatePercent: number;
   nextDue: string;
   redemptionDate: string;
+  sourceType: 'salary' | 'business';
+  companyId?: mongoose.Types.ObjectId | null;
   payments: IPawnPayment[];
   createdAt: Date;
   updatedAt: Date;
@@ -52,6 +54,8 @@ const PawnedItemSchema = new Schema<IPawnedItem>({
   interestRatePercent: { type: Number, required: true, min: 0 },
   nextDue: { type: String, required: true },
   redemptionDate: { type: String, default: '' },
+  sourceType: { type: String, enum: ['salary', 'business'], default: 'salary' },
+  companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null },
   payments: [PawnPaymentSchema],
 }, { timestamps: true });
 

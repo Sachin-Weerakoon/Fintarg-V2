@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
 import { FormCard } from '@/components/ui/FormCard';
+import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
@@ -21,11 +22,20 @@ import { useFieldErrors } from '@/hooks/useFieldErrors';
 
 type PawnErrorKey = 'description' | 'ticketNumber' | 'amountReceived' | 'interestRate' | 'nextDue';
 
-export function PawnedTab() {
+export function PawnedTab({
+  streamScope = 'all',
+  companyId,
+}: {
+  streamScope?: 'all' | 'salary' | 'business';
+  companyId?: string;
+} = {}) {
   const { state, save } = useApp();
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
+
+  const hasBusiness = state.profile.workMode === 'both' || state.profile.workMode === 'business' || (state.companies && state.companies.length > 0);
+  const defaultSourceType: 'salary' | 'business' = streamScope === 'business' ? 'business' : 'salary';
 
   const [form, setForm] = useState({
     description: '',
@@ -34,8 +44,23 @@ export function PawnedTab() {
     interestRate: '',
     nextDue: getLocalDate(),
     redemptionDate: '',
+    sourceType: defaultSourceType,
+    companyId: companyId && companyId !== 'all' ? companyId : '',
   });
   const [errors, setErrors] = useState<Partial<Record<PawnErrorKey, string>>>({});
+
+  const filteredPawnedItems = useMemo(() => {
+    let list = state.pawnedItems;
+    if (streamScope === 'salary') {
+      list = list.filter(p => p.sourceType !== 'business');
+    } else if (streamScope === 'business') {
+      list = list.filter(p => p.sourceType === 'business');
+      if (companyId && companyId !== 'all') {
+        list = list.filter(p => p.companyId === companyId);
+      }
+    }
+    return list;
+  }, [state.pawnedItems, streamScope, companyId]);
 
   const updateForm = (patch: Partial<typeof form>, key?: PawnErrorKey) => {
     setForm(f => ({ ...f, ...patch }));
@@ -85,6 +110,8 @@ export function PawnedTab() {
         nextDue,
         redemptionDate,
         status: 'active',
+        sourceType: form.sourceType,
+        companyId: form.sourceType === 'business' ? (form.companyId || undefined) : undefined,
         payments: [],
       },
     });
@@ -99,6 +126,8 @@ export function PawnedTab() {
       interestRate: '',
       nextDue: getLocalDate(),
       redemptionDate: '',
+      sourceType: defaultSourceType,
+      companyId: companyId && companyId !== 'all' ? companyId : '',
     });
   };
 
@@ -214,24 +243,25 @@ export function PawnedTab() {
     <div className="grid md:grid-cols-2 gap-6">
       <div>
         <h3 className="font-semibold text-sm mb-3 text-text">Pawned items</h3>
-        {state.pawnedItems.length === 0 ? (
+        {filteredPawnedItems.length === 0 ? (
           <EmptyState
             title="No pawned items"
-            helper="Track pawned gold items, monthly interest rates, and redemption deadlines."
+            helper={streamScope === 'business' ? 'No pawned items recorded under business funds.' : 'Track pawned gold items, monthly interest rates, and redemption deadlines.'}
           />
         ) : (
           <div className="space-y-3">
-            {state.pawnedItems.map(p => {
+            {filteredPawnedItems.map(p => {
               const status = p.status || 'active';
               const principalOutstanding = p.principalOutstanding !== undefined ? p.principalOutstanding : p.amountReceived;
               const interestPaid = p.interestPaid || 0;
               const statusTone = status === 'redeemed' ? 'success' : status === 'forfeited' ? 'danger' : 'primary';
+              const linkedCompany = p.companyId ? state.companies.find(c => c.id === p.companyId) : null;
 
               return (
                 <Card key={p.id} className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-sm text-text">{p.description}</span>
                         {p.ticketNumber && (
                           <span className="text-[11px] font-mono text-muted bg-surface-hover px-1.5 py-0.5 rounded border border-border">
@@ -240,6 +270,9 @@ export function PawnedTab() {
                         )}
                         <Badge tone={statusTone} size="sm">
                           {status.toUpperCase()}
+                        </Badge>
+                        <Badge tone={p.sourceType === 'business' ? 'warning' : 'neutral'} size="sm">
+                          {p.sourceType === 'business' ? (linkedCompany ? linkedCompany.name : 'Business') : 'Salary'}
                         </Badge>
                       </div>
                       <div className="text-xs text-muted mt-1 space-x-2">
@@ -349,6 +382,35 @@ export function PawnedTab() {
         title="Add Pawned Item"
         className="h-fit sticky top-4"
       >
+        {hasBusiness && (
+          <div className="p-3.5 rounded-xl bg-surface-hover/60 border border-border space-y-3 mb-2">
+            <Field id="pawn-source-type" label="Funds Source">
+              <SegmentedTabs
+                size="sm"
+                options={[
+                  { id: 'salary', label: 'Salary / Personal' },
+                  { id: 'business', label: 'Business Money' },
+                ]}
+                value={form.sourceType}
+                onChange={v => updateForm({ sourceType: v as 'salary' | 'business', companyId: '' })}
+              />
+            </Field>
+
+            {form.sourceType === 'business' && (
+              <Field id="pawn-company" label="Business Enterprise">
+                <Select
+                  value={form.companyId}
+                  onChange={e => updateForm({ companyId: e.target.value })}
+                >
+                  <option value="">{state.companies.length ? 'Select business (optional)' : 'General business'}</option>
+                  {state.companies.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+          </div>
+        )}
         <Field id="pawn-desc" label="Description" required error={errors.description}>
           <Input
             value={form.description}

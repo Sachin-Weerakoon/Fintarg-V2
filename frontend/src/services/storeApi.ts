@@ -207,8 +207,9 @@ export async function loadPersistedData(plan: UserPlan = 'basic'): Promise<Parti
       chequeNumber: row.chequeNumber,
       bankAccountId: row.bankAccountId ? String(row.bankAccountId) : undefined,
       payee: row.payee,
-      frequency: row.frequency,
       status: row.status,
+      sourceType: row.sourceType || 'salary',
+      companyId: row.companyId ? String(row.companyId) : undefined,
       payments: (row.payments || []).map((p: RawRecord) => ({
         id: p._id,
         _id: p._id,
@@ -233,6 +234,8 @@ export async function loadPersistedData(plan: UserPlan = 'basic'): Promise<Parti
       tenureMonths: row.tenureMonths,
       monthlyPayment: row.monthlyPaymentCents ? row.monthlyPaymentCents / 100 : undefined,
       totalInterest: row.totalInterestCents ? row.totalInterestCents / 100 : undefined,
+      sourceType: row.sourceType || 'salary',
+      companyId: row.companyId ? String(row.companyId) : undefined,
       repayments: (row.repayments || []).map((r: RawRecord) => ({
         id: r._id,
         _id: r._id,
@@ -303,6 +306,8 @@ export async function loadPersistedData(plan: UserPlan = 'basic'): Promise<Parti
       interestRate: row.interestRatePercent,
       nextDue: row.nextDue,
       redemptionDate: row.redemptionDate,
+      sourceType: row.sourceType || 'salary',
+      companyId: row.companyId ? String(row.companyId) : undefined,
       payments: (row.payments || []).map((p: RawRecord) => ({
         id: p._id,
         _id: p._id,
@@ -580,6 +585,8 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
       };
       if (action.entry.interestBasis) payload.interestBasis = action.entry.interestBasis;
       if (action.entry.tenureMonths) payload.tenureMonths = action.entry.tenureMonths;
+      if (action.entry.sourceType) payload.sourceType = action.entry.sourceType;
+      if (action.entry.companyId) payload.companyId = action.entry.companyId;
       return create('/api/backend/records/loans', payload);
     }
     case 'UPDATE_LOAN': {
@@ -594,6 +601,8 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
       if (src.dueDate !== undefined) payload.dueDate = src.dueDate;
       if (src.interestBasis !== undefined) payload.interestBasis = src.interestBasis;
       if (src.tenureMonths !== undefined) payload.tenureMonths = src.tenureMonths;
+      if (src.sourceType !== undefined) payload.sourceType = src.sourceType;
+      if (src.companyId !== undefined) payload.companyId = src.companyId;
       return void (await send(`/api/backend/records/loans/${id}`, 'PATCH', payload));
     }
     case 'DELETE_LOAN':

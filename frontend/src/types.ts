@@ -150,6 +150,8 @@ export interface FinancePayment {
   /** Matches the server enums; the server advances every payment monthly. */
   frequency?: 'monthly' | 'one-time';
   status?: 'active' | 'cleared' | 'cancelled' | 'completed';
+  sourceType?: 'salary' | 'business';
+  companyId?: string;
   payments?: FinancePaymentHistory[];
 }
 
@@ -179,6 +181,8 @@ export interface Loan {
   tenureMonths?: number;
   monthlyPayment?: number;
   totalInterest?: number;
+  sourceType?: 'salary' | 'business';
+  companyId?: string;
   repayments?: LoanRepayment[];
 }
 
@@ -205,6 +209,8 @@ export interface PawnedItem {
   interestRate: number;
   nextDue: string;
   redemptionDate: string;
+  sourceType?: 'salary' | 'business';
+  companyId?: string;
   payments?: PawnPayment[];
 }
 

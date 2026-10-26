@@ -267,6 +267,14 @@ function toStoredForCreate(kind: RecordKind, input: Record<string, unknown>) {
       stored.cardId = null;
     }
   }
+  if ('companyId' in stored) {
+    if (stored.companyId) {
+      if (!mongoose.isValidObjectId(stored.companyId)) throw new HttpError(400, 'Invalid company id');
+      stored.companyId = new mongoose.Types.ObjectId(String(stored.companyId));
+    } else {
+      stored.companyId = null;
+    }
+  }
   return stored;
 }
 
@@ -388,6 +396,14 @@ function toStoredForUpdate(kind: RecordKind, input: Record<string, unknown>, exi
       stored.cardId = null;
     }
   }
+  if ('companyId' in stored) {
+    if (stored.companyId) {
+      if (!mongoose.isValidObjectId(stored.companyId)) throw new HttpError(400, 'Invalid company id');
+      stored.companyId = new mongoose.Types.ObjectId(String(stored.companyId));
+    } else {
+      stored.companyId = null;
+    }
+  }
   return stored;
 }
 
@@ -475,7 +491,7 @@ export async function createRecord(kind: RecordKind, userId: string, input: Reco
   if (kind === 'loans' && input.dueDate && input.startDate && String(input.dueDate) < String(input.startDate)) {
     throw new HttpError(400, 'Due date cannot be before start date');
   }
-  if (input.companyId && (kind === 'businessBranches' || kind === 'ownerDraws' || kind === 'expenses')) {
+  if (input.companyId && (kind === 'businessBranches' || kind === 'ownerDraws' || kind === 'expenses' || kind === 'loans' || kind === 'pawnedItems' || kind === 'financePayments')) {
     if (!mongoose.isValidObjectId(input.companyId)) throw new HttpError(400, 'Invalid company id');
     if (!await CompanyModel.exists({ _id: input.companyId, userId })) throw new HttpError(404, 'Company not found');
   }
@@ -585,7 +601,7 @@ export async function createRecord(kind: RecordKind, userId: string, input: Reco
 
 export async function updateRecord(kind: RecordKind, userId: string, id: string, input: Record<string, unknown>) {
   if (!mongoose.isValidObjectId(id)) throw new HttpError(400, 'Invalid record id');
-  if (input.companyId && (kind === 'businessBranches' || kind === 'ownerDraws' || kind === 'expenses')) {
+  if (input.companyId && (kind === 'businessBranches' || kind === 'ownerDraws' || kind === 'expenses' || kind === 'loans' || kind === 'pawnedItems' || kind === 'financePayments')) {
     if (!mongoose.isValidObjectId(input.companyId)) throw new HttpError(400, 'Invalid company id');
     if (!await CompanyModel.exists({ _id: input.companyId, userId })) throw new HttpError(404, 'Company not found');
   }

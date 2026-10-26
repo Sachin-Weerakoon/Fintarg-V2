@@ -25,6 +25,8 @@ export interface ILoan extends Document {
   startDate: string;
   dueDate: string;
   balanceCents: number;
+  sourceType: 'salary' | 'business';
+  companyId?: mongoose.Types.ObjectId | null;
   repayments: ILoanRepayment[];
   createdAt: Date;
   updatedAt: Date;
@@ -43,6 +45,8 @@ const LoanSchema = new Schema<ILoan>({
   startDate: { type: String, required: true },
   dueDate: { type: String, default: '' },
   balanceCents: { type: Number, required: true, min: 0 },
+  sourceType: { type: String, enum: ['salary', 'business'], default: 'salary' },
+  companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null },
   repayments: [{
     date: { type: String, required: true },
     amountCents: { type: Number, required: true },

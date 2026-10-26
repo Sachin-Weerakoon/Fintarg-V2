@@ -220,6 +220,8 @@ const financePaymentSchema = z.object({
   payee: z.string().trim().max(120).default(''),
   frequency: z.enum(['monthly', 'one-time']).default('monthly'),
   status: z.enum(['active', 'completed', 'cleared', 'cancelled']).default('active'),
+  sourceType: z.enum(['salary', 'business']).optional().default('salary'),
+  companyId: z.string().optional().nullable(),
 });
 
 const loanSchema = z.object({
@@ -231,6 +233,8 @@ const loanSchema = z.object({
   tenureMonths: z.coerce.number().int().min(1).max(600).default(12),
   startDate: date,
   dueDate: optionalIsoDateSchema.default(''),
+  sourceType: z.enum(['salary', 'business']).optional().default('salary'),
+  companyId: z.string().optional().nullable(),
 });
 
 const pawnedItemSchema = z.object({
@@ -243,6 +247,8 @@ const pawnedItemSchema = z.object({
   nextDue: date,
   redemptionDate: optionalIsoDateSchema.default(''),
   status: z.enum(['active', 'redeemed', 'forfeited']).default('active'),
+  sourceType: z.enum(['salary', 'business']).optional().default('salary'),
+  companyId: z.string().optional().nullable(),
 });
 
 const goalSchema = z.object({

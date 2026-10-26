@@ -28,11 +28,27 @@ type FormErrorKey = 'label' | 'chequeNumber' | 'amount' | 'dueDay' | 'nextDueDat
 // Cheques and standing orders are drawn on a current account.
 const CHEQUE_ACCOUNT_TYPES: NonNullable<BankAccount['accountType']>[] = ['current', 'checking'];
 
-export function FinanceTab() {
+export function FinanceTab({
+  streamScope = 'all',
+  companyId,
+}: {
+  streamScope?: 'all' | 'salary' | 'business';
+  companyId?: string;
+} = {}) {
   const { state, save } = useApp();
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
+
+  const hasBusiness = state.profile.workMode === 'both' || state.profile.workMode === 'business' || (state.companies && state.companies.length > 0);
+  const defaultSourceType: 'salary' | 'business' =
+    streamScope === 'business'
+      ? 'business'
+      : streamScope === 'salary'
+      ? 'salary'
+      : state.profile.workMode === 'business'
+      ? 'business'
+      : 'salary';
 
   const emptyForm = {
     paymentKind: 'instalment' as NonNullable<FinancePayment['paymentKind']>,
@@ -46,6 +62,8 @@ export function FinanceTab() {
     frequency: 'monthly' as NonNullable<FinancePayment['frequency']>,
     bankAccountId: '',
     status: 'active' as NonNullable<FinancePayment['status']>,
+    sourceType: defaultSourceType,
+    companyId: companyId && companyId !== 'all' ? companyId : '',
   };
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
@@ -131,6 +149,8 @@ export function FinanceTab() {
       frequency: kind === 'cheque' ? 'one-time' : kind === 'standing_order' ? form.frequency : 'monthly',
       bankAccountId: form.bankAccountId || undefined,
       status: form.status,
+      sourceType: form.sourceType,
+      companyId: form.sourceType === 'business' ? (form.companyId || undefined) : undefined,
       payments: existing?.payments || [],
     };
 
@@ -213,10 +233,18 @@ export function FinanceTab() {
     }
   };
 
-  const filteredPayments = state.financePayments.filter(f => {
-    if (filterKind === 'all') return true;
-    return (f.paymentKind || 'instalment') === filterKind;
-  });
+  const filteredPayments = useMemo(() => {
+    return state.financePayments.filter(f => {
+      if (filterKind !== 'all' && (f.paymentKind || 'instalment') !== filterKind) return false;
+      const itemSource = f.sourceType || 'salary';
+      if (streamScope === 'salary' && itemSource !== 'salary') return false;
+      if (streamScope === 'business') {
+        if (itemSource !== 'business') return false;
+        if (companyId && companyId !== 'all' && f.companyId !== companyId) return false;
+      }
+      return true;
+    });
+  }, [state.financePayments, filterKind, streamScope, companyId]);
 
   return (
     <div className="grid md:grid-cols-3 gap-6">
@@ -256,13 +284,17 @@ export function FinanceTab() {
                 : 'primary';
 
               const isActive = status === 'active' && fp.monthsRemaining > 0;
+              const linkedCompany = fp.companyId ? state.companies.find(c => c.id === fp.companyId) : null;
 
               return (
                 <Card key={fp.id} className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-sm text-text truncate">{label}</span>
+                        <Badge tone={fp.sourceType === 'business' ? 'warning' : 'neutral'} size="sm" className="text-[10px]">
+                          {fp.sourceType === 'business' ? (linkedCompany ? linkedCompany.name : 'Business') : 'Salary'}
+                        </Badge>
                         <Badge tone={kind === 'cheque' ? 'warning' : kind === 'standing_order' ? 'primary' : 'neutral'} size="sm" className="capitalize text-[10px]">
                           {kind.replace('_', ' ')}
                         </Badge>
@@ -317,6 +349,8 @@ export function FinanceTab() {
                             frequency: fp.frequency === 'one-time' ? 'one-time' : 'monthly',
                             bankAccountId: fp.bankAccountId || '',
                             status: fp.status || 'active',
+                            sourceType: fp.sourceType || defaultSourceType,
+                            companyId: fp.companyId || '',
                           });
                         }}
                         aria-label="Edit payment"
@@ -388,6 +422,34 @@ export function FinanceTab() {
         }
         className="h-fit sticky top-4"
       >
+        {hasBusiness && (
+          <div className="p-3.5 rounded-xl bg-surface-hover/60 border border-border space-y-3 mb-2">
+            <Field id="fp-source-type" label="Payment Source / Obligation For">
+              <SegmentedTabs
+                size="sm"
+                options={[
+                  { id: 'salary', label: 'Salary / Personal' },
+                  { id: 'business', label: 'Business Money' },
+                ]}
+                value={form.sourceType}
+                onChange={v => updateForm({ sourceType: v as 'salary' | 'business', companyId: '' })}
+              />
+            </Field>
+            {form.sourceType === 'business' && (
+              <Field id="fp-company" label="Business Enterprise">
+                <Select
+                  value={form.companyId}
+                  onChange={e => updateForm({ companyId: e.target.value })}
+                >
+                  <option value="">{state.companies.length ? 'Select business (optional)' : 'General business'}</option>
+                  {state.companies.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+          </div>
+        )}
         <Field id="fp-kind" label="Payment Type" required>
           <Select
             value={form.paymentKind}

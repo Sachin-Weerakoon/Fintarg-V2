@@ -3,7 +3,9 @@ import { useState, useMemo } from 'react';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
 import { FormCard } from '@/components/ui/FormCard';
+import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { StatCard } from '@/components/ui/StatCard';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
@@ -28,11 +30,20 @@ import { useFieldErrors } from '@/hooks/useFieldErrors';
 
 const BANK_METHODS = ['bank_transfer', 'cheque', 'standing_order', 'debit_card'];
 
-export function LoansTab() {
+export function LoansTab({
+  streamScope = 'all',
+  companyId,
+}: {
+  streamScope?: 'all' | 'salary' | 'business';
+  companyId?: string;
+} = {}) {
   const { state, save } = useApp();
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
+
+  const hasBusiness = state.profile.workMode === 'both' || state.profile.workMode === 'business' || (state.companies && state.companies.length > 0);
+  const defaultSourceType: 'salary' | 'business' = streamScope === 'business' ? 'business' : 'salary';
 
   const [form, setForm] = useState({
     lender: '',
@@ -43,6 +54,8 @@ export function LoansTab() {
     tenureMonths: '12',
     startDate: getLocalDate(),
     dueDate: '',
+    sourceType: defaultSourceType,
+    companyId: companyId && companyId !== 'all' ? companyId : '',
   });
   const [editId, setEditId] = useState<string | null>(null);
   const loanErrors = useFieldErrors<'lender' | 'amount' | 'rate' | 'tenureMonths' | 'startDate' | 'dueDate'>();
@@ -61,10 +74,23 @@ export function LoansTab() {
   // Amortization sheet state
   const [amortizingLoan, setAmortizingLoan] = useState<Loan | null>(null);
 
+  const filteredLoans = useMemo(() => {
+    let list = state.loans;
+    if (streamScope === 'salary') {
+      list = list.filter(l => l.sourceType !== 'business');
+    } else if (streamScope === 'business') {
+      list = list.filter(l => l.sourceType === 'business');
+      if (companyId && companyId !== 'all') {
+        list = list.filter(l => l.companyId === companyId);
+      }
+    }
+    return list;
+  }, [state.loans, streamScope, companyId]);
+
   // Summary calculations
-  const totalPrincipal = state.loans.reduce((s, l) => s + l.principal, 0);
-  const totalBalance = state.loans.reduce((s, l) => s + l.balance, 0);
-  const totalMonthlyEMI = state.loans.reduce((s, l) => s + (l.monthlyPayment || 0), 0);
+  const totalPrincipal = filteredLoans.reduce((s, l) => s + l.principal, 0);
+  const totalBalance = filteredLoans.reduce((s, l) => s + l.balance, 0);
+  const totalMonthlyEMI = filteredLoans.reduce((s, l) => s + (l.monthlyPayment || 0), 0);
 
   // Live loan calculator preview
   const previewPrincipal = Number(form.amount) || 0;
@@ -114,6 +140,8 @@ export function LoansTab() {
       balance: newBalance,
       monthlyPayment: calc.monthlyPayment,
       totalInterest: calc.totalInterest,
+      sourceType: form.sourceType,
+      companyId: form.sourceType === 'business' ? (form.companyId || undefined) : undefined,
       repayments: existingLoan?.repayments || [],
     };
 
@@ -135,6 +163,8 @@ export function LoansTab() {
       tenureMonths: '12',
       startDate: getLocalDate(),
       dueDate: '',
+      sourceType: defaultSourceType,
+      companyId: companyId && companyId !== 'all' ? companyId : '',
     });
   };
 
@@ -237,21 +267,27 @@ export function LoansTab() {
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-4">
           <h3 className="font-semibold text-sm text-text">Loans & Mortgages</h3>
-          {state.loans.length === 0 ? (
+          {filteredLoans.length === 0 ? (
             <EmptyState
               title="No active loans"
-              helper="Add personal, business, or bank loans to calculate amortization and log repayments."
+              helper={streamScope === 'business' ? 'No business loans recorded for this filter.' : 'Add personal, business, or bank loans to calculate amortization and log repayments.'}
             />
           ) : (
             <div className="space-y-3">
-              {state.loans.map(ln => {
+              {filteredLoans.map(ln => {
                 const paidAmount = ln.principal - ln.balance;
                 const progressPct = ln.principal > 0 ? Math.min(100, Math.round((paidAmount / ln.principal) * 100)) : 0;
+                const linkedCompany = ln.companyId ? state.companies.find(c => c.id === ln.companyId) : null;
                 return (
                   <Card key={ln.id} className="p-4 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="font-bold text-sm text-text">{ln.lender}</div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm text-text">{ln.lender}</span>
+                          <Badge tone={ln.sourceType === 'business' ? 'warning' : 'neutral'} size="sm">
+                            {ln.sourceType === 'business' ? (linkedCompany ? linkedCompany.name : 'Business') : 'Salary'}
+                          </Badge>
+                        </div>
                         <div className="text-xs text-muted mt-0.5">
                           Principal <span className="font-semibold num text-text">{formatRs(ln.principal)}</span> · {ln.rate}% ({ln.interestBasis || 'annual'}) · {ln.method === 'simple' ? 'Flat' : 'Reducing Balance'} · {ln.tenureMonths || 12}M
                         </div>
@@ -406,6 +442,8 @@ export function LoansTab() {
                     method: 'reducing_balance',
                     startDate: getLocalDate(),
                     dueDate: '',
+                    sourceType: defaultSourceType,
+                    companyId: companyId && companyId !== 'all' ? companyId : '',
                   });
                 }}
               >
@@ -415,6 +453,34 @@ export function LoansTab() {
           }
           className="h-fit sticky top-4"
         >
+          {hasBusiness && (
+            <div className="p-3.5 rounded-xl bg-surface-hover/60 border border-border space-y-3 mb-2">
+              <Field id="loan-source-type" label="Loan Purpose / Funds Source">
+                <SegmentedTabs
+                  size="sm"
+                  options={[
+                    { id: 'salary', label: 'Salary / Personal' },
+                    { id: 'business', label: 'Business Money' },
+                  ]}
+                  value={form.sourceType}
+                  onChange={v => setForm(f => ({ ...f, sourceType: v as 'salary' | 'business', companyId: '' }))}
+                />
+              </Field>
+              {form.sourceType === 'business' && (
+                <Field id="loan-company" label="Business Enterprise">
+                  <Select
+                    value={form.companyId}
+                    onChange={e => setForm(f => ({ ...f, companyId: e.target.value }))}
+                  >
+                    <option value="">{state.companies.length ? 'Select business (optional)' : 'General business'}</option>
+                    {state.companies.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+            </div>
+          )}
           <Field id="loan-lender" label="Lender" required error={loanErrors.errors.lender}>
             <Input
               value={form.lender}
@@ -536,6 +602,8 @@ export function LoansTab() {
                     method: 'reducing_balance',
                     startDate: getLocalDate(),
                     dueDate: '',
+                    sourceType: defaultSourceType,
+                    companyId: companyId && companyId !== 'all' ? companyId : '',
                   });
                 }}
               >

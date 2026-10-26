@@ -276,9 +276,9 @@ function FinancialContent() {
       {tab === 'transactions' && <TransactionsHistoryTab range={range} />}
       {tab === 'expenses' && <ExpensesTab range={range} month={month} streamScope={streamScope} companyId={selectedCompanyId} />}
       {tab === 'income' && <IncomeTab range={range} streamScope={streamScope} companyId={selectedCompanyId} />}
-      {tab === 'finance' && <FinanceTab />}
-      {tab === 'loans' && <LoansTab />}
-      {tab === 'pawned' && <PawnedTab />}
+      {tab === 'finance' && <FinanceTab streamScope={streamScope} companyId={selectedCompanyId} />}
+      {tab === 'loans' && <LoansTab streamScope={streamScope} companyId={selectedCompanyId} />}
+      {tab === 'pawned' && <PawnedTab streamScope={streamScope} companyId={selectedCompanyId} />}
     </PageContainer>
   );
 }
