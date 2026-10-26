@@ -127,7 +127,7 @@ export default function PrintAnalysisPage() {
           <tbody className="divide-y divide-border/60">
             <tr>
               <td className="py-2 font-medium text-text">Total Monthly Income</td>
-              <td className="py-2 text-muted">Inflows (Salary, Business, Other)</td>
+              <td className="py-2 text-muted">Inflows</td>
               <td className="py-2 text-right font-semibold text-primary-text">{formatRs(totalIncome)}</td>
             </tr>
             <tr>

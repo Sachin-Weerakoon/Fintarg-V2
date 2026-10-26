@@ -6,6 +6,8 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Icon } from '@/components/ui/Icon';
+import { Badge } from '@/components/ui/Badge';
+import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import Link from 'next/link';
 
 export type AnalysisScope = 'consolidated' | 'company' | 'branch';
@@ -37,76 +39,35 @@ export function AnalysisScopeSelector({
   return (
     <Card className="!p-3.5 mb-6 border border-border/80 bg-surface/90 shadow-sm backdrop-blur-sm">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
-        {/* Scope Pill Buttons */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-surface-hover/80 border border-border/70 overflow-x-auto">
-          <button
-            type="button"
-            onClick={() => onScopeChange('consolidated')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-              scope === 'consolidated'
-                ? 'bg-primary-500 text-white shadow-sm'
-                : 'text-muted hover:text-text hover:bg-surface/60'
-            }`}
-          >
-            <Icon name="analysis" size={14} />
-            <span>Consolidated Portfolio</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (hasCompanies) {
-                const targetCo = companyId || companies[0]?.id || '';
-                onScopeChange('company', targetCo);
-              } else {
-                onScopeChange('company');
-              }
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-              scope === 'company'
-                ? 'bg-primary-500 text-white shadow-sm'
-                : 'text-muted hover:text-text hover:bg-surface/60'
-            }`}
-          >
-            <Icon name="briefcase" size={14} />
-            <span>By Business (Company)</span>
-            {hasCompanies && (
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                scope === 'company' ? 'bg-white/20 text-white' : 'bg-surface-hover text-muted'
-              }`}>
-                {companies.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (hasBranches) {
-                const targetCo = companyId || branches[0]?.companyId || '';
-                const targetBr = branchId || branches[0]?.id || '';
-                onScopeChange('branch', targetCo, targetBr);
-              } else {
-                onScopeChange('branch');
-              }
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-              scope === 'branch'
-                ? 'bg-primary-500 text-white shadow-sm'
-                : 'text-muted hover:text-text hover:bg-surface/60'
-            }`}
-          >
-            <Icon name="bank" size={14} />
-            <span>By Operating Branch</span>
-            {hasBranches && (
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                scope === 'branch' ? 'bg-white/20 text-white' : 'bg-surface-hover text-muted'
-              }`}>
-                {branches.length}
-              </span>
-            )}
-          </button>
-        </div>
+        {/* Scope tabs */}
+        <SegmentedTabs
+          aria-label="Analysis scope"
+          value={scope}
+          onChange={next => {
+            if (next === 'company' && hasCompanies) {
+              onScopeChange('company', companyId || companies[0]?.id || '');
+            } else if (next === 'branch' && hasBranches) {
+              onScopeChange('branch', companyId || branches[0]?.companyId || '', branchId || branches[0]?.id || '');
+            } else {
+              onScopeChange(next);
+            }
+          }}
+          options={[
+            { id: 'consolidated', label: 'Consolidated Portfolio', icon: <Icon name="analysis" size={14} /> },
+            {
+              id: 'company',
+              label: 'By Business',
+              icon: <Icon name="briefcase" size={14} />,
+              badge: hasCompanies ? <Badge tone="neutral" size="sm">{companies.length}</Badge> : undefined,
+            },
+            {
+              id: 'branch',
+              label: 'By Operating Branch',
+              icon: <Icon name="bank" size={14} />,
+              badge: hasBranches ? <Badge tone="neutral" size="sm">{branches.length}</Badge> : undefined,
+            },
+          ]}
+        />
 
         {/* Dynamic Selectors when scoped */}
         {scope === 'company' && hasCompanies && (

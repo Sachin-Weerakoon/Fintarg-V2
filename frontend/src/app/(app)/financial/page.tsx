@@ -2,12 +2,14 @@
 import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useApp, formatRs, calcMonthlyIncome, calcFinancePayments } from '@/store';
+import { useApp, formatRs, calcFinancePayments } from '@/store';
+import { calcIncomeForRange } from '@/lib/money';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
-import { MonthPicker } from '@/components/ui/MonthPicker';
-import { useSelectedMonth } from '@/hooks/useSelectedMonth';
+import { DateRangePicker } from '@/components/ui/DateRangePicker';
+import { useSelectedRange } from '@/hooks/useSelectedRange';
+import { isInRange, monthCoverage } from '@/utils/date';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -41,7 +43,9 @@ function FinancialContent() {
   const initialTab: Tab = (rawTab && TAB_OPTIONS.some(t => t.id === rawTab)) ? rawTab : 'accounts';
 
   const { state } = useApp();
-  const [month, setMonth] = useSelectedMonth();
+  const [range, setRange] = useSelectedRange();
+  // Monthly figures (daily budget, monthly totals) use the month the range ends in.
+  const month = range.to.slice(0, 7);
 
   const rawStream = searchParams.get('stream') as StreamScope | null;
   const initialStream: StreamScope = (rawStream && ['all', 'salary', 'business'].includes(rawStream)) ? rawStream : 'all';
@@ -73,58 +77,62 @@ function FinancialContent() {
     router.replace(`/financial?${params.toString()}`, { scroll: false });
   };
 
-  // Compute multi-stream financial KPI metrics
+  // Compute multi-stream financial KPI metrics over the selected range. Monthly amounts
+  // (recurring income, salaries, instalments) are prorated by how much of each month it covers.
   const streamKPIs = useMemo(() => {
-    // 1. Incomes
-    const totalConsolidatedIncome = calcMonthlyIncome(state.income, month, state.employmentProfiles);
+    const monthsCovered = monthCoverage(range).reduce((s, c) => s + c.fraction, 0);
+    const inRangeOneTime = (i: { frequency: string; date: string }) => i.frequency === 'one-time' && isInRange(i.date, range);
 
-    const salaryEmploymentIncome = state.employmentProfiles.reduce((s, p) => s + (p.monthlyGross - (p.monthlyDeductions || 0)), 0);
-    const salaryManualIncome = state.income
-      .filter(i => (i.type === 'salary' || i.type === 'other') && (i.frequency === 'monthly' || (i.frequency === 'one-time' && i.date.startsWith(month))))
-      .reduce((s, i) => s + i.amount, 0);
+    // 1. Incomes
+    const totalConsolidatedIncome = calcIncomeForRange(state.income, range, state.employmentProfiles);
+
+    const salaryEmploymentIncome = state.employmentProfiles.reduce((s, p) => s + (p.monthlyGross - (p.monthlyDeductions || 0)), 0) * monthsCovered;
+    const salaryIncome = state.income.filter(i => i.type === 'salary' || i.type === 'other');
+    const salaryManualIncome = salaryIncome.filter(i => i.frequency === 'monthly').reduce((s, i) => s + i.amount, 0) * monthsCovered
+      + salaryIncome.filter(inRangeOneTime).reduce((s, i) => s + i.amount, 0);
     const salaryTotalInflow = salaryEmploymentIncome + salaryManualIncome;
 
     // Business revenue from income entries + branch daily sales
-    const businessManualIncome = state.income
-      .filter(i => i.type === 'business' && (i.frequency === 'monthly' || (i.frequency === 'one-time' && i.date.startsWith(month))))
-      .reduce((s, i) => s + i.amount, 0);
+    const businessIncome = state.income.filter(i => i.type === 'business');
+    const businessManualIncome = businessIncome.filter(i => i.frequency === 'monthly').reduce((s, i) => s + i.amount, 0) * monthsCovered
+      + businessIncome.filter(inRangeOneTime).reduce((s, i) => s + i.amount, 0);
 
     const relevantBranches = selectedCompanyId === 'all'
       ? state.businessBranches
       : state.businessBranches.filter(b => b.companyId === selectedCompanyId);
 
-    const branchMonthlySales = relevantBranches.reduce((sum, b) => {
+    const branchSales = relevantBranches.reduce((sum, b) => {
       const sales = (b.entries || [])
-        .filter(e => e.type === 'revenue' && e.date.startsWith(month))
+        .filter(e => e.type === 'revenue' && isInRange(e.date, range))
         .reduce((s, e) => s + e.amount, 0);
       return sum + sales;
     }, 0);
-    const businessTotalInflow = businessManualIncome + branchMonthlySales;
+    const businessTotalInflow = businessManualIncome + branchSales;
 
     // 2. Expenses
-    const monthExpenses = state.expenses.filter(e => e.date.startsWith(month));
-    const totalExpenses = monthExpenses.reduce((s, e) => s + e.amount, 0);
+    const rangeExpenses = state.expenses.filter(e => isInRange(e.date, range));
+    const totalExpenses = rangeExpenses.reduce((s, e) => s + e.amount, 0);
 
-    const personalExpenses = monthExpenses
+    const personalExpenses = rangeExpenses
       .filter(e => e.sourceType !== 'business')
       .reduce((s, e) => s + e.amount, 0);
 
-    let businessExpenses = monthExpenses.filter(e => e.sourceType === 'business');
+    let businessExpenses = rangeExpenses.filter(e => e.sourceType === 'business');
     if (selectedCompanyId !== 'all') {
       businessExpenses = businessExpenses.filter(e => e.companyId === selectedCompanyId);
     }
     const businessExpTotal = businessExpenses.reduce((s, e) => s + e.amount, 0);
 
-    const branchMonthlyCosts = relevantBranches.reduce((sum, b) => {
+    const branchCosts = relevantBranches.reduce((sum, b) => {
       const costs = (b.entries || [])
-        .filter(e => e.type !== 'revenue' && !e.id.startsWith('be_exp_') && e.date.startsWith(month))
+        .filter(e => e.type !== 'revenue' && !e.id.startsWith('be_exp_') && isInRange(e.date, range))
         .reduce((s, e) => s + e.amount, 0);
       return sum + costs;
     }, 0);
-    const businessTotalCosts = businessExpTotal + branchMonthlyCosts;
+    const businessTotalCosts = businessExpTotal + branchCosts;
 
     // 3. Obligations
-    const obligations = calcFinancePayments(state.financePayments);
+    const obligations = calcFinancePayments(state.financePayments) * monthsCovered;
 
     if (streamScope === 'salary') {
       const netSalaryFlow = salaryTotalInflow - personalExpenses;
@@ -168,34 +176,28 @@ function FinancialContent() {
       netValue: netConsolidatedFlow,
       tone: netConsolidatedFlow >= 0 ? 'success' as const : 'danger' as const,
     };
-  }, [state, month, streamScope, selectedCompanyId]);
+  }, [state, range, streamScope, selectedCompanyId]);
 
   return (
     <PageContainer>
       {/* Top Header */}
       <PageHeader
         title="Financial Ledger"
-        description="Unified corporate & personal financial hub: manage bank accounts, multi-stream cash flows, operating expenses, and transactions."
-        actions={<MonthPicker value={month} onChange={setMonth} size="sm" />}
+        actions={<DateRangePicker value={range} onChange={setRange} size="sm" />}
       />
 
       {/* Multi-Stream Intelligence & Scope Switcher for Hybrid & Business Profiles */}
       {hasBusiness && (
         <Card className="p-4 sm:p-5 bg-gradient-to-r from-surface via-surface to-primary-tint/20 border-primary/20 shadow-sm space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-bold text-primary-text uppercase tracking-wider flex items-center gap-1.5">
-                  <Icon name="bank" size={14} />
-                  Finance Stream Intelligence
-                </span>
-                <Badge tone="primary" size="sm">
-                  {streamScope === 'all' ? 'Job + Business' : streamScope === 'salary' ? 'Job Salary' : 'Business'}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted mt-0.5">
-                Switch stream views to isolate personal employment cash flow, business operating capital, or consolidated totals.
-              </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-primary-text uppercase tracking-wider flex items-center gap-1.5">
+                <Icon name="bank" size={14} />
+                Finance Stream Intelligence
+              </span>
+              <Badge tone="primary" size="sm">
+                {streamScope === 'all' ? 'Job + Business' : streamScope === 'salary' ? 'Job Salary' : 'Business'}
+              </Badge>
             </div>
 
             {/* Stream Switcher */}
@@ -203,8 +205,8 @@ function FinancialContent() {
               <SegmentedTabs
                 size="sm"
                 options={[
-                  { id: 'all', label: 'Consolidated (All)' },
-                  { id: 'salary', label: 'Job / Salary' },
+                  { id: 'all', label: 'Consolidated' },
+                  { id: 'salary', label: 'Salary' },
                   { id: 'business', label: 'Business Cash' },
                 ]}
                 value={streamScope}
@@ -271,9 +273,9 @@ function FinancialContent() {
       />
 
       {tab === 'accounts' && <AccountsTab />}
-      {tab === 'transactions' && <TransactionsHistoryTab month={month} />}
-      {tab === 'expenses' && <ExpensesTab month={month} streamScope={streamScope} companyId={selectedCompanyId} />}
-      {tab === 'income' && <IncomeTab month={month} streamScope={streamScope} companyId={selectedCompanyId} />}
+      {tab === 'transactions' && <TransactionsHistoryTab range={range} />}
+      {tab === 'expenses' && <ExpensesTab range={range} month={month} streamScope={streamScope} companyId={selectedCompanyId} />}
+      {tab === 'income' && <IncomeTab range={range} streamScope={streamScope} companyId={selectedCompanyId} />}
       {tab === 'finance' && <FinanceTab />}
       {tab === 'loans' && <LoansTab />}
       {tab === 'pawned' && <PawnedTab />}
@@ -285,7 +287,7 @@ export default function Financial() {
   return (
     <Suspense fallback={
       <PageContainer>
-        <PageHeader title="Financial Ledger" description="Loading financial ledger..." />
+        <PageHeader title="Financial Ledger" />
       </PageContainer>
     }>
       <FinancialContent />

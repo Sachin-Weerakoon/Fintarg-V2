@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { PasswordField } from '@/components/ui/PasswordField';
 import { BrandLogo } from '@/components/ui/BrandLogo';
+import { PasswordRules } from '@/components/ui/PasswordRules';
+import { passwordProblem } from '@/lib/passwordPolicy';
+import { apiErrorMessage } from '@/services/apiClient';
 
 export default function ResetPassword({ params }: { params: Promise<{ token: string }> }) {
   const [password, setPassword] = useState('');
@@ -23,8 +26,9 @@ export default function ResetPassword({ params }: { params: Promise<{ token: str
     e.preventDefault();
     setError('');
     if (!token) return;
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long.');
+    const problem = passwordProblem(password);
+    if (problem) {
+      setError(problem);
       return;
     }
     setLoading(true);
@@ -36,7 +40,7 @@ export default function ResetPassword({ params }: { params: Promise<{ token: str
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        setError(data.error || 'Invalid or expired token.');
+        setError(apiErrorMessage(data, 'Invalid or expired token.'));
         return;
       }
       router.push('/welcome?tab=signin');
@@ -54,18 +58,14 @@ export default function ResetPassword({ params }: { params: Promise<{ token: str
           <BrandLogo variant="full" height={32} />
         </div>
 
-        <h2 className="text-2xl font-bold tracking-tight text-white mb-2">Set a new password</h2>
-        <p className="text-xs sm:text-sm text-slate-400 mb-6 leading-relaxed">
-          Choose a secure password with at least 8 characters for your account.
-        </p>
+        <h2 className="text-2xl font-bold tracking-tight text-white mb-6">Set a new password</h2>
 
-        <form onSubmit={submit} className="space-y-4">
-          <Field id="password" label={<span className="text-slate-200">New password</span>} error={error}>
+        <form onSubmit={submit} noValidate className="space-y-4">
+          <Field id="password" label={<span className="text-white/90">New password</span>} error={error}>
             <PasswordField
               value={password}
               onChange={e => setPassword(e.target.value)}
-              minLength={8}
-              placeholder="At least 8 characters"
+              placeholder="Create a password"
               className="form-input-dark"
               iconLeft={
                 <svg className="w-4 h-4 transition-colors group-focus-within:text-primary-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -75,6 +75,7 @@ export default function ResetPassword({ params }: { params: Promise<{ token: str
               }
               required
             />
+            <PasswordRules password={password} tone="dark" />
           </Field>
           <Button
             type="submit"
@@ -86,7 +87,7 @@ export default function ResetPassword({ params }: { params: Promise<{ token: str
           </Button>
         </form>
 
-        <p className="text-center text-xs mt-6 text-slate-400">
+        <p className="text-center text-xs mt-6 text-white/60">
           <Link href="/welcome?tab=signin" className="text-primary-400 font-semibold hover:text-primary-300 hover:underline">
             ← Back to sign in
           </Link>

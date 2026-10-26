@@ -135,7 +135,7 @@ export function CompanyAnalysisView({
               <div id="company-health-heading" className="text-xs uppercase tracking-wider font-bold text-primary-300">
                 Enterprise Health
               </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">{monthLabel(month)}</div>
+              <div className="text-[11px] text-white/60 mt-0.5">{monthLabel(month)}</div>
             </div>
           </div>
 
@@ -156,7 +156,7 @@ export function CompanyAnalysisView({
                 : `Cash-flow positive with ${(metrics.operatingMargin * 100).toFixed(0)}% margin. Expanding branch throughput will drive sustained profitability.`}
             </h2>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-white/80 leading-relaxed">
               {metrics.branchesCount === 0
                 ? 'No active branch registered under this company yet.'
                 : `${metrics.branchesCount} operating branch(es) generating ${formatRs(metrics.totalRevenue)} in gross commercial inflows.`}
@@ -167,11 +167,11 @@ export function CompanyAnalysisView({
           <div className="grid grid-cols-2 gap-2.5">
             {metrics.healthScore.factors.map(f => (
               <div key={f.name} className="p-3 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
-                <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold flex items-center justify-between">
+                <div className="text-[11px] uppercase tracking-wider text-white/60 font-semibold flex items-center justify-between">
                   <span>{f.name}</span>
                   <span className="font-mono text-white font-bold">{f.score}</span>
                 </div>
-                <div className="text-[11px] text-slate-300 mt-1 font-medium truncate">{f.hint}</div>
+                <div className="text-[11px] text-white/80 mt-1 font-medium truncate">{f.hint}</div>
               </div>
             ))}
           </div>
@@ -280,9 +280,6 @@ export function CompanyAnalysisView({
                     <Icon name="analysis" size={15} className="text-primary-text" />
                     Enterprise Cash Flow Waterfall
                   </h3>
-                  <p className="text-xs text-muted mt-0.5">
-                    How gross branch sales flow through bills and owner drawings to retained capital
-                  </p>
                 </div>
               </div>
               <WaterfallChart steps={metrics.waterfall} />
@@ -296,9 +293,6 @@ export function CompanyAnalysisView({
                       <Icon name="target" size={15} className="text-primary-text" />
                       Corporate Target Pacing
                     </h3>
-                    <p className="text-xs text-muted mt-0.5">
-                      Combined performance against aggregate branch targets for {monthLabel(month)}
-                    </p>
                   </div>
                   <Badge tone={metrics.targetAchievedPct >= 100 ? 'success' : metrics.targetAchievedPct >= 80 ? 'primary' : 'warning'}>
                     {metrics.targetAchievedPct}% Achieved
@@ -350,9 +344,6 @@ export function CompanyAnalysisView({
                   <Icon name="bank" size={15} className="text-primary-text" />
                   Branch Performance Leaderboard
                 </h3>
-                <p className="text-xs text-muted mt-0.5">
-                  Unit economics and revenue contribution ranked across all operating outlets
-                </p>
               </div>
             </div>
 
@@ -463,9 +454,6 @@ export function CompanyAnalysisView({
               <Icon name="credit-card" size={15} className="text-primary-text" />
               Operating Cost Distribution
             </h3>
-            <p className="text-xs text-muted mb-4">
-              Overheads and utility breakdown across all company branches
-            </p>
             <div className="flex items-center justify-center py-4">
               {donutSlices.length > 0 ? (
                 <DonutChart
@@ -481,7 +469,6 @@ export function CompanyAnalysisView({
 
           <Card className="p-5">
             <h3 className="text-sm font-bold text-text mb-1">Expense Categories</h3>
-            <p className="text-xs text-muted mb-4">Breakdown of operational spend drivers</p>
             <div className="space-y-3">
               {metrics.costCategories.map((c, i) => (
                 <div key={c.category} className="space-y-1">
@@ -517,9 +504,6 @@ export function CompanyAnalysisView({
                 <Icon name="bolt" size={15} className="text-primary-text" />
                 6-Month Enterprise Trend & 3-Month Projection
               </h3>
-              <p className="text-xs text-muted mt-0.5">
-                Statistical projection based on multi-branch historical sales velocity and target guidance
-              </p>
             </div>
             <Badge tone="primary">Confidence Band: ±12%</Badge>
           </div>

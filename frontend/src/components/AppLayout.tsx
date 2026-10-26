@@ -161,10 +161,9 @@ function AppLayoutInner({
         {/* Desktop layout */}
         <div className="hidden md:flex min-h-screen">
           <aside
-            className="w-64 min-h-screen sticky top-0 h-screen overflow-y-auto border-r flex-shrink-0 flex flex-col transition-colors duration-300"
+            className="w-64 min-h-screen sticky top-0 h-screen overflow-y-auto border-r border-[color:var(--color-sidebar-border,rgba(255,255,255,0.08))] flex-shrink-0 flex flex-col transition-colors duration-300"
             style={{
               background: `linear-gradient(to bottom, var(--color-sidebar-bg, #0B1220), var(--color-sidebar-to, #070D18))`,
-              borderColor: 'var(--color-sidebar-border, rgba(255,255,255,0.08))',
             }}
           >
             <div className="px-5 py-6">

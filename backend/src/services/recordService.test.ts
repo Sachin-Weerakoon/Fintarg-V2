@@ -441,7 +441,7 @@ describe('recordService CRUD & Update partial isolation (1.1)', () => {
       const item = await createRecord('pawnedItems', userId, {
         description: 'Gold Chain (16g)',
         amountReceived: 60000,
-        interestRate: 24, // 24% annual / 2% monthly -> 60000 * 0.24 / 12 = 1200 rupees (120,000 cents)
+        interestRate: 2, // 2% per month -> 60000 * 0.02 = 1200 rupees (120,000 cents)
         nextDue: '2026-04-15',
       });
 

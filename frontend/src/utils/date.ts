@@ -65,6 +65,71 @@ export function defaultMonthBounds(now: Date = new Date()): { min: string; max: 
   return { min: addMonths(current, -36), max: addMonths(current, 1) };
 }
 
+/** An inclusive date range, both ends 'YYYY-MM-DD'. */
+export interface DateRange {
+  from: string;
+  to: string;
+}
+
+/** True for a real calendar date in 'YYYY-MM-DD' form. */
+export function isIsoDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
+
+/** First to last day of a 'YYYY-MM' month. */
+export function monthRange(month: string): DateRange {
+  const p = parseMonth(month);
+  if (!p) return monthRange(getLocalMonth());
+  const lastDay = new Date(p.year, p.month, 0).getDate();
+  return { from: `${month}-01`, to: `${month}-${String(lastDay).padStart(2, '0')}` };
+}
+
+/** Shift a 'YYYY-MM-DD' by delta days in local time. */
+export function addDays(value: string, delta: number): string {
+  const [y, m, d] = value.split('-').map(Number);
+  return getLocalDate(new Date(y, m - 1, d + delta));
+}
+
+/** Every 'YYYY-MM' month the range touches, oldest first. */
+export function monthsInRange(range: DateRange): string[] {
+  const months: string[] = [];
+  const last = range.to.slice(0, 7);
+  for (let m = range.from.slice(0, 7); m <= last; m = addMonths(m, 1)) months.push(m);
+  return months;
+}
+
+/**
+ * How much of each month the range covers: 1 for the whole month, 15/30 for half of September.
+ * Used to prorate monthly amounts (recurring income, instalments) over an arbitrary range.
+ */
+export function monthCoverage(range: DateRange): { month: string; fraction: number }[] {
+  return monthsInRange(range).map(month => {
+    const full = monthRange(month);
+    const start = range.from > full.from ? range.from : full.from;
+    const end = range.to < full.to ? range.to : full.to;
+    const days = Number(end.slice(8, 10)) - Number(start.slice(8, 10)) + 1;
+    return { month, fraction: days / Number(full.to.slice(8, 10)) };
+  });
+}
+
+export function isInRange(date: string, range: DateRange): boolean {
+  return date >= range.from && date <= range.to;
+}
+
+/** '2026-10-01'..'2026-10-31' -> '1 Oct – 31 Oct 2026' (years shown once when shared). */
+export function formatDateRange(range: DateRange): string {
+  const fmt = (value: string, withYear: boolean) => {
+    const [y, m, d] = value.split('-').map(Number);
+    return `${d} ${MONTH_SHORT[m - 1]}${withYear ? ` ${y}` : ''}`;
+  };
+  const sameYear = range.from.slice(0, 4) === range.to.slice(0, 4);
+  if (range.from === range.to) return fmt(range.from, true);
+  return `${fmt(range.from, !sameYear)} – ${fmt(range.to, true)}`;
+}
+
 /**
  * Returns time-aware greeting ('Good morning', 'Good afternoon', 'Good evening') based on local time.
  */

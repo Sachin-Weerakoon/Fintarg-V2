@@ -18,15 +18,27 @@ import { Alert } from '@/components/ui/Alert';
 import {
   SRI_LANKAN_BANKS,
   SRI_LANKAN_BANK_DETAILS,
+  CVV_LENGTH,
   detectCardNetwork,
+  expiryProblem,
   formatCardNumberInput,
   formatExpiryInput,
+  isValidCardNumber,
 } from '@/utils/bankData';
 import type { BankAccount, Card as CardType } from '@/types';
 import { getLocalDate } from '@/utils/date';
+import { useFieldErrors } from '@/hooks/useFieldErrors';
+
+const OTHER_BANK = 'Other Bank';
+
+type AccountErrorKey = 'name' | 'bankName' | 'accountNumber' | 'branch' | 'currentBalance';
+type CardErrorKey = 'name' | 'cardNumber' | 'expiryDate' | 'cvv' | 'bankAccountId' | 'creditLimit' | 'billingDay' | 'dueDay';
+
+const isDayOfMonth = (value: string) => /^\d{1,2}$/.test(value) && Number(value) >= 1 && Number(value) <= 31;
 
 export function AccountsTab() {
-  const { state, dispatch } = useApp();
+  const { state, save } = useApp();
+  const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
   const [activeSubTab, setActiveSubTab] = useState<'accounts' | 'cards'>('accounts');
@@ -44,7 +56,7 @@ export function AccountsTab() {
     notes: '',
   });
   const [editAccountId, setEditAccountId] = useState<string | null>(null);
-  const [accountError, setAccountError] = useState('');
+  const [accountErrors, setAccountErrors] = useState<Partial<Record<AccountErrorKey, string>>>({});
   const [viewAccountDetails, setViewAccountDetails] = useState<BankAccount | null>(null);
 
   // Card Form
@@ -63,8 +75,15 @@ export function AccountsTab() {
     dueDay: '',
   });
   const [editCardId, setEditCardId] = useState<string | null>(null);
-  const [cardError, setCardError] = useState('');
+  const [cardErrors, setCardErrors] = useState<Partial<Record<CardErrorKey, string>>>({});
   const [viewCardDetails, setViewCardDetails] = useState<CardType | null>(null);
+
+  const clearAccountError = (key: AccountErrorKey) => {
+    if (accountErrors[key]) setAccountErrors(e => ({ ...e, [key]: undefined }));
+  };
+  const clearCardError = (key: CardErrorKey) => {
+    if (cardErrors[key]) setCardErrors(e => ({ ...e, [key]: undefined }));
+  };
 
   // Clipboard copy state
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -79,30 +98,20 @@ export function AccountsTab() {
     description: '',
   });
   const [transferError, setTransferError] = useState('');
+  const transferErrors = useFieldErrors<'fromEntity' | 'toEntity' | 'amount' | 'date'>();
   const [isTransferring, setIsTransferring] = useState(false);
 
   const submitTransfer = async () => {
-    if (!transferForm.fromEntity) {
-      setTransferError('Please select a source account, card, or cash wallet.');
-      return;
-    }
-    if (!transferForm.toEntity) {
-      setTransferError('Please select a destination account, card, or cash wallet.');
-      return;
-    }
-    if (transferForm.fromEntity === transferForm.toEntity) {
-      setTransferError('Source and destination accounts must be different.');
-      return;
-    }
     const numAmount = Number(transferForm.amount);
-    if (!numAmount || numAmount <= 0) {
-      setTransferError('Please enter a valid positive transfer amount.');
-      return;
-    }
-    if (!transferForm.date) {
-      setTransferError('Please enter a valid transfer date.');
-      return;
-    }
+    const valid = transferErrors.check({
+      fromEntity: transferForm.fromEntity ? undefined : 'Select where the money comes from.',
+      toEntity: !transferForm.toEntity
+        ? 'Select where the money goes.'
+        : transferForm.toEntity === transferForm.fromEntity ? 'Choose a different destination.' : undefined,
+      amount: numAmount > 0 ? undefined : 'Enter an amount greater than zero.',
+      date: transferForm.date ? undefined : 'Choose the transfer date.',
+    });
+    if (!valid) return;
 
     let fromAccountId: string | null = null;
     let fromCardId: string | null = null;
@@ -118,8 +127,8 @@ export function AccountsTab() {
 
     setIsTransferring(true);
     setTransferError('');
-    try {
-      await dispatch({
+    // On failure the store rolls back and shows the server's reason; the modal stays open.
+    const ok = await save({
         type: 'TRANSFER_FUNDS',
         fromAccountId,
         fromCardId,
@@ -128,25 +137,22 @@ export function AccountsTab() {
         amount: numAmount,
         date: transferForm.date,
         description: transferForm.description.trim() || undefined,
-      });
-      toast.success(`Transferred ${formatRs(numAmount)} successfully`);
-      setIsTransferOpen(false);
-      setTransferForm({
-        fromEntity: '',
-        toEntity: '',
-        amount: '',
-        date: getLocalDate(),
-        description: '',
-      });
-    } catch (err: any) {
-      setTransferError(err?.message || 'Transfer failed. Please try again.');
-    } finally {
-      setIsTransferring(false);
-    }
+    });
+    setIsTransferring(false);
+    if (!ok) return;
+    toast.success(`Transferred ${formatRs(numAmount)} successfully`);
+    setIsTransferOpen(false);
+    setTransferForm({
+      fromEntity: '',
+      toEntity: '',
+      amount: '',
+      date: getLocalDate(),
+      description: '',
+    });
   };
 
-  const setAccountArchived = (acc: BankAccount, isArchived: boolean) => {
-    dispatch({ type: 'UPDATE_BANK_ACCOUNT', entry: { ...acc, isArchived } });
+  const setAccountArchived = async (acc: BankAccount, isArchived: boolean) => {
+    if (!(await save({ type: 'UPDATE_BANK_ACCOUNT', entry: { ...acc, isArchived } }))) return;
     toast.success(isArchived ? `"${acc.name}" archived` : `"${acc.name}" restored`);
   };
 
@@ -185,8 +191,7 @@ export function AccountsTab() {
       tone: 'danger',
     });
     if (ok) {
-      dispatch({ type: 'DELETE_BANK_ACCOUNT', id: acc.id });
-      toast.success(`Bank account "${acc.name}" deleted`);
+      if (await save({ type: 'DELETE_BANK_ACCOUNT', id: acc.id })) toast.success(`Bank account "${acc.name}" deleted`);
     }
   };
 
@@ -199,8 +204,7 @@ export function AccountsTab() {
       tone: 'danger',
     });
     if (ok) {
-      dispatch({ type: 'DELETE_CARD', id });
-      toast.success(`Payment card "${name}" deleted`);
+      if (await save({ type: 'DELETE_CARD', id })) toast.success(`Payment card "${name}" deleted`);
     }
   };
 
@@ -219,7 +223,7 @@ export function AccountsTab() {
   };
 
   const handleBankSelectChange = (val: string) => {
-    if (val === 'Other / Custom Bank') {
+    if (val === OTHER_BANK) {
       if (SRI_LANKAN_BANKS.includes(accountForm.bankName)) {
         setAccountForm(f => ({ ...f, bankName: '', branchCode: '', swiftCode: '' }));
       }
@@ -232,23 +236,41 @@ export function AccountsTab() {
         swiftCode: preset ? preset.swift : f.swiftCode,
       }));
     }
-    if (accountError) setAccountError('');
+    clearAccountError('bankName');
   };
 
-  const submitAccount = () => {
-    if (!accountForm.name.trim()) {
-      setAccountError('Account nickname is required (e.g. Primary Savings, Business Ops).');
-      return;
-    }
-    if (!accountForm.bankName.trim()) {
-      setAccountError('Bank name is required. Please select or enter your bank.');
-      return;
-    }
+  const submitAccount = async () => {
+    const errors: Partial<Record<AccountErrorKey, string>> = {};
     const sanitizedNumber = accountForm.accountNumber.replace(/\s+/g, '');
-    if (!sanitizedNumber || sanitizedNumber.length < 4) {
-      setAccountError('Valid bank account number is required (at least 4 digits).');
-      return;
+    if (!accountForm.name.trim()) errors.name = 'Enter a nickname for this account.';
+    // The built-in cash wallet has no bank, branch or real account number; only its name is editable.
+    if (accountForm.accountType !== 'cash') {
+      if (!accountForm.bankName.trim()) errors.bankName = 'Select or enter the bank.';
+      if (!sanitizedNumber) {
+        errors.accountNumber = 'Enter the account number.';
+      } else if (!/^[A-Za-z0-9-]{6,20}$/.test(sanitizedNumber) || !/\d/.test(sanitizedNumber)) {
+        errors.accountNumber = 'Account number must be 6 to 20 digits.';
+      } else if (state.bankAccounts.some(a =>
+        a.id !== editAccountId
+        && a.accountNumber === sanitizedNumber
+        && a.bankName.trim().toLowerCase() === accountForm.bankName.trim().toLowerCase()
+      )) {
+        errors.accountNumber = 'This account is already saved.';
+      }
+      if (!accountForm.branch.trim()) errors.branch = 'Enter the branch.';
     }
+    // The server keeps balances at or above zero; it also manages the balance after creation.
+    if (!editAccountId) {
+      const balanceText = accountForm.currentBalance.trim();
+      if (balanceText === '' || !Number.isFinite(Number(balanceText))) {
+        errors.currentBalance = 'Enter the current balance, or 0.';
+      } else if (Number(balanceText) < 0) {
+        errors.currentBalance = 'Balance cannot be negative.';
+      }
+    }
+    setAccountErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     const balance = Number(accountForm.currentBalance) || 0;
     const entry: BankAccount = {
       id: editAccountId || 'ba_' + Date.now(),
@@ -264,12 +286,13 @@ export function AccountsTab() {
       notes: accountForm.notes.trim(),
     };
 
-    if (editAccountId) {
-      dispatch({ type: 'UPDATE_BANK_ACCOUNT', entry });
-      setEditAccountId(null);
-    } else {
-      dispatch({ type: 'ADD_BANK_ACCOUNT', entry });
-    }
+    setSaving(true);
+    const ok = await save(editAccountId ? { type: 'UPDATE_BANK_ACCOUNT', entry } : { type: 'ADD_BANK_ACCOUNT', entry });
+    setSaving(false);
+    // On failure the store has already rolled back and shown the server's reason; keep the input.
+    if (!ok) return;
+    toast.success(editAccountId ? 'Bank account updated' : 'Bank account added');
+    setEditAccountId(null);
     setAccountForm({
       name: '',
       bankName: '',
@@ -281,48 +304,44 @@ export function AccountsTab() {
       currentBalance: '',
       notes: '',
     });
-    setAccountError('');
+    setAccountErrors({});
   };
 
-  const submitCard = () => {
-    if (!cardForm.name.trim()) {
-      setCardError('Card label is required (e.g. Commercial Visa Platinum).');
-      return;
-    }
+  const submitCard = async () => {
+    const errors: Partial<Record<CardErrorKey, string>> = {};
     const cleanNumber = cardForm.cardNumber.replace(/\s+/g, '');
-    if (!editCardId && !cleanNumber && !cardForm.lastFourDigits) {
-      setCardError('Card number is required.');
-      return;
+    // When editing, the full number is never stored, so the masked one stands for "unchanged".
+    const numberUnchanged = Boolean(editCardId) && cardForm.cardNumber.includes('•');
+    if (!cardForm.name.trim()) errors.name = 'Enter a label for this card.';
+    if (!numberUnchanged) {
+      if (!cleanNumber) errors.cardNumber = 'Enter the card number.';
+      else if (!isValidCardNumber(cleanNumber)) errors.cardNumber = 'Enter a valid card number.';
     }
-    if (cleanNumber && (cleanNumber.length < 12 || cleanNumber.length > 19)) {
-      setCardError('Please enter a valid card number (12 to 19 digits).');
-      return;
+    const expiryIssue = cardForm.expiryDate ? expiryProblem(cardForm.expiryDate) : 'Enter the expiry date.';
+    if (expiryIssue) errors.expiryDate = expiryIssue;
+    // The server never stores the CVV, so when editing it is only asked for again if the number changes.
+    const cvvNeeded = !editCardId || !numberUnchanged;
+    if (cvvNeeded && !cardForm.cvv) errors.cvv = 'Enter the 3-digit CVV.';
+    else if (cardForm.cvv && cardForm.cvv.length !== CVV_LENGTH) errors.cvv = `CVV must be exactly ${CVV_LENGTH} digits.`;
+    if (cardForm.cardType === 'debit' && !cardForm.bankAccountId) {
+      errors.bankAccountId = 'Select the bank account this debit card draws from.';
     }
-    if (cardForm.expiryDate) {
-      const match = cardForm.expiryDate.match(/^(\d{2})\/(\d{2})$/);
-      if (!match) {
-        setCardError('Expiry date must be in MM/YY format (e.g. 12/28).');
-        return;
-      }
-      const month = parseInt(match[1], 10);
-      if (month < 1 || month > 12) {
-        setCardError('Expiry month must be between 01 and 12.');
-        return;
-      }
+    if (cardForm.cardType === 'credit') {
+      if (!(Number(cardForm.creditLimit) > 0)) errors.creditLimit = 'Enter the credit limit.';
+      if (!isDayOfMonth(cardForm.billingDay)) errors.billingDay = 'Enter a day from 1 to 31.';
+      if (!isDayOfMonth(cardForm.dueDay)) errors.dueDay = 'Enter a day from 1 to 31.';
     }
-    if (cardForm.cvv && (cardForm.cvv.length < 3 || cardForm.cvv.length > 4)) {
-      setCardError('CVV / CVC must be 3 or 4 digits.');
-      return;
-    }
+    setCardErrors(errors);
+    if (Object.keys(errors).length > 0) return;
 
-    const lastFour = cleanNumber ? cleanNumber.slice(-4) : (cardForm.lastFourDigits || '0000');
+    const lastFour = numberUnchanged ? cardForm.lastFourDigits : cleanNumber.slice(-4);
 
     const entry: CardType = {
       id: editCardId || 'cd_' + Date.now(),
       name: cardForm.name.trim(),
       bankAccountId: cardForm.bankAccountId || undefined,
       cardType: cardForm.cardType,
-      cardNumber: cardForm.cardNumber,
+      cardNumber: numberUnchanged ? undefined : cardForm.cardNumber,
       lastFourDigits: lastFour,
       cardNetwork: cardForm.cardNetwork,
       expiryDate: cardForm.expiryDate,
@@ -333,12 +352,12 @@ export function AccountsTab() {
       dueDay: cardForm.dueDay ? Number(cardForm.dueDay) : undefined,
     };
 
-    if (editCardId) {
-      dispatch({ type: 'UPDATE_CARD', entry });
-      setEditCardId(null);
-    } else {
-      dispatch({ type: 'ADD_CARD', entry });
-    }
+    setSaving(true);
+    const ok = await save(editCardId ? { type: 'UPDATE_CARD', entry } : { type: 'ADD_CARD', entry });
+    setSaving(false);
+    if (!ok) return;
+    toast.success(editCardId ? 'Card updated' : 'Card added');
+    setEditCardId(null);
     setCardForm({
       name: '',
       bankAccountId: '',
@@ -353,7 +372,7 @@ export function AccountsTab() {
       billingDay: '',
       dueDay: '',
     });
-    setCardError('');
+    setCardErrors({});
   };
 
   return (
@@ -397,6 +416,7 @@ export function AccountsTab() {
           onClick={() => {
             setIsTransferOpen(true);
             setTransferError('');
+            transferErrors.reset();
           }}
           className="flex items-center gap-1.5 shrink-0"
         >
@@ -480,7 +500,7 @@ export function AccountsTab() {
                           )}
                           {acc.swiftCode && (
                             <div>
-                              <span className="text-muted/70 text-[10px] uppercase block">SWIFT / BIC</span>
+                              <span className="text-muted/70 text-[10px] uppercase block">SWIFT Code</span>
                               <span className="font-medium font-mono text-text">{acc.swiftCode}</span>
                             </div>
                           )}
@@ -503,7 +523,7 @@ export function AccountsTab() {
                           variant="secondary"
                           size="sm"
                           onClick={() => setViewAccountDetails(acc)}
-                          className="gap-1.5 text-xs flex-1 sm:flex-initial"
+                          className="gap-1.5 text-xs whitespace-nowrap flex-1 sm:flex-initial"
                         >
                           <Icon name="eye" size={13} />
                           <span>View Details</span>
@@ -515,6 +535,7 @@ export function AccountsTab() {
                             size="sm"
                             onClick={() => {
                               setEditAccountId(acc.id);
+                              setAccountErrors({});
                               setAccountForm({
                                 name: acc.name,
                                 bankName: acc.bankName,
@@ -561,38 +582,33 @@ export function AccountsTab() {
 
           {/* Add / Edit Bank Account Form */}
           <Card className="p-5 h-fit">
-            <h3 className="font-semibold text-sm mb-4 text-text flex items-center justify-between">
-              <span>{editAccountId ? 'Edit Bank Account' : 'Add Bank Account'}</span>
-              <span className="text-[11px] font-normal text-muted">Banking Standards</span>
+            <h3 className="font-semibold text-sm mb-4 text-text">
+              {editAccountId ? 'Edit Bank Account' : 'Add Bank Account'}
             </h3>
 
-            {accountError && (
-              <Alert tone="danger" className="mb-4" onDismiss={() => setAccountError('')}>
-                {accountError}
-              </Alert>
-            )}
-
             <div className="space-y-3.5">
-              <Field id="acc-name" label="Account Nickname" hint="e.g. Primary Savings, Business Operations">
+              <Field id="acc-name" label="Account Nickname" required error={accountErrors.name}>
                 <Input
                   value={accountForm.name}
                   onChange={e => {
                     setAccountForm(f => ({ ...f, name: e.target.value }));
-                    if (accountError) setAccountError('');
+                    clearAccountError('name');
                   }}
                   placeholder="e.g. Primary Savings"
+                  hasError={Boolean(accountErrors.name)}
                 />
               </Field>
 
-              <Field id="acc-bank" label="Bank Name" hint="Select standard preset or enter custom bank">
+              <Field id="acc-bank" label="Bank Name" required error={accountErrors.bankName}>
                 <Select
                   id="acc-bank"
                   value={
                     SRI_LANKAN_BANKS.includes(accountForm.bankName)
                       ? accountForm.bankName
-                      : 'Other / Custom Bank'
+                      : OTHER_BANK
                   }
                   onChange={e => handleBankSelectChange(e.target.value)}
+                  hasError={Boolean(accountErrors.bankName)}
                 >
                   {SRI_LANKAN_BANKS.map(bank => (
                     <option key={bank} value={bank}>{bank}</option>
@@ -601,58 +617,67 @@ export function AccountsTab() {
                 {(!SRI_LANKAN_BANKS.includes(accountForm.bankName) || accountForm.bankName === '') && (
                   <Input
                     className="mt-2"
+                    aria-label="Bank name"
                     value={accountForm.bankName}
                     onChange={e => {
                       setAccountForm(f => ({ ...f, bankName: e.target.value }));
-                      if (accountError) setAccountError('');
+                      clearAccountError('bankName');
                     }}
-                    placeholder="Enter custom bank name (e.g. Foreign bank, Union)"
+                    placeholder="Enter bank name"
+                    hasError={Boolean(accountErrors.bankName)}
                   />
                 )}
               </Field>
 
-              <Field id="acc-number" label="Account Number" hint="Full account number will be visible on your account details">
+              <Field id="acc-number" label="Account Number" required error={accountErrors.accountNumber}>
                 <Input
+                  inputMode="numeric"
+                  maxLength={20}
                   value={accountForm.accountNumber}
                   onChange={e => {
                     const cleaned = e.target.value.replace(/[^a-zA-Z0-9-]/g, '');
                     setAccountForm(f => ({ ...f, accountNumber: cleaned }));
-                    if (accountError) setAccountError('');
+                    clearAccountError('accountNumber');
                   }}
                   placeholder="e.g. 8001234567"
+                  hasError={Boolean(accountErrors.accountNumber)}
                 />
               </Field>
 
               <div className="grid grid-cols-2 gap-3">
-                <Field id="acc-type" label="Account Type">
+                <Field id="acc-type" label="Account Type" required>
                   <Select
                     value={accountForm.accountType}
-                    onChange={e => setAccountForm(f => ({ ...f, accountType: e.target.value as any }))}
+                    onChange={e => setAccountForm(f => ({ ...f, accountType: e.target.value as BankAccount['accountType'] }))}
                   >
-                    <option value="savings">Savings Account</option>
-                    <option value="current">Current / Checking</option>
-                    <option value="business">Business Account</option>
-                    <option value="other">Fixed Deposit / Other</option>
+                    <option value="savings">Savings</option>
+                    <option value="current">Current</option>
+                    <option value="business">Business</option>
+                    <option value="other">Fixed Deposit</option>
                   </Select>
                 </Field>
-                <Field id="acc-branch" label="Branch (optional)">
+                <Field id="acc-branch" label="Branch" required error={accountErrors.branch}>
                   <Input
                     value={accountForm.branch}
-                    onChange={e => setAccountForm(f => ({ ...f, branch: e.target.value }))}
+                    onChange={e => {
+                      setAccountForm(f => ({ ...f, branch: e.target.value }));
+                      clearAccountError('branch');
+                    }}
                     placeholder="e.g. Kollupitiya"
+                    hasError={Boolean(accountErrors.branch)}
                   />
                 </Field>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <Field id="acc-branchcode" label="Branch Code" hint="e.g. 034">
+                <Field id="acc-branchcode" label="Branch Code">
                   <Input
                     value={accountForm.branchCode}
                     onChange={e => setAccountForm(f => ({ ...f, branchCode: e.target.value }))}
                     placeholder="e.g. 034"
                   />
                 </Field>
-                <Field id="acc-swift" label="SWIFT / BIC" hint="e.g. COMB-LK-LX">
+                <Field id="acc-swift" label="SWIFT Code">
                   <Input
                     value={accountForm.swiftCode}
                     onChange={e => setAccountForm(f => ({ ...f, swiftCode: e.target.value }))}
@@ -661,16 +686,24 @@ export function AccountsTab() {
                 </Field>
               </div>
 
-              <Field id="acc-balance" label="Current Balance (Rs.)">
+              {/* After creation the server keeps the balance in step with the ledger, so it is set only once. */}
+              <Field id="acc-balance" label="Current Balance" required={!editAccountId} error={accountErrors.currentBalance}>
                 <Input
                   type="number"
+                  min="0"
+                  step="any"
                   value={accountForm.currentBalance}
-                  onChange={e => setAccountForm(f => ({ ...f, currentBalance: e.target.value }))}
+                  disabled={Boolean(editAccountId)}
+                  onChange={e => {
+                    setAccountForm(f => ({ ...f, currentBalance: e.target.value }));
+                    clearAccountError('currentBalance');
+                  }}
                   placeholder="e.g. 150,000"
+                  hasError={Boolean(accountErrors.currentBalance)}
                 />
               </Field>
 
-              <Field id="acc-notes" label="Notes (optional)">
+              <Field id="acc-notes" label="Notes">
                 <Input
                   value={accountForm.notes}
                   onChange={e => setAccountForm(f => ({ ...f, notes: e.target.value }))}
@@ -679,7 +712,7 @@ export function AccountsTab() {
               </Field>
 
               <div className="flex gap-2 pt-1">
-                <Button variant="primary" className="flex-1" onClick={submitAccount}>
+                <Button variant="primary" className="flex-1" onClick={submitAccount} loading={saving}>
                   {editAccountId ? 'Update Account' : 'Save Account'}
                 </Button>
                 {editAccountId && (
@@ -698,7 +731,7 @@ export function AccountsTab() {
                         currentBalance: '',
                         notes: '',
                       });
-                      setAccountError('');
+                      setAccountErrors({});
                     }}
                   >
                     Cancel
@@ -765,7 +798,7 @@ export function AccountsTab() {
                         {linkedAcc && (
                           <div className="text-xs text-muted flex items-center gap-1.5 mt-2">
                             <Icon name="bank" size={12} />
-                            <span className="truncate">Linked: {linkedAcc.name} ({linkedAcc.bankName})</span>
+                            <span className="truncate">Linked: {linkedAcc.name} · {linkedAcc.bankName}</span>
                           </div>
                         )}
 
@@ -789,7 +822,7 @@ export function AccountsTab() {
                           variant="secondary"
                           size="sm"
                           onClick={() => setViewCardDetails(c)}
-                          className="gap-1.5 text-xs flex-1 sm:flex-initial"
+                          className="gap-1.5 text-xs whitespace-nowrap flex-1 sm:flex-initial"
                         >
                           <Icon name="eye" size={13} />
                           <span>View Details</span>
@@ -801,6 +834,7 @@ export function AccountsTab() {
                             size="sm"
                             onClick={() => {
                               setEditCardId(c.id);
+                              setCardErrors({});
                               setCardForm({
                                 name: c.name,
                                 bankAccountId: c.bankAccountId || '',
@@ -840,9 +874,8 @@ export function AccountsTab() {
 
           {/* Add / Edit Card Form */}
           <Card className="p-5 h-fit">
-            <h3 className="font-semibold text-sm mb-4 text-text flex items-center justify-between">
-              <span>{editCardId ? 'Edit Card' : 'Add Bank Card'}</span>
-              <span className="text-[11px] font-normal text-muted">Card Standards</span>
+            <h3 className="font-semibold text-sm mb-4 text-text">
+              {editCardId ? 'Edit Card' : 'Add Bank Card'}
             </h3>
 
             {/* Live Interactive Visual Card Preview */}
@@ -891,91 +924,101 @@ export function AccountsTab() {
               </div>
             </div>
 
-            {cardError && (
-              <Alert tone="danger" className="mb-4" onDismiss={() => setCardError('')}>
-                {cardError}
-              </Alert>
-            )}
-
             <div className="space-y-3.5">
-              <Field id="card-name" label="Card Label" hint="e.g. Commercial Visa Platinum, BOC Debit">
+              <Field id="card-name" label="Card Label" required error={cardErrors.name}>
                 <Input
                   value={cardForm.name}
                   onChange={e => {
                     setCardForm(f => ({ ...f, name: e.target.value }));
-                    if (cardError) setCardError('');
+                    clearCardError('name');
                   }}
                   placeholder="e.g. Commercial Visa Platinum"
+                  hasError={Boolean(cardErrors.name)}
                 />
               </Field>
 
               {/* Standard 4-digit Spacing Card Number Input */}
-              <Field
-                id="card-number"
-                label="Card Number"
-                hint="Auto-spaced 4 digits (standard banking format)"
-              >
+              <Field id="card-number" label="Card Number" required error={cardErrors.cardNumber}>
                 <Input
-                  maxLength={19}
+                  inputMode="numeric"
+                  autoComplete="cc-number"
+                  maxLength={23}
                   value={cardForm.cardNumber}
                   onChange={e => {
                     const formatted = formatCardNumberInput(e.target.value);
                     const cleanDigits = formatted.replace(/\s+/g, '');
                     const detectedNet = detectCardNetwork(cleanDigits);
-                    setCardForm(f => ({
-                      ...f,
-                      cardNumber: formatted,
-                      lastFourDigits: cleanDigits.length >= 4 ? cleanDigits.slice(-4) : f.lastFourDigits,
-                      cardNetwork: detectedNet !== 'other' ? detectedNet : f.cardNetwork,
-                    }));
-                    if (cardError) setCardError('');
+                    setCardForm(f => {
+                      const cardNetwork = detectedNet !== 'other' ? detectedNet : f.cardNetwork;
+                      return {
+                        ...f,
+                        cardNumber: formatted,
+                        lastFourDigits: cleanDigits.length >= 4 ? cleanDigits.slice(-4) : f.lastFourDigits,
+                        cardNetwork,
+                      };
+                    });
+                    clearCardError('cardNumber');
                   }}
                   placeholder="e.g. 4532 1100 2345 6789"
+                  hasError={Boolean(cardErrors.cardNumber)}
                 />
               </Field>
 
-              {/* Expiry Date (MM/YY) and CVC / CVV */}
+              {/* Expiry Date (MM/YY) and CVV */}
               <div className="grid grid-cols-2 gap-3">
-                <Field id="card-expiry" label="Expiry Date" hint="MM/YY">
+                <Field id="card-expiry" label="Expiry Date" required error={cardErrors.expiryDate}>
                   <Input
+                    inputMode="numeric"
+                    autoComplete="cc-exp"
                     maxLength={5}
                     value={cardForm.expiryDate}
                     onChange={e => {
                       const formatted = formatExpiryInput(e.target.value);
                       setCardForm(f => ({ ...f, expiryDate: formatted }));
-                      if (cardError) setCardError('');
+                      clearCardError('expiryDate');
                     }}
                     placeholder="MM/YY"
+                    hasError={Boolean(cardErrors.expiryDate)}
                   />
                 </Field>
-                <Field id="card-cvv" label="CVC / CVV" hint="3-4 digits">
+                <Field id="card-cvv" label="CVV" required={!editCardId || !cardForm.cardNumber.includes('•')} error={cardErrors.cvv}>
                   <Input
                     type="password"
-                    maxLength={4}
+                    inputMode="numeric"
+                    autoComplete="cc-csc"
+                    maxLength={CVV_LENGTH}
                     value={cardForm.cvv}
                     onChange={e => {
-                      setCardForm(f => ({ ...f, cvv: e.target.value.replace(/\D/g, '') }));
-                      if (cardError) setCardError('');
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, CVV_LENGTH);
+                      setCardForm(f => ({ ...f, cvv: digits }));
+                      clearCardError('cvv');
                     }}
                     placeholder="•••"
+                    hasError={Boolean(cardErrors.cvv)}
                   />
                 </Field>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <Field id="card-type" label="Type">
+                <Field id="card-type" label="Type" required>
                   <Select
                     value={cardForm.cardType}
-                    onChange={e => setCardForm(f => ({ ...f, cardType: e.target.value as any }))}
+                    onChange={e => {
+                      setCardForm(f => ({ ...f, cardType: e.target.value as CardType['cardType'] }));
+                      setCardErrors(err => ({ ...err, bankAccountId: undefined, creditLimit: undefined, billingDay: undefined, dueDay: undefined }));
+                    }}
                   >
                     <option value="debit">Debit</option>
                     <option value="credit">Credit</option>
                   </Select>
                 </Field>
-                <Field id="card-network" label="Network">
+                <Field id="card-network" label="Network" required>
                   <Select
                     value={cardForm.cardNetwork}
-                    onChange={e => setCardForm(f => ({ ...f, cardNetwork: e.target.value as any }))}
+                    onChange={e => {
+                      const cardNetwork = e.target.value as CardType['cardNetwork'];
+                      setCardForm(f => ({ ...f, cardNetwork }));
+                    }}
                   >
                     <option value="visa">Visa</option>
                     <option value="mastercard">MasterCard</option>
@@ -987,41 +1030,59 @@ export function AccountsTab() {
 
               <BankSelect
                 id="card-bank-account"
-                label="Linked Bank Account (optional)"
+                label="Linked Bank Account"
                 value={cardForm.bankAccountId}
-                onChange={id => setCardForm(f => ({ ...f, bankAccountId: id }))}
-                bankAccounts={state.bankAccounts}
+                onChange={id => {
+                  setCardForm(f => ({ ...f, bankAccountId: id }));
+                  clearCardError('bankAccountId');
+                }}
+                bankAccounts={state.bankAccounts.filter(a => a.accountType !== 'cash')}
+                required={cardForm.cardType === 'debit'}
+                error={cardErrors.bankAccountId}
               />
 
               {cardForm.cardType === 'credit' && (
                 <>
-                  <Field id="card-limit" label="Credit Limit (Rs.)">
+                  <Field id="card-limit" label="Credit Limit" required error={cardErrors.creditLimit}>
                     <Input
                       type="number"
+                      min="1"
                       value={cardForm.creditLimit}
-                      onChange={e => setCardForm(f => ({ ...f, creditLimit: e.target.value }))}
+                      onChange={e => {
+                        setCardForm(f => ({ ...f, creditLimit: e.target.value }));
+                        clearCardError('creditLimit');
+                      }}
                       placeholder="e.g. 200,000"
+                      hasError={Boolean(cardErrors.creditLimit)}
                     />
                   </Field>
                   <div className="grid grid-cols-2 gap-3">
-                    <Field id="card-billingday" label="Billing Day">
+                    <Field id="card-billingday" label="Billing Day" required error={cardErrors.billingDay}>
                       <Input
                         type="number"
                         min="1"
                         max="31"
                         value={cardForm.billingDay}
-                        onChange={e => setCardForm(f => ({ ...f, billingDay: e.target.value }))}
+                        onChange={e => {
+                          setCardForm(f => ({ ...f, billingDay: e.target.value }));
+                          clearCardError('billingDay');
+                        }}
                         placeholder="e.g. 15"
+                        hasError={Boolean(cardErrors.billingDay)}
                       />
                     </Field>
-                    <Field id="card-dueday" label="Due Day">
+                    <Field id="card-dueday" label="Due Day" required error={cardErrors.dueDay}>
                       <Input
                         type="number"
                         min="1"
                         max="31"
                         value={cardForm.dueDay}
-                        onChange={e => setCardForm(f => ({ ...f, dueDay: e.target.value }))}
+                        onChange={e => {
+                          setCardForm(f => ({ ...f, dueDay: e.target.value }));
+                          clearCardError('dueDay');
+                        }}
                         placeholder="e.g. 28"
+                        hasError={Boolean(cardErrors.dueDay)}
                       />
                     </Field>
                   </div>
@@ -1029,7 +1090,7 @@ export function AccountsTab() {
               )}
 
               <div className="flex gap-2 pt-1">
-                <Button variant="primary" className="flex-1" onClick={submitCard}>
+                <Button variant="primary" className="flex-1" onClick={submitCard} loading={saving}>
                   {editCardId ? 'Update Card' : 'Save Card'}
                 </Button>
                 {editCardId && (
@@ -1051,7 +1112,7 @@ export function AccountsTab() {
                         billingDay: '',
                         dueDay: '',
                       });
-                      setCardError('');
+                      setCardErrors({});
                     }}
                   >
                     Cancel
@@ -1147,7 +1208,7 @@ export function AccountsTab() {
                   <span className="font-medium text-text font-mono">{viewAccountDetails.branchCode || '—'}</span>
                 </div>
                 <div>
-                  <span className="text-muted block text-[11px]">SWIFT / BIC Code</span>
+                  <span className="text-muted block text-[11px]">SWIFT Code</span>
                   <span className="font-medium text-text font-mono">{viewAccountDetails.swiftCode || '—'}</span>
                 </div>
                 <div>
@@ -1157,7 +1218,7 @@ export function AccountsTab() {
               </div>
               {viewAccountDetails.notes && (
                 <div className="pt-2 border-t border-border/60">
-                  <span className="text-muted block text-[11px]">Notes / Instructions</span>
+                  <span className="text-muted block text-[11px]">Notes</span>
                   <span className="font-normal text-text">{viewAccountDetails.notes}</span>
                 </div>
               )}
@@ -1200,7 +1261,7 @@ export function AccountsTab() {
                     `Account Number: ${viewAccountDetails.accountNumber}`,
                     viewAccountDetails.branch ? `Branch: ${viewAccountDetails.branch}` : '',
                     viewAccountDetails.branchCode ? `Branch Code: ${viewAccountDetails.branchCode}` : '',
-                    viewAccountDetails.swiftCode ? `SWIFT / BIC: ${viewAccountDetails.swiftCode}` : '',
+                    viewAccountDetails.swiftCode ? `SWIFT Code: ${viewAccountDetails.swiftCode}` : '',
                   ].filter(Boolean).join('\n');
                   copyToClipboard(slip, 'transfer_slip');
                 }}
@@ -1213,6 +1274,7 @@ export function AccountsTab() {
                 className="w-full sm:w-auto text-xs"
                 onClick={() => {
                   setEditAccountId(viewAccountDetails.id);
+                  setAccountErrors({});
                   setAccountForm({
                     name: viewAccountDetails.name,
                     bankName: viewAccountDetails.bankName,
@@ -1347,6 +1409,7 @@ export function AccountsTab() {
                 size="sm"
                 onClick={() => {
                   setEditCardId(viewCardDetails.id);
+                  setCardErrors({});
                   setCardForm({
                     name: viewCardDetails.name,
                     bankAccountId: viewCardDetails.bankAccountId || '',
@@ -1386,10 +1449,6 @@ export function AccountsTab() {
           title="Transfer Funds"
         >
           <div className="space-y-4">
-            <p className="text-xs text-muted">
-              Move funds between your bank accounts, cash wallet, or credit cards. Both balances and transactions will be recorded automatically in your ledger.
-            </p>
-
             {transferError && (
               <Alert tone="danger" title="Transfer Error">
                 {transferError}
@@ -1397,43 +1456,43 @@ export function AccountsTab() {
             )}
 
             <div className="grid sm:grid-cols-2 gap-3">
-              <Field id="transfer-from-select" label="From (Source)" required>
+              <Field id="transfer-from-select" label="From" required error={transferErrors.errors.fromEntity}>
                 <Select
                   id="transfer-from-select"
                   value={transferForm.fromEntity}
-                  onChange={e => setTransferForm(f => ({ ...f, fromEntity: e.target.value }))}
+                  onChange={e => { setTransferForm(f => ({ ...f, fromEntity: e.target.value })); transferErrors.clear('fromEntity', 'toEntity'); }}
                 >
                   <option value="">Select source...</option>
                   <option value="cash">Cash Wallet</option>
                   {state.bankAccounts.filter(a => !a.isArchived).map(a => (
                     <option key={a.id} value={`ba_${a.id}`}>
-                      {a.name} ({a.bankName}) · {formatRs(a.currentBalance || 0)}
+                      {a.name} · {a.bankName} · {formatRs(a.currentBalance || 0)}
                     </option>
                   ))}
                   {state.cards.map(c => (
                     <option key={c.id} value={`cd_${c.id}`}>
-                      {c.name} ({c.cardType.toUpperCase()} •••• {c.lastFourDigits})
+                      {c.name} · •••• {c.lastFourDigits}
                     </option>
                   ))}
                 </Select>
               </Field>
 
-              <Field id="transfer-to-select" label="To (Destination)" required>
+              <Field id="transfer-to-select" label="To" required error={transferErrors.errors.toEntity}>
                 <Select
                   id="transfer-to-select"
                   value={transferForm.toEntity}
-                  onChange={e => setTransferForm(f => ({ ...f, toEntity: e.target.value }))}
+                  onChange={e => { setTransferForm(f => ({ ...f, toEntity: e.target.value })); transferErrors.clear('toEntity'); }}
                 >
                   <option value="">Select destination...</option>
                   <option value="cash">Cash Wallet</option>
                   {state.bankAccounts.filter(a => !a.isArchived).map(a => (
                     <option key={a.id} value={`ba_${a.id}`}>
-                      {a.name} ({a.bankName}) · {formatRs(a.currentBalance || 0)}
+                      {a.name} · {a.bankName} · {formatRs(a.currentBalance || 0)}
                     </option>
                   ))}
                   {state.cards.map(c => (
                     <option key={c.id} value={`cd_${c.id}`}>
-                      {c.name} ({c.cardType.toUpperCase()} •••• {c.lastFourDigits})
+                      {c.name} · •••• {c.lastFourDigits}
                     </option>
                   ))}
                 </Select>
@@ -1441,7 +1500,7 @@ export function AccountsTab() {
             </div>
 
             <div className="grid sm:grid-cols-2 gap-3">
-              <Field id="transfer-amount-input" label="Amount (LKR)" required>
+              <Field id="transfer-amount-input" label="Amount" required error={transferErrors.errors.amount}>
                 <Input
                   id="transfer-amount-input"
                   type="number"
@@ -1449,25 +1508,25 @@ export function AccountsTab() {
                   step="any"
                   placeholder="e.g. 5000"
                   value={transferForm.amount}
-                  onChange={e => setTransferForm(f => ({ ...f, amount: e.target.value }))}
+                  onChange={e => { setTransferForm(f => ({ ...f, amount: e.target.value })); transferErrors.clear('amount'); }}
                 />
               </Field>
 
-              <Field id="transfer-date-input" label="Transfer Date" required>
+              <Field id="transfer-date-input" label="Transfer Date" required error={transferErrors.errors.date}>
                 <Input
                   id="transfer-date-input"
                   type="date"
                   value={transferForm.date}
-                  onChange={e => setTransferForm(f => ({ ...f, date: e.target.value }))}
+                  onChange={e => { setTransferForm(f => ({ ...f, date: e.target.value })); transferErrors.clear('date'); }}
                 />
               </Field>
             </div>
 
-            <Field id="transfer-note-input" label="Note / Reference (Optional)">
+            <Field id="transfer-note-input" label="Note">
               <Input
                 id="transfer-note-input"
                 type="text"
-                placeholder="e.g. Monthly savings allocation, ATM withdrawal"
+                placeholder="e.g. ATM withdrawal"
                 value={transferForm.description}
                 onChange={e => setTransferForm(f => ({ ...f, description: e.target.value }))}
               />

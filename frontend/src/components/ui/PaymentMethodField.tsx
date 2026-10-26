@@ -14,10 +14,10 @@ export type PaymentMethod =
 export const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] = [
   { value: 'cash', label: 'Cash' },
   { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'card', label: 'Card (Debit / Credit)' },
+  { value: 'card', label: 'Card' },
   { value: 'cheque', label: 'Cheque' },
   { value: 'standing_order', label: 'Standing Order' },
-  { value: 'online', label: 'Online / App' },
+  { value: 'online', label: 'Online' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -52,15 +52,13 @@ export function PaymentMethodField({
     key: string;
     value: PaymentMethod;
     label: string;
-    sublabel: string;
     icon: React.ReactNode;
     matches: boolean;
   }[] = [
     {
       key: 'bank',
       value: 'bank_transfer',
-      label: 'Link Bank',
-      sublabel: 'Savings / Current',
+      label: 'Bank',
       matches: value === 'bank_transfer',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -79,7 +77,6 @@ export function PaymentMethodField({
       key: 'card',
       value: 'card',
       label: 'Card',
-      sublabel: 'Debit / Credit',
       matches: value === 'card',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -92,7 +89,6 @@ export function PaymentMethodField({
       key: 'cash',
       value: 'cash',
       label: 'Cash',
-      sublabel: 'Physical notes',
       matches: value === 'cash',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -105,8 +101,7 @@ export function PaymentMethodField({
     {
       key: 'other',
       value: isOtherCategory ? value : 'other',
-      label: 'Other Types',
-      sublabel: isOtherCategory ? value.replace('_', ' ') : 'Cheque / Online',
+      label: 'Other',
       matches: isOtherCategory,
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -123,10 +118,10 @@ export function PaymentMethodField({
     : boxes;
 
   const otherSubOptions = ([
-    { value: 'other' as const, label: 'General Other' },
+    { value: 'other' as const, label: 'Other' },
     { value: 'cheque' as const, label: 'Cheque' },
     { value: 'standing_order' as const, label: 'Standing Order' },
-    { value: 'online' as const, label: 'Online / App' },
+    { value: 'online' as const, label: 'Online' },
   ] satisfies { value: PaymentMethod; label: string }[]).filter(
     opt => !allowedMethods || allowedMethods.includes(opt.value)
   );
@@ -150,7 +145,7 @@ export function PaymentMethodField({
                 aria-checked={isSelected}
                 disabled={disabled}
                 onClick={() => onChange(box.value)}
-                className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between gap-2 select-none outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 ${
+                className={`p-3 rounded-xl border transition-all flex flex-col items-center justify-center gap-1.5 select-none outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 ${
                   disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
                 } ${
                   isSelected
@@ -158,43 +153,26 @@ export function PaymentMethodField({
                     : 'border-border bg-surface hover:bg-surface-hover hover:border-slate-300 dark:hover:border-slate-600 text-muted'
                 }`}
               >
-                <div className="flex items-center justify-between w-full">
-                  <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
-                      isSelected
-                        ? 'bg-primary-500 text-white shadow-xs'
-                        : 'bg-surface-hover text-muted'
-                    }`}
-                  >
-                    {box.icon}
-                  </div>
-                  <div
-                    className={`w-4.5 h-4.5 rounded-full border-[1.5px] flex items-center justify-center transition-all ${
-                      isSelected
-                        ? 'border-primary-500 bg-primary-500 text-white text-[10px] font-bold shadow-xs'
-                        : 'border-slate-300 dark:border-slate-600 bg-surface'
-                    }`}
-                  >
-                    {isSelected && '✓'}
-                  </div>
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                    isSelected
+                      ? 'bg-primary-500 text-white shadow-xs'
+                      : 'bg-surface-hover text-muted'
+                  }`}
+                >
+                  {box.icon}
                 </div>
-                <div>
-                  <div className={`text-xs font-semibold ${isSelected ? 'text-text' : 'text-text-2'}`}>
-                    {box.label}
-                  </div>
-                  <div className="text-[10px] text-muted truncate capitalize">
-                    {box.sublabel}
-                  </div>
+                <div className={`text-xs font-semibold ${isSelected ? 'text-text' : 'text-text-2'}`}>
+                  {box.label}
                 </div>
               </button>
             );
           })}
         </div>
 
-        {/* Sub-options when "Other Types" is chosen */}
+        {/* Sub-options when "Other" is chosen */}
         {isOtherCategory && (
           <div className="p-2.5 rounded-xl bg-surface-hover/70 border border-border/80 flex flex-wrap items-center gap-1.5 animate-fade-in">
-            <span className="text-[11px] font-medium text-muted mr-1">Specific type:</span>
             {otherSubOptions.map(sub => (
               <button
                 key={sub.value}

@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { Chip } from '@/components/ui/Chip';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -151,7 +152,7 @@ export function BranchAnalysisView({
               <div id="branch-health-heading" className="text-xs uppercase tracking-wider font-bold text-primary-300">
                 Outlet Viability
               </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">{monthLabel(month)}</div>
+              <div className="text-[11px] text-white/60 mt-0.5">{monthLabel(month)}</div>
             </div>
           </div>
 
@@ -163,14 +164,10 @@ export function BranchAnalysisView({
                 <span className="opacity-75">· {branch.location || 'HQ'}</span>
               </div>
               {company && (
-                <button
-                  type="button"
-                  onClick={onBackToCompany}
-                  className="inline-flex items-center gap-1 text-[11px] text-slate-300 hover:text-white transition-colors bg-white/5 px-2 py-0.5 rounded-full border border-white/10"
-                >
+                <Chip tone="dark" onClick={onBackToCompany} className="!px-2 !py-0.5 text-[11px] font-medium bg-white/5 !text-white/80 hover:!text-white">
                   <Icon name="briefcase" size={11} />
                   <span>{company.name}</span>
-                </button>
+                </Chip>
               )}
             </div>
 
@@ -184,7 +181,7 @@ export function BranchAnalysisView({
                 : `Run-rate indicates ${formatRs(metrics.targetPace.projectedMonthEnd)} projected by month end (${metrics.targetPace.projectedPct}% of monthly target).`}
             </h2>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-white/80 leading-relaxed">
               {branch.branchType || 'Outlet'} operating with{' '}
               {metrics.monthlyTarget > 0 ? (
                 <>
@@ -200,11 +197,11 @@ export function BranchAnalysisView({
           <div className="grid grid-cols-2 gap-2.5">
             {metrics.healthScore.factors.map(f => (
               <div key={f.name} className="p-3 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col justify-between">
-                <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold flex items-center justify-between">
+                <div className="text-[11px] uppercase tracking-wider text-white/60 font-semibold flex items-center justify-between">
                   <span>{f.name}</span>
                   <span className="font-mono text-white font-bold">{f.score}</span>
                 </div>
-                <div className="text-[11px] text-slate-300 mt-1 font-medium truncate">{f.hint}</div>
+                <div className="text-[11px] text-white/80 mt-1 font-medium truncate">{f.hint}</div>
               </div>
             ))}
           </div>
@@ -322,9 +319,6 @@ export function BranchAnalysisView({
                     <Icon name="analysis" size={15} className="text-primary-text" />
                     Branch Unit Cash Flow Waterfall
                   </h3>
-                  <p className="text-xs text-muted mt-0.5">
-                    Operating margin flow from gross branch receipts to net cash contribution
-                  </p>
                 </div>
               </div>
               <WaterfallChart steps={branchWaterfall} />
@@ -339,9 +333,6 @@ export function BranchAnalysisView({
                       <Icon name="target" size={15} className="text-primary-text" />
                       Monthly Target Pacing Tracker
                     </h3>
-                    <p className="text-xs text-muted mt-0.5">
-                      Pacing velocity vs target quota for {monthLabel(month)}
-                    </p>
                   </div>
                   <Badge tone={targetTone}>
                     {metrics.targetPace.targetStatus.toUpperCase()}
@@ -424,9 +415,6 @@ export function BranchAnalysisView({
               <Icon name="calendar" size={15} className="text-primary-text" />
               Peak Weekday Sales Rhythm
             </h3>
-            <p className="text-xs text-muted mb-4">
-              Aggregate sales revenue distributed by day of the week (Sun – Sat)
-            </p>
             <div className="py-4">
               <WeekdayBars values={metrics.weekdayTotals} formatValue={compactNumber} />
             </div>
@@ -438,9 +426,6 @@ export function BranchAnalysisView({
               <Icon name="analysis" size={15} className="text-primary-text" />
               Daily Sales Heatmap
             </h3>
-            <p className="text-xs text-muted mb-4">
-              Daily revenue intensity across the month of {monthLabel(month)}
-            </p>
             <HeatCalendar cells={metrics.dailySales} formatValue={compactNumber} />
           </Card>
         </div>
@@ -451,9 +436,6 @@ export function BranchAnalysisView({
               <Icon name="credit-card" size={15} className="text-primary-text" />
               Utility Bills vs Operating Overheads
             </h3>
-            <p className="text-xs text-muted mb-4">
-              Distribution of cost drivers for {branch.name}
-            </p>
             <div className="flex items-center justify-center py-4">
               {donutSlices.length > 0 ? (
                 <DonutChart
@@ -469,7 +451,6 @@ export function BranchAnalysisView({
 
           <Card className="p-5">
             <h3 className="text-sm font-bold text-text mb-1">Cost Categories</h3>
-            <p className="text-xs text-muted mb-4">Breakdown of operational spend drivers</p>
             <div className="space-y-3">
               {metrics.costCategories.map((c, i) => (
                 <div key={c.category} className="space-y-1">
@@ -505,9 +486,6 @@ export function BranchAnalysisView({
                 <Icon name="bolt" size={15} className="text-primary-text" />
                 6-Month Branch Trend & 3-Month Projection
               </h3>
-              <p className="text-xs text-muted mt-0.5">
-                Revenue vs cost historical trends with damped growth forecast
-              </p>
             </div>
             <Badge tone="primary">Confidence Band: ±15%</Badge>
           </div>

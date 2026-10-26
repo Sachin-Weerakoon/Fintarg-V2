@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -41,7 +41,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
       type={type}
       disabled={isDisabled}
       aria-busy={loading ? 'true' : undefined}
-      className={`btn-${variant} ${sizeClasses[size]} ${loading ? 'opacity-80 cursor-wait' : ''} ${className}`.trim()}
+      // A link-style button sits inline with text, so it takes no size padding.
+      className={`btn-${variant} ${variant === 'link' ? 'text-xs' : sizeClasses[size]} ${loading ? 'opacity-80 cursor-wait' : ''} ${className}`.trim()}
       {...props}
     >
       {loading ? (
@@ -52,7 +53,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
       ) : (
         iconLeft && <span className="flex-shrink-0">{iconLeft}</span>
       )}
-      {children && <span>{children}</span>}
+      {/* display: contents lets an inline <Icon /> + text child pick up the button's flex gap. */}
+      {children && <span className="contents">{children}</span>}
       {!loading && iconRight && <span className="flex-shrink-0">{iconRight}</span>}
     </button>
   );

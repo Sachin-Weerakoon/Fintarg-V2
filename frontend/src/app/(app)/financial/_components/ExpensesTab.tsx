@@ -3,7 +3,6 @@ import { useState, useMemo } from 'react';
 import {
   useApp,
   formatRs,
-  calcMonthlyExpenses,
   calcMonthlyIncome,
   calcFinancePayments,
   calcDailyExpenseBudget,
@@ -16,6 +15,7 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Checkbox } from '@/components/ui/Checkbox';
+import { Chip } from '@/components/ui/Chip';
 import { MoneyField } from '@/components/ui/MoneyField';
 import { DateField } from '@/components/ui/DateField';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -28,25 +28,35 @@ import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/ToastProvider';
 import { EXPENSE_CATS } from '@/utils/bankData';
 import type { ExpenseEntry } from '@/types';
+import { getLocalDate, isInRange, type DateRange } from '@/utils/date';
+import { useFieldErrors } from '@/hooks/useFieldErrors';
 
 export function ExpensesTab({
+  range,
   month,
   streamScope = 'all',
   companyId,
 }: {
+  range: DateRange;
   month: string;
   streamScope?: 'all' | 'salary' | 'business';
   companyId?: string;
 }) {
-  const { state, dispatch } = useApp();
+  const { state, save } = useApp();
+  const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
 
   const hasBusiness = state.profile.workMode === 'both' || state.profile.workMode === 'business' || (state.companies && state.companies.length > 0);
   const defaultCompanyId = state.companies[0]?.id || '';
+  // New expenses default to today, or to the range's last day when today is outside it.
+  const defaultDate = () => {
+    const today = getLocalDate();
+    return isInRange(today, range) ? today : range.to;
+  };
 
   const [form, setForm] = useState({
-    date: month + '-' + new Date().toISOString().slice(8, 10),
+    date: defaultDate(),
     category: 'Food',
     amount: '',
     note: '',
@@ -59,12 +69,12 @@ export function ExpensesTab({
     branchId: '',
   });
   const [editId, setEditId] = useState<string | null>(null);
-  const [error, setError] = useState('');
+  const { errors, check, clear, reset: resetErrors } = useFieldErrors<'date' | 'amount' | 'bankAccountId' | 'cardId' | 'companyId'>();
   const [catFilter, setCatFilter] = useState('All');
 
   // Filter expenses according to streamScope and company filter
-  const streamFilteredExpenses = useMemo(() => {
-    let list = state.expenses.filter(e => e.date.startsWith(month));
+  const streamExpenses = useMemo(() => {
+    let list = state.expenses;
     if (streamScope === 'salary') {
       list = list.filter(e => e.sourceType !== 'business');
     } else if (streamScope === 'business') {
@@ -74,9 +84,18 @@ export function ExpensesTab({
       }
     }
     return list;
-  }, [state.expenses, month, streamScope, companyId]);
+  }, [state.expenses, streamScope, companyId]);
 
-  const monthTotal = streamFilteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const streamFilteredExpenses = useMemo(
+    () => streamExpenses.filter(e => isInRange(e.date, range)),
+    [streamExpenses, range],
+  );
+
+  const rangeTotal = streamFilteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  // The daily budget is a monthly figure, so it always uses the whole month the range ends in.
+  const monthTotal = streamExpenses
+    .filter(e => e.date.startsWith(month))
+    .reduce((sum, e) => sum + e.amount, 0);
 
   const catMap = useMemo(() => {
     const map: Record<string, number> = {};
@@ -108,11 +127,18 @@ export function ExpensesTab({
     return state.businessBranches.filter(b => b.companyId === form.companyId);
   }, [state.businessBranches, form.companyId]);
 
-  const submit = () => {
-    if (!form.amount || Number(form.amount) <= 0) {
-      setError('Amount must be greater than zero.');
-      return;
-    }
+  const submit = async () => {
+    const isBusiness = form.sourceType === 'business';
+    const valid = check({
+      date: form.date ? undefined : 'Choose the date.',
+      amount: Number(form.amount) > 0 ? undefined : 'Enter an amount greater than zero.',
+      // Mirrors the server rule: bank-backed methods must name the account they draw from.
+      bankAccountId: ['bank_transfer', 'cheque', 'standing_order'].includes(form.paymentMethod) && !form.bankAccountId
+        ? 'Select the bank account this was paid from.' : undefined,
+      cardId: form.paymentMethod === 'card' && state.cards.length > 0 && !form.cardId ? 'Select the card used.' : undefined,
+      companyId: isBusiness && !form.companyId ? 'Select the business this was paid from.' : undefined,
+    });
+    if (!valid) return;
     const entry: ExpenseEntry = {
       id: editId || 'e_' + Date.now(),
       date: form.date,
@@ -128,16 +154,15 @@ export function ExpensesTab({
       branchId: form.sourceType === 'business' ? (form.branchId || undefined) : undefined,
     };
 
-    if (editId) {
-      dispatch({ type: 'UPDATE_EXPENSE', entry });
-      toast.success('Expense updated');
-      setEditId(null);
-    } else {
-      dispatch({ type: 'ADD_EXPENSE', entry });
-      toast.success('Expense recorded');
-    }
+    setSaving(true);
+    const ok = await save(editId ? { type: 'UPDATE_EXPENSE', entry } : { type: 'ADD_EXPENSE', entry });
+    setSaving(false);
+    // On failure the store has already rolled back and shown the server's reason; keep the input.
+    if (!ok) return;
+    toast.success(editId ? 'Expense updated' : 'Expense recorded');
+    setEditId(null);
     setForm({
-      date: month + '-' + new Date().toISOString().slice(8, 10),
+      date: defaultDate(),
       category: 'Food',
       amount: '',
       note: '',
@@ -149,7 +174,7 @@ export function ExpensesTab({
       companyId: (companyId && companyId !== 'all') ? companyId : defaultCompanyId,
       branchId: '',
     });
-    setError('');
+    resetErrors();
   };
 
   const handleEdit = (expense: ExpenseEntry) => {
@@ -167,7 +192,7 @@ export function ExpensesTab({
       companyId: expense.companyId || defaultCompanyId,
       branchId: expense.branchId || '',
     });
-    setError('');
+    resetErrors();
   };
 
   const handleDelete = async (id: string, amount: number, category: string) => {
@@ -179,8 +204,7 @@ export function ExpensesTab({
       tone: 'danger',
     });
     if (ok) {
-      dispatch({ type: 'DELETE_EXPENSE', id });
-      toast.success('Expense deleted');
+      if (await save({ type: 'DELETE_EXPENSE', id })) toast.success('Expense deleted');
     }
   };
 
@@ -226,7 +250,7 @@ export function ExpensesTab({
         return (
           <span className="text-xs text-muted capitalize">
             {(e.paymentMethod || 'cash').replace('_', ' ')}
-            {linkedBank && ` (${linkedBank.bankName})`}
+            {linkedBank && ` · ${linkedBank.bankName}`}
           </span>
         );
       },
@@ -279,23 +303,20 @@ export function ExpensesTab({
         {/* KPI Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <StatCard
-            label="Total Monthly Outflow"
-            value={formatRs(monthTotal)}
-            detail={streamScope === 'business' ? 'Business operating expenses' : streamScope === 'salary' ? 'Personal job living costs' : 'Consolidated cash outflow'}
+            label="Total Outflow"
+            value={formatRs(rangeTotal)}
             tone="danger"
             icon={<Icon name="arrow-down" size={18} />}
           />
           <StatCard
             label="Days Left in Month"
             value={`${daysLeft} days`}
-            detail="Current billing cycle"
             tone="default"
             icon={<Icon name="calendar" size={18} />}
           />
           <StatCard
             label="Daily Expense Target"
             value={formatRs(dailyBudget)}
-            detail="Recommended spending"
             tone="default"
             icon={<Icon name="financial" size={18} />}
           />
@@ -305,28 +326,19 @@ export function ExpensesTab({
         {cats.length > 2 && (
           <Card className="p-4">
             <div className="text-xs font-semibold text-text uppercase tracking-wider mb-2.5">
-              Expense Category Breakdown ({streamFilteredExpenses.length} entries)
+              Expense Category Breakdown
             </div>
             <div className="flex flex-wrap gap-2">
               {cats.map(c => {
                 const isSelected = catFilter === c;
-                const amt = c === 'All' ? monthTotal : (catMap[c] || 0);
+                const amt = c === 'All' ? rangeTotal : (catMap[c] || 0);
                 return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setCatFilter(c)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      isSelected
-                        ? 'bg-primary-500 text-white shadow-sm'
-                        : 'bg-surface hover:bg-surface-hover text-text border border-border'
-                    }`}
-                  >
+                  <Chip key={c} selected={isSelected} onClick={() => setCatFilter(c)} className="rounded-lg px-3 py-1.5 font-medium">
                     <span>{c}</span>
                     <span className={`text-[11px] num ${isSelected ? 'text-white/80' : 'text-muted'}`}>
-                      ({formatRs(amt)})
+                      {formatRs(amt)}
                     </span>
-                  </button>
+                  </Chip>
                 );
               })}
             </div>
@@ -341,7 +353,7 @@ export function ExpensesTab({
           emptyState={
             <EmptyState
               title="No expenses recorded"
-              helper={streamScope === 'business' ? 'No operating expenses logged for this business stream this month.' : 'Add your first expense for this month to track cash outflow and maintain your budget.'}
+              helper={streamScope === 'business' ? 'No operating expenses logged for this business stream in this date range.' : 'No expenses in this date range.'}
             />
           }
         />
@@ -351,7 +363,6 @@ export function ExpensesTab({
       <FormCard
         icon="wallet"
         title={editId ? 'Edit Expense' : 'Record Expense'}
-        description={editId ? 'Modify this recorded transaction details' : 'Log cash outflow against your monthly budget'}
         badge={editId ? 'Editing' : undefined}
         actions={
           editId ? (
@@ -361,7 +372,7 @@ export function ExpensesTab({
               onClick={() => {
                 setEditId(null);
                 setForm({
-                  date: month + '-' + new Date().toISOString().slice(8, 10),
+                  date: defaultDate(),
                   category: 'Food',
                   amount: '',
                   note: '',
@@ -373,7 +384,7 @@ export function ExpensesTab({
                   companyId: (companyId && companyId !== 'all') ? companyId : defaultCompanyId,
                   branchId: '',
                 });
-                setError('');
+                resetErrors();
               }}
             >
               Cancel
@@ -385,7 +396,7 @@ export function ExpensesTab({
         {/* Paid Out From Funding Source Selector */}
         {hasBusiness && (
           <div className="p-3.5 rounded-xl bg-surface-hover/60 border border-border space-y-3">
-            <Field id="expense-source-type" label="Paid Out From / Funding Source">
+            <Field id="expense-source-type" label="Paid Out From">
               <SegmentedTabs
                 size="sm"
                 options={[
@@ -393,20 +404,26 @@ export function ExpensesTab({
                   { id: 'business', label: 'Business Cash' },
                 ]}
                 value={form.sourceType}
-                onChange={v => setForm(f => ({ ...f, sourceType: v as any }))}
+                onChange={v => {
+                  setForm(f => ({ ...f, sourceType: v as 'salary' | 'business' }));
+                  clear('companyId');
+                }}
               />
             </Field>
 
             {form.sourceType === 'business' && (
               <>
-                <Field id="expense-company" label="From Which Business?" required>
+                <Field id="expense-company" label="Business" required error={errors.companyId}>
                   <Select
                     value={form.companyId}
                     onChange={e => {
                       const cid = e.target.value;
                       setForm(f => ({ ...f, companyId: cid, branchId: '' }));
+                      clear('companyId');
                     }}
+                    hasError={Boolean(errors.companyId)}
                   >
+                    <option value="">{state.companies.length ? 'Select business' : 'No businesses added'}</option>
                     {state.companies.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
@@ -414,7 +431,7 @@ export function ExpensesTab({
                 </Field>
 
                 {companyBranches.length > 0 && (
-                  <Field id="expense-branch" label="Branch / Outlet (Optional)">
+                  <Field id="expense-branch" label="Branch">
                     <Select
                       value={form.branchId}
                       onChange={e => setForm(f => ({ ...f, branchId: e.target.value }))}
@@ -431,10 +448,14 @@ export function ExpensesTab({
           </div>
         )}
 
-        <Field id="expense-date" label="Date" required>
+        <Field id="expense-date" label="Date" required error={errors.date}>
           <DateField
             value={form.date}
-            onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+            onChange={e => {
+              setForm(f => ({ ...f, date: e.target.value }));
+              clear('date');
+            }}
+            hasError={Boolean(errors.date)}
           />
         </Field>
         <Field id="expense-category" label="Category" required>
@@ -445,33 +466,48 @@ export function ExpensesTab({
             {EXPENSE_CATS.map(c => <option key={c} value={c}>{c}</option>)}
           </Select>
         </Field>
-        <Field id="expense-amount" label="Amount (Rs.)" required error={error}>
+        <Field id="expense-amount" label="Amount" required error={errors.amount}>
           <MoneyField
             value={form.amount}
-            onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
-            hasError={!!error}
+            onChange={v => {
+              setForm(f => ({ ...f, amount: String(v) }));
+              clear('amount');
+            }}
+            hasError={Boolean(errors.amount)}
           />
         </Field>
         <PaymentMethodField
           value={form.paymentMethod}
-          onChange={method => setForm(f => ({ ...f, paymentMethod: method }))}
+          onChange={method => {
+            setForm(f => ({ ...f, paymentMethod: method }));
+            clear('bankAccountId', 'cardId');
+          }}
         />
         {['bank_transfer', 'cheque', 'standing_order'].includes(form.paymentMethod) && (
           <BankSelect
             value={form.bankAccountId}
-            onChange={id => setForm(f => ({ ...f, bankAccountId: id }))}
+            onChange={id => {
+              setForm(f => ({ ...f, bankAccountId: id }));
+              clear('bankAccountId');
+            }}
             bankAccounts={state.bankAccounts}
+            required
+            error={errors.bankAccountId}
           />
         )}
         {form.paymentMethod === 'card' && state.cards.length > 0 && (
-          <Field id="expense-card" label="Card">
+          <Field id="expense-card" label="Card" required error={errors.cardId}>
             <Select
               value={form.cardId}
-              onChange={e => setForm(f => ({ ...f, cardId: e.target.value }))}
+              onChange={e => {
+                setForm(f => ({ ...f, cardId: e.target.value }));
+                clear('cardId');
+              }}
+              hasError={Boolean(errors.cardId)}
             >
               <option value="">Select Card</option>
               {state.cards.map(c => (
-                <option key={c.id} value={c.id}>{c.name} (•••• {c.lastFourDigits})</option>
+                <option key={c.id} value={c.id}>{c.name} · •••• {c.lastFourDigits}</option>
               ))}
             </Select>
           </Field>
@@ -494,6 +530,7 @@ export function ExpensesTab({
             className="flex-1 shadow-sm hover:shadow-primary-500/20"
             iconLeft={<Icon name={editId ? 'check' : 'plus'} size={15} />}
             onClick={submit}
+            loading={saving}
           >
             {editId ? 'Update Expense' : 'Save Expense'}
           </Button>
@@ -503,7 +540,7 @@ export function ExpensesTab({
               onClick={() => {
                 setEditId(null);
                 setForm({
-                  date: month + '-' + new Date().toISOString().slice(8, 10),
+                  date: defaultDate(),
                   category: 'Food',
                   amount: '',
                   note: '',
@@ -515,7 +552,7 @@ export function ExpensesTab({
                   companyId: (companyId && companyId !== 'all') ? companyId : defaultCompanyId,
                   branchId: '',
                 });
-                setError('');
+                resetErrors();
               }}
             >
               Cancel

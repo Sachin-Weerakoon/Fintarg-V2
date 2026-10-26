@@ -14,7 +14,7 @@ export const SRI_LANKAN_BANKS = [
   'Cargills Bank',
   'Standard Chartered Bank',
   'HSBC Sri Lanka',
-  'Other / Custom Bank',
+  'Other Bank',
 ];
 
 export const SRI_LANKAN_BANK_DETAILS: Record<string, { swift: string; code: string }> = {
@@ -46,6 +46,38 @@ export function detectCardNetwork(numberStr: string): 'visa' | 'mastercard' | 'a
 export function formatCardNumberInput(val: string): string {
   const digits = val.replace(/\D/g, '').slice(0, 19);
   return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+
+/** Luhn checksum, which every real Visa, Mastercard and Amex number passes. */
+export function isValidCardNumber(numberStr: string): boolean {
+  const digits = numberStr.replace(/\s+/g, '');
+  if (!/^\d{12,19}$/.test(digits)) return false;
+  let sum = 0;
+  for (let i = 0; i < digits.length; i++) {
+    let d = Number(digits[digits.length - 1 - i]);
+    if (i % 2 === 1) {
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
+    sum += d;
+  }
+  return sum % 10 === 0;
+}
+
+/** Every card's security code (CVV) is exactly this many digits. */
+export const CVV_LENGTH = 3;
+
+/** 'MM/YY' -> null when valid and not expired, otherwise the reason. Cards stay valid through their expiry month. */
+export function expiryProblem(expiry: string, now: Date = new Date()): string | null {
+  const match = expiry.match(/^(\d{2})\/(\d{2})$/);
+  if (!match) return 'Enter the expiry date as MM/YY.';
+  const month = Number(match[1]);
+  if (month < 1 || month > 12) return 'Expiry month must be from 01 to 12.';
+  const year = 2000 + Number(match[2]);
+  if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1)) {
+    return 'This card has expired.';
+  }
+  return null;
 }
 
 export function formatExpiryInput(val: string): string {

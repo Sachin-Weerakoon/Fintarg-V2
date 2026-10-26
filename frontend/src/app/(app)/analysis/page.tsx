@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { RangeSlider } from '@/components/ui/RangeSlider';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import { MonthPicker } from '@/components/ui/MonthPicker';
@@ -326,19 +327,11 @@ function AnalysisContent() {
       ? `${selectedBranch.name} Analytics`
       : 'Financial Analysis';
 
-  const pageDescription =
-    scope === 'company' && selectedCompany
-      ? 'Consolidated enterprise performance, cross-branch comparison, cash flow waterfall, and forward projections.'
-      : scope === 'branch' && selectedBranch
-      ? `Unit economics, sales rhythm, target pacing, and utility cost drivers for ${selectedBranch.location || 'this operating outlet'}.`
-      : 'Live health score, spending patterns, forecasts and a personalised plan — all computed from your own records.';
-
   return (
     <PageContainer>
       <PageHeader
         eyebrow={scope === 'company' ? 'Enterprise' : scope === 'branch' ? 'Branch Unit' : 'Intelligence'}
         title={pageTitle}
-        description={pageDescription}
         actions={
           <>
             <MonthPicker value={month} onChange={setMonth} size="sm" className="no-print" />
@@ -444,7 +437,7 @@ function AnalysisContent() {
                   <div id="health-heading" className="text-xs uppercase tracking-wider font-bold text-primary-300">
                     Financial health
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">{monthLabel(month)}</div>
+                  <div className="text-[11px] text-white/60 mt-0.5">{monthLabel(month)}</div>
                 </div>
               </div>
 
@@ -454,11 +447,11 @@ function AnalysisContent() {
                   Your money coach
                 </div>
                 <p className="text-lg sm:text-xl font-bold leading-snug text-white tracking-tight">{headline}</p>
-                {outlook && <p className="text-sm text-slate-300 leading-relaxed">{outlook}</p>}
+                {outlook && <p className="text-sm text-white/80 leading-relaxed">{outlook}</p>}
                 {plan[0] && (
                   <Link href={plan[0].href || '/analysis'} className="inline-flex items-center gap-2 text-xs font-semibold text-primary-300 hover:text-primary-200 group">
                     <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 group-hover:bg-white/10 transition-colors">Next best action</span>
-                    <span className="text-slate-200">{plan[0].title}</span>
+                    <span className="text-white/90">{plan[0].title}</span>
                     <Icon name="arrow-right" size={13} className="group-hover:translate-x-0.5 transition-transform" />
                   </Link>
                 )}
@@ -468,7 +461,7 @@ function AnalysisContent() {
                 {health.factors.map((f: HealthFactor) => (
                   <div key={f.key} title={f.detail}>
                     <div className="flex items-center justify-between text-[11px] mb-1">
-                      <span className="font-semibold text-slate-200">{f.label}</span>
+                      <span className="font-semibold text-white/90">{f.label}</span>
                       <span className="num font-bold" style={{ color: factorColor(f.score) }}>
                         {Math.round(f.score)}
                       </span>
@@ -476,7 +469,7 @@ function AnalysisContent() {
                     <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-700" style={{ width: `${f.score}%`, background: factorColor(f.score) }} />
                     </div>
-                    <div className="text-[10.5px] text-slate-500 mt-0.5 truncate">{f.detail}</div>
+                    <div className="text-[10.5px] text-white/45 mt-0.5 truncate">{f.detail}</div>
                   </div>
                 ))}
               </div>
@@ -521,7 +514,6 @@ function AnalysisContent() {
                 <SectionTitle
                   icon="analysis"
                   title="Income vs outflow — history & forecast"
-                  hint="Solid lines are your actuals. Dashed lines project the next 3 months from your recent trend; the shaded band is the likely range of spending."
                   right={
                     <div className="hidden sm:flex items-center gap-4 text-[11px] text-muted flex-shrink-0">
                       <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-success-solid" /> Income</span>
@@ -534,18 +526,18 @@ function AnalysisContent() {
 
               <div className="grid lg:grid-cols-5 gap-5">
                 <Card className="lg:col-span-3">
-                  <SectionTitle icon="wallet" title={`Where ${monthLabel(month)} went`} hint="From income down to what you keep." />
+                  <SectionTitle icon="wallet" title={`Where ${monthLabel(month)} went`} />
                   <WaterfallChart steps={waterfall} formatValue={compactNumber} />
                 </Card>
                 <Card className="lg:col-span-2">
-                  <SectionTitle icon="heart" title="Health profile" hint="The bigger the shape, the stronger the money habits." />
+                  <SectionTitle icon="heart" title="Health profile" />
                   <RadarChart axes={health.factors.map(f => ({ label: FACTOR_SHORT[f.key] || f.label, value: f.score }))} />
                 </Card>
               </div>
 
               <div className="grid lg:grid-cols-2 gap-5">
                 <Card>
-                  <SectionTitle icon="target" title="Your path to financial success" hint="Ranked actions with the biggest impact on your situation right now." />
+                  <SectionTitle icon="target" title="Your path to financial success" />
                   <ol className="space-y-3">
                     {plan.map((s, idx) => (
                       <li key={s.id}>
@@ -569,7 +561,7 @@ function AnalysisContent() {
                 </Card>
 
                 <Card>
-                  <SectionTitle icon="shield" title="Financial independence ladder" hint="Six milestones from stability to full resilience." />
+                  <SectionTitle icon="shield" title="Financial independence ladder" />
                   <ul className="space-y-3.5">
                     {ladder.map(r => (
                       <li key={r.id}>
@@ -595,7 +587,7 @@ function AnalysisContent() {
             <div className="space-y-5 animate-rise-in">
               <div className="grid lg:grid-cols-5 gap-5">
                 <Card className="lg:col-span-2">
-                  <SectionTitle icon="credit-card" title="Spending mix" hint="Hover a slice to isolate a category." />
+                  <SectionTitle icon="credit-card" title="Spending mix" />
                   {donut.length === 0 ? (
                     <EmptyState title="No expenses recorded" helper="Add expenses for this month to see your spending mix." action={<Link href="/financial?tab=expenses"><Button variant="secondary" size="sm">Record expense</Button></Link>} />
                   ) : (
@@ -615,7 +607,7 @@ function AnalysisContent() {
                 </Card>
 
                 <Card className="lg:col-span-3">
-                  <SectionTitle icon="analysis" title="Category movement" hint="Compared with your 3‑month average — spikes are flagged so nothing creeps up unnoticed." />
+                  <SectionTitle icon="analysis" title="Category movement" />
                   {cats.length === 0 ? (
                     <p className="text-xs text-muted">No category data yet.</p>
                   ) : (
@@ -657,12 +649,12 @@ function AnalysisContent() {
 
               <div className="grid lg:grid-cols-5 gap-5">
                 <Card className="lg:col-span-2">
-                  <SectionTitle icon="calendar" title="Daily spending heat map" hint="Darker days = bigger spend." />
+                  <SectionTitle icon="calendar" title="Daily spending heat map" />
                   <HeatCalendar cells={daily} formatValue={formatRs} />
                 </Card>
                 <div className="lg:col-span-3 space-y-5">
                   <Card>
-                    <SectionTitle icon="bolt" title="Month-end pace" hint={pace.isCurrent ? `Day ${pace.elapsed} of ${pace.daysInMonth}. Here is where today’s habits lead.` : 'Completed month summary.'} />
+                    <SectionTitle icon="bolt" title="Month-end pace" hint={pace.isCurrent ? `Day ${pace.elapsed} of ${pace.daysInMonth}` : undefined} />
                     <div className="grid grid-cols-3 gap-3 mb-4">
                       <div className="p-3 rounded-xl bg-surface-hover border border-border">
                         <div className="text-[10px] uppercase tracking-wider text-muted font-semibold">Spent</div>
@@ -756,17 +748,16 @@ function AnalysisContent() {
 
               <div className="grid lg:grid-cols-2 gap-5">
                 <Card>
-                  <SectionTitle icon="bolt" title="What if I trim discretionary spending?" hint="Drag to see the monthly and yearly effect on your forecast. Essentials like rent and utilities are left untouched." />
+                  <SectionTitle icon="bolt" title="What if I trim discretionary spending?" />
                   <div className="flex items-center gap-4 mb-5">
-                    <input
-                      type="range"
+                    <RangeSlider
                       min={0}
                       max={40}
                       step={5}
                       value={trim}
-                      onChange={e => setTrim(Number(e.target.value))}
+                      onChange={setTrim}
                       aria-label="Percentage to trim"
-                      className="flex-1 accent-[var(--color-primary-500)]"
+                      className="flex-1"
                     />
                     <span className="num text-lg font-black text-primary-text w-14 text-right">{trim}%</span>
                   </div>
@@ -788,17 +779,16 @@ function AnalysisContent() {
                 </Card>
 
                 <Card>
-                  <SectionTitle icon="shield" title="How fast can I build a 3‑month cushion?" hint="Set aside an extra amount each month and see when your emergency fund is complete." />
+                  <SectionTitle icon="shield" title="How fast can I build a 3‑month cushion?" />
                   <div className="flex items-center gap-4 mb-5">
-                    <input
-                      type="range"
+                    <RangeSlider
                       min={0}
                       max={Math.max(10000, Math.round((current.income * 0.3) / 1000) * 1000)}
                       step={500}
                       value={extraSave}
-                      onChange={e => setExtraSave(Number(e.target.value))}
+                      onChange={setExtraSave}
                       aria-label="Extra monthly saving"
-                      className="flex-1 accent-[var(--color-primary-500)]"
+                      className="flex-1"
                     />
                     <span className="num text-base font-black text-primary-text w-28 text-right">{formatRs(extraSave)}</span>
                   </div>
@@ -831,7 +821,7 @@ function AnalysisContent() {
           {tab === 'goals' && (
             <div className="space-y-5 animate-rise-in">
               <Card>
-                <SectionTitle icon="target" title="Goal projections" hint="Based on what you actually contributed over the last 30 days." right={<Link href="/goals" className="no-print"><Button variant="secondary" size="sm">Manage goals</Button></Link>} />
+                <SectionTitle icon="target" title="Goal projections" right={<Link href="/goals" className="no-print"><Button variant="secondary" size="sm">Manage goals</Button></Link>} />
                 {goals.length === 0 ? (
                   <EmptyState title="No goals yet" helper="Create a savings goal and Fintarg will track your pace and project the finish date." action={<Link href="/goals"><Button variant="primary" size="sm">Create goal</Button></Link>} />
                 ) : (
@@ -873,7 +863,7 @@ function AnalysisContent() {
 
               <div className="grid lg:grid-cols-5 gap-5">
                 <Card className="lg:col-span-3">
-                  <SectionTitle icon="bank" title="Debt overview" hint="Pay the item with the highest cost per rupee owed first (avalanche method) to free cash fastest." />
+                  <SectionTitle icon="bank" title="Debt overview" />
                   {debt.items.length === 0 ? (
                     <div className="flex items-center gap-3 p-4 rounded-xl bg-success-tint/40 border border-success-solid/25 text-xs text-success-text">
                       <Icon name="check" size={18} /> You have no active debt. Brilliant.
@@ -918,7 +908,7 @@ function AnalysisContent() {
                 </Card>
 
                 <Card className="lg:col-span-2">
-                  <SectionTitle icon="calendar" title="Coming up" hint="Bills, instalments and reminders over the next 30 days." />
+                  <SectionTitle icon="calendar" title="Coming up" />
                   {obligations.length === 0 ? (
                     <p className="text-xs text-muted">Nothing due in the next 30 days.</p>
                   ) : (
@@ -954,7 +944,7 @@ export default function Analysis() {
   return (
     <Suspense fallback={
       <PageContainer>
-        <PageHeader eyebrow="Intelligence" title="Financial Analysis" description="Loading analysis..." />
+        <PageHeader eyebrow="Intelligence" title="Financial Analysis" />
       </PageContainer>
     }>
       <AnalysisContent />

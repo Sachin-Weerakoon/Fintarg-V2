@@ -24,9 +24,13 @@ import {
 import { fetchLoanPayoff } from '@/services/storeApi';
 import type { Loan } from '@/types';
 import { getLocalDate } from '@/utils/date';
+import { useFieldErrors } from '@/hooks/useFieldErrors';
+
+const BANK_METHODS = ['bank_transfer', 'cheque', 'standing_order', 'debit_card'];
 
 export function LoansTab() {
-  const { state, dispatch } = useApp();
+  const { state, save } = useApp();
+  const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -41,6 +45,8 @@ export function LoansTab() {
     dueDate: '',
   });
   const [editId, setEditId] = useState<string | null>(null);
+  const loanErrors = useFieldErrors<'lender' | 'amount' | 'rate' | 'tenureMonths' | 'startDate' | 'dueDate'>();
+  const repayErrors = useFieldErrors<'bankAccountId' | 'amount' | 'date'>();
 
   // Repayment sheet state
   const [repayingLoan, setRepayingLoan] = useState<Loan | null>(null);
@@ -69,14 +75,24 @@ export function LoansTab() {
     return calculateLoan(previewPrincipal, previewRate, previewTenure, form.method, form.interestBasis);
   }, [previewPrincipal, previewRate, previewTenure, form.method, form.interestBasis]);
 
-  const submit = () => {
-    if (!form.lender || !form.amount) return;
+  const submit = async () => {
+    const rateValue = Number(form.rate);
+    const tenureValue = Number(form.tenureMonths);
+    const valid = loanErrors.check({
+      lender: form.lender.trim() ? undefined : 'Enter the lender.',
+      amount: Number(form.amount) > 0 ? undefined : 'Enter the principal amount.',
+      rate: form.rate.trim() !== '' && rateValue >= 0 && rateValue <= 1000 ? undefined : 'Enter an interest rate from 0 to 1000.',
+      tenureMonths: Number.isInteger(tenureValue) && tenureValue >= 1 && tenureValue <= 600 ? undefined : 'Enter 1 to 600 months.',
+      startDate: form.startDate ? undefined : 'Choose the start date.',
+      dueDate: form.dueDate && form.startDate && form.dueDate < form.startDate ? 'Due date cannot be before the start date.' : undefined,
+    });
+    if (!valid) return;
     const principal = Number(form.amount);
-    const rate = Number(form.rate) || 0;
-    const tenure = Number(form.tenureMonths) || 12;
+    const rate = rateValue;
+    const tenure = tenureValue;
     const calc = calculateLoan(principal, rate, tenure, form.method, form.interestBasis);
 
-    const startDate = form.startDate || getLocalDate();
+    const startDate = form.startDate;
     const defaultDue = new Date(startDate);
     defaultDue.setMonth(defaultDue.getMonth() + tenure);
     const dueDate = form.dueDate || defaultDue.toISOString().slice(0, 10);
@@ -87,7 +103,7 @@ export function LoansTab() {
 
     const entry: Loan = {
       id: editId || 'ln_' + Date.now(),
-      lender: form.lender,
+      lender: form.lender.trim(),
       principal,
       rate,
       method: form.method,
@@ -101,15 +117,15 @@ export function LoansTab() {
       repayments: existingLoan?.repayments || [],
     };
 
-    if (editId) {
-      dispatch({ type: 'UPDATE_LOAN', entry });
-      toast.success('Loan record updated');
-      setEditId(null);
-    } else {
-      dispatch({ type: 'ADD_LOAN', entry });
-      toast.success('Loan record added');
-    }
+    setSaving(true);
+    const ok = await save(editId ? { type: 'UPDATE_LOAN', entry } : { type: 'ADD_LOAN', entry });
+    setSaving(false);
+    // On failure the store has already rolled back and shown the server's reason; keep the input.
+    if (!ok) return;
+    toast.success(editId ? 'Loan record updated' : 'Loan record added');
+    setEditId(null);
 
+    loanErrors.reset();
     setForm({
       lender: '',
       amount: '',
@@ -122,14 +138,17 @@ export function LoansTab() {
     });
   };
 
-  const handleRecordRepayment = () => {
-    if (!repayingLoan || !repaymentForm.amount || Number(repaymentForm.amount) <= 0) return;
-    const isBankMethod = ['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(repaymentForm.paymentMethod);
-    if (isBankMethod && !repaymentForm.bankAccountId) {
-      toast.error('Please select a bank account for this payment method');
-      return;
-    }
-    dispatch({
+  const handleRecordRepayment = async () => {
+    if (!repayingLoan) return;
+    const valid = repayErrors.check({
+      bankAccountId: BANK_METHODS.includes(repaymentForm.paymentMethod) && !repaymentForm.bankAccountId
+        ? 'Select the account this is paid from.' : undefined,
+      amount: Number(repaymentForm.amount) > 0 ? undefined : 'Enter the repayment amount.',
+      date: repaymentForm.date ? undefined : 'Choose the payment date.',
+    });
+    if (!valid) return;
+    setSaving(true);
+    const ok = await save({
       type: 'RECORD_LOAN_REPAYMENT',
       id: repayingLoan.id,
       amount: Number(repaymentForm.amount),
@@ -138,6 +157,8 @@ export function LoansTab() {
       paymentMethod: repaymentForm.paymentMethod,
       bankAccountId: repaymentForm.bankAccountId || null,
     });
+    setSaving(false);
+    if (!ok) return;
     toast.success(`Repayment of ${formatRs(Number(repaymentForm.amount))} logged`);
     setRepayingLoan(null);
     setRepaymentForm({
@@ -158,11 +179,11 @@ export function LoansTab() {
       tone: 'danger',
     });
     if (!ok) return;
-    dispatch({
+    if (!(await save({
       type: 'DELETE_LOAN_REPAYMENT',
       id: loanId,
       repaymentId,
-    });
+    }))) return;
     toast.success(`Repayment of ${formatRs(amount)} undone`);
   };
 
@@ -175,8 +196,7 @@ export function LoansTab() {
       tone: 'danger',
     });
     if (ok) {
-      dispatch({ type: 'DELETE_LOAN', id });
-      toast.success('Loan record deleted');
+      if (await save({ type: 'DELETE_LOAN', id })) toast.success('Loan record deleted');
     }
   };
 
@@ -207,7 +227,7 @@ export function LoansTab() {
           icon={<Icon name="arrow-down" size={18} />}
         />
         <StatCard
-          label="Monthly Outflow (EMI)"
+          label="Monthly Outflow"
           value={formatRs(totalMonthlyEMI)}
           tone="warning"
           icon={<Icon name="calendar" size={18} />}
@@ -263,6 +283,7 @@ export function LoansTab() {
                           size="sm"
                           onClick={() => {
                             setRepayingLoan(ln);
+                            repayErrors.reset();
                             setRepaymentForm({
                               amount: '',
                               date: getLocalDate(),
@@ -288,6 +309,8 @@ export function LoansTab() {
                                 toast.error('Could not fetch the exact settlement amount; using the outstanding balance instead');
                               }
                               setRepayingLoan(ln);
+                              repayErrors.reset();
+                            repayErrors.reset();
                               setRepaymentForm({
                                 amount: String(settlementAmount),
                                 date: today,
@@ -365,7 +388,6 @@ export function LoansTab() {
         <FormCard
           icon="financial"
           title={editId ? 'Edit Loan' : 'Add Loan'}
-          description={editId ? 'Update loan parameters and rate' : 'Configure personal, business, or bank borrowing terms'}
           badge={editId ? 'Editing' : undefined}
           actions={
             editId ? (
@@ -374,6 +396,7 @@ export function LoansTab() {
                 size="sm"
                 onClick={() => {
                   setEditId(null);
+                  loanErrors.reset();
                   setForm({
                     lender: '',
                     amount: '',
@@ -392,27 +415,27 @@ export function LoansTab() {
           }
           className="h-fit sticky top-4"
         >
-          <Field id="loan-lender" label="Lender / Institution" required>
+          <Field id="loan-lender" label="Lender" required error={loanErrors.errors.lender}>
             <Input
               value={form.lender}
-              onChange={e => setForm(f => ({ ...f, lender: e.target.value }))}
+              onChange={e => { setForm(f => ({ ...f, lender: e.target.value })); loanErrors.clear('lender'); }}
               placeholder="e.g. Commercial Bank, Mortgage Ltd."
             />
           </Field>
-          <Field id="loan-principal" label="Principal Amount (Rs.)" required>
+          <Field id="loan-principal" label="Principal Amount" required error={loanErrors.errors.amount}>
             <MoneyField
               value={form.amount}
-              onChange={v => setForm(f => ({ ...f, amount: String(v) }))}
+              onChange={v => { setForm(f => ({ ...f, amount: String(v) })); loanErrors.clear('amount'); }}
               placeholder="e.g. 1,000,000"
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field id="loan-rate" label="Interest rate (%)" required>
+            <Field id="loan-rate" label="Interest Rate %" required error={loanErrors.errors.rate}>
               <Input
                 type="number"
                 step="0.1"
                 value={form.rate}
-                onChange={e => setForm(f => ({ ...f, rate: e.target.value }))}
+                onChange={e => { setForm(f => ({ ...f, rate: e.target.value })); loanErrors.clear('rate'); }}
                 placeholder="e.g. 12"
               />
             </Field>
@@ -427,11 +450,11 @@ export function LoansTab() {
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field id="loan-tenure" label="Tenure (Months)" required>
+            <Field id="loan-tenure" label="Tenure in Months" required error={loanErrors.errors.tenureMonths}>
               <Input
                 type="number"
                 value={form.tenureMonths}
-                onChange={e => setForm(f => ({ ...f, tenureMonths: e.target.value }))}
+                onChange={e => { setForm(f => ({ ...f, tenureMonths: e.target.value })); loanErrors.clear('tenureMonths'); }}
                 placeholder="e.g. 12"
               />
             </Field>
@@ -441,22 +464,22 @@ export function LoansTab() {
                 onChange={e => setForm(f => ({ ...f, method: e.target.value as any }))}
               >
                 <option value="reducing_balance">Reducing Balance</option>
-                <option value="simple">Simple / Flat</option>
+                <option value="simple">Simple</option>
                 <option value="compound">Compound</option>
               </Select>
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field id="loan-start" label="Start Date" required>
+            <Field id="loan-start" label="Start Date" required error={loanErrors.errors.startDate}>
               <DateField
                 value={form.startDate}
-                onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
+                onChange={e => { setForm(f => ({ ...f, startDate: e.target.value })); loanErrors.clear('startDate', 'dueDate'); }}
               />
             </Field>
-            <Field id="loan-due" label="Due Date (optional)">
+            <Field id="loan-due" label="Due Date" error={loanErrors.errors.dueDate}>
               <DateField
                 value={form.dueDate}
-                onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
+                onChange={e => { setForm(f => ({ ...f, dueDate: e.target.value })); loanErrors.clear('dueDate'); }}
               />
             </Field>
           </div>
@@ -494,6 +517,7 @@ export function LoansTab() {
               className="flex-1 shadow-sm hover:shadow-primary-500/20"
               iconLeft={<Icon name={editId ? 'check' : 'plus'} size={15} />}
               onClick={submit}
+              loading={saving}
             >
               {editId ? 'Update Loan' : 'Save Loan Record'}
             </Button>
@@ -502,6 +526,7 @@ export function LoansTab() {
                 variant="secondary"
                 onClick={() => {
                   setEditId(null);
+                  loanErrors.reset();
                   setForm({
                     lender: '',
                     amount: '',
@@ -526,13 +551,13 @@ export function LoansTab() {
         isOpen={Boolean(repayingLoan)}
         onClose={() => setRepayingLoan(null)}
         title="Record Loan Repayment"
-        description={repayingLoan ? `Log a payment for ${repayingLoan.lender}` : ''}
+        description={repayingLoan ? repayingLoan.lender : ''}
       >
         <div className="space-y-4 pt-2">
           <Field id="repay-method" label="Payment Method">
             <Select
               value={repaymentForm.paymentMethod}
-              onChange={e => setRepaymentForm(f => ({ ...f, paymentMethod: e.target.value }))}
+              onChange={e => { setRepaymentForm(f => ({ ...f, paymentMethod: e.target.value })); repayErrors.clear('bankAccountId'); }}
             >
               <option value="cash">Cash</option>
               <option value="bank_transfer">Bank Transfer</option>
@@ -543,34 +568,34 @@ export function LoansTab() {
             </Select>
           </Field>
           {['bank_transfer', 'cheque', 'standing_order', 'debit_card'].includes(repaymentForm.paymentMethod) && (
-            <Field id="repay-account" label="Debit Bank Account">
+            <Field id="repay-account" label="Debit Bank Account" required error={repayErrors.errors.bankAccountId}>
               <Select
                 value={repaymentForm.bankAccountId}
-                onChange={e => setRepaymentForm(f => ({ ...f, bankAccountId: e.target.value }))}
+                onChange={e => { setRepaymentForm(f => ({ ...f, bankAccountId: e.target.value })); repayErrors.clear('bankAccountId'); }}
               >
                 <option value="">Select Account...</option>
                 {state.bankAccounts.filter(b => !b.isArchived).map(b => (
                   <option key={b.id} value={b.id}>
-                    {b.bankName} - {b.accountNumber} ({formatRs(b.currentBalance)})
+                    {b.bankName} · {b.accountNumber} · {formatRs(b.currentBalance)}
                   </option>
                 ))}
               </Select>
             </Field>
           )}
-          <Field id="repay-amount" label="Repayment Amount (Rs.)">
+          <Field id="repay-amount" label="Repayment Amount" required error={repayErrors.errors.amount}>
             <MoneyField
               value={repaymentForm.amount}
-              onChange={v => setRepaymentForm(f => ({ ...f, amount: String(v) }))}
+              onChange={v => { setRepaymentForm(f => ({ ...f, amount: String(v) })); repayErrors.clear('amount'); }}
               placeholder="e.g. 25,000"
             />
           </Field>
-          <Field id="repay-date" label="Payment Date">
+          <Field id="repay-date" label="Payment Date" required error={repayErrors.errors.date}>
             <DateField
               value={repaymentForm.date}
-              onChange={e => setRepaymentForm(f => ({ ...f, date: e.target.value }))}
+              onChange={e => { setRepaymentForm(f => ({ ...f, date: e.target.value })); repayErrors.clear('date'); }}
             />
           </Field>
-          <Field id="repay-note" label="Notes (optional)">
+          <Field id="repay-note" label="Notes">
             <Input
               value={repaymentForm.note}
               onChange={e => setRepaymentForm(f => ({ ...f, note: e.target.value }))}
@@ -578,7 +603,7 @@ export function LoansTab() {
             />
           </Field>
           <div className="flex gap-2 pt-2">
-            <Button variant="primary" className="flex-1" onClick={handleRecordRepayment}>
+            <Button variant="primary" className="flex-1" onClick={handleRecordRepayment} loading={saving}>
               Save Repayment
             </Button>
             <Button variant="secondary" onClick={() => setRepayingLoan(null)}>

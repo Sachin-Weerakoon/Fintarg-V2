@@ -157,7 +157,6 @@ export default function DashboardClient() {
       <PageHeader
         eyebrow={`Finance Dashboard · ${selectedMonth}`}
         title={`${greeting}${userName ? `, ${userName}` : ''}`}
-        description="Here is your financial pulse and priority items for this month."
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <MonthPicker value={selectedMonth} onChange={setSelectedMonth} size="sm" />
@@ -284,7 +283,6 @@ export default function DashboardClient() {
                     <Badge tone="danger" size="sm" dot>Needs Attention</Badge>
                   )}
                 </div>
-                <p className="text-xs text-muted mt-0.5">Automated cashflow forecast & risk assessment</p>
               </div>
               <Link href="/financial?tab=expenses">
                 <Button variant="secondary" size="sm" iconRight={<Icon name="arrow-right" size={14} />}>
