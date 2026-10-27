@@ -2,6 +2,7 @@ import mongoose, { type Document, Schema } from 'mongoose';
 
 export interface IBankAccount extends Document {
   userId: mongoose.Types.ObjectId;
+  companyId?: mongoose.Types.ObjectId | null;
   bankName: string;
   accountNumber: string;
   accountName: string;
@@ -21,6 +22,7 @@ export interface IBankAccount extends Document {
 
 const BankAccountSchema = new Schema<IBankAccount>({
   userId: { type: Schema.Types.ObjectId, required: true, index: true },
+  companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null, index: true },
   bankName: { type: String, required: true, trim: true },
   accountNumber: { type: String, required: true, trim: true },
   accountName: { type: String, required: true, trim: true },

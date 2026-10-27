@@ -47,7 +47,14 @@ export function ExpensesTab({
   const confirm = useConfirm();
   const toast = useToast();
 
-  const hasBusiness = state.profile.workMode === 'both' || state.profile.workMode === 'business' || (state.companies && state.companies.length > 0);
+  const isSalaryAndBusiness = state.profile.workMode === 'both';
+  const isBusinessOnly = state.profile.workMode === 'business';
+  const defaultSourceType: 'salary' | 'business' =
+    isBusinessOnly
+      ? 'business'
+      : streamScope === 'business'
+      ? 'business'
+      : 'salary';
   const defaultCompanyId = state.companies[0]?.id || '';
   // New expenses default to today, or to the range's last day when today is outside it.
   const defaultDate = () => {
@@ -64,7 +71,7 @@ export function ExpensesTab({
     paymentMethod: 'cash' as PaymentMethod,
     bankAccountId: '',
     cardId: '',
-    sourceType: (streamScope === 'business' ? 'business' : 'salary') as 'salary' | 'business',
+    sourceType: defaultSourceType,
     companyId: (companyId && companyId !== 'all') ? companyId : defaultCompanyId,
     branchId: '',
   });
@@ -128,7 +135,8 @@ export function ExpensesTab({
   }, [state.businessBranches, form.companyId]);
 
   const submit = async () => {
-    const isBusiness = form.sourceType === 'business';
+    const effectiveSourceType = isBusinessOnly ? 'business' : (!isSalaryAndBusiness ? 'salary' : form.sourceType);
+    const isBusiness = effectiveSourceType === 'business';
     const valid = check({
       date: form.date ? undefined : 'Choose the date.',
       amount: Number(form.amount) > 0 ? undefined : 'Enter an amount greater than zero.',
@@ -136,7 +144,7 @@ export function ExpensesTab({
       bankAccountId: ['bank_transfer', 'cheque', 'standing_order'].includes(form.paymentMethod) && !form.bankAccountId
         ? 'Select the bank account this was paid from.' : undefined,
       cardId: form.paymentMethod === 'card' && state.cards.length > 0 && !form.cardId ? 'Select the card used.' : undefined,
-      companyId: isBusiness && !form.companyId ? 'Select the business this was paid from.' : undefined,
+      companyId: isBusiness && state.companies.length > 0 && !form.companyId ? 'Select the business this was paid from.' : undefined,
     });
     if (!valid) return;
     const entry: ExpenseEntry = {
@@ -149,9 +157,9 @@ export function ExpensesTab({
       paymentMethod: form.paymentMethod,
       bankAccountId: form.bankAccountId || undefined,
       cardId: form.cardId || undefined,
-      sourceType: form.sourceType,
-      companyId: form.sourceType === 'business' ? (form.companyId || undefined) : undefined,
-      branchId: form.sourceType === 'business' ? (form.branchId || undefined) : undefined,
+      sourceType: effectiveSourceType,
+      companyId: effectiveSourceType === 'business' ? (form.companyId || undefined) : undefined,
+      branchId: effectiveSourceType === 'business' ? (form.branchId || undefined) : undefined,
     };
 
     setSaving(true);
@@ -170,7 +178,7 @@ export function ExpensesTab({
       paymentMethod: 'cash',
       bankAccountId: '',
       cardId: '',
-      sourceType: (streamScope === 'business' ? 'business' : 'salary'),
+      sourceType: defaultSourceType,
       companyId: (companyId && companyId !== 'all') ? companyId : defaultCompanyId,
       branchId: '',
     });
@@ -380,7 +388,7 @@ export function ExpensesTab({
                   paymentMethod: 'cash',
                   bankAccountId: '',
                   cardId: '',
-                  sourceType: (streamScope === 'business' ? 'business' : 'salary'),
+                  sourceType: defaultSourceType,
                   companyId: (companyId && companyId !== 'all') ? companyId : defaultCompanyId,
                   branchId: '',
                 });
@@ -394,14 +402,14 @@ export function ExpensesTab({
         className="h-fit sticky top-4"
       >
         {/* Paid Out From Funding Source Selector */}
-        {hasBusiness && (
+        {isSalaryAndBusiness && (
           <div className="p-3.5 rounded-xl bg-surface-hover/60 border border-border space-y-3">
             <Field id="expense-source-type" label="Paid Out From">
               <SegmentedTabs
                 size="sm"
                 options={[
-                  { id: 'salary', label: 'Job Salary Cash' },
-                  { id: 'business', label: 'Business Cash' },
+                  { id: 'salary', label: 'Salary' },
+                  { id: 'business', label: 'Business' },
                 ]}
                 value={form.sourceType}
                 onChange={v => {
@@ -411,7 +419,7 @@ export function ExpensesTab({
               />
             </Field>
 
-            {form.sourceType === 'business' && (
+            {form.sourceType === 'business' && state.companies.length > 0 && (
               <>
                 <Field id="expense-company" label="Business" required error={errors.companyId}>
                   <Select
@@ -423,7 +431,7 @@ export function ExpensesTab({
                     }}
                     hasError={Boolean(errors.companyId)}
                   >
-                    <option value="">{state.companies.length ? 'Select business' : 'No businesses added'}</option>
+                    <option value="">Select business</option>
                     {state.companies.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
@@ -444,6 +452,41 @@ export function ExpensesTab({
                   </Field>
                 )}
               </>
+            )}
+          </div>
+        )}
+
+        {isBusinessOnly && state.companies.length > 0 && (
+          <div className="p-3.5 rounded-xl bg-surface-hover/60 border border-border space-y-3">
+            <Field id="expense-company" label="Business" required error={errors.companyId}>
+              <Select
+                value={form.companyId}
+                onChange={e => {
+                  const cid = e.target.value;
+                  setForm(f => ({ ...f, companyId: cid, branchId: '' }));
+                  clear('companyId');
+                }}
+                hasError={Boolean(errors.companyId)}
+              >
+                <option value="">Select business</option>
+                {state.companies.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </Select>
+            </Field>
+
+            {companyBranches.length > 0 && (
+              <Field id="expense-branch" label="Branch">
+                <Select
+                  value={form.branchId}
+                  onChange={e => setForm(f => ({ ...f, branchId: e.target.value }))}
+                >
+                  <option value="">General Enterprise Overhead</option>
+                  {companyBranches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name} · {b.location || 'HQ'}</option>
+                  ))}
+                </Select>
+              </Field>
             )}
           </div>
         )}

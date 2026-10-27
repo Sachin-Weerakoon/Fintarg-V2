@@ -47,6 +47,7 @@ export type PaymentMethod =
 
 export interface BankAccount {
   id: string;
+  companyId?: string | null;
   name: string;
   accountNumber: string;
   bankName: string;
@@ -64,6 +65,7 @@ export interface BankAccount {
 
 export interface Card {
   id: string;
+  companyId?: string | null;
   name: string;
   bankAccountId?: string;
   cardType: 'credit' | 'debit';

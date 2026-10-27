@@ -2,6 +2,7 @@ import mongoose, { type Document, Schema } from 'mongoose';
 
 export interface ICard extends Document {
   userId: mongoose.Types.ObjectId;
+  companyId?: mongoose.Types.ObjectId | null;
   bankAccountId?: mongoose.Types.ObjectId | null;
   cardName: string;
   cardHolder?: string;
@@ -21,6 +22,7 @@ export interface ICard extends Document {
 
 const CardSchema = new Schema<ICard>({
   userId: { type: Schema.Types.ObjectId, required: true, index: true },
+  companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null, index: true },
   bankAccountId: { type: Schema.Types.ObjectId, ref: 'BankAccount', default: null },
   cardName: { type: String, required: true, trim: true },
   cardHolder: { type: String, default: '', trim: true },

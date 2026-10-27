@@ -54,7 +54,11 @@ function FinancialContent() {
   const [streamScope, setStreamScope] = useState<StreamScope>(initialStream);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
 
-  const hasBusiness = state.profile.workMode === 'both' || state.profile.workMode === 'business' || (state.companies && state.companies.length > 0);
+  const isSalaryOnly = state.profile.workMode === 'salary';
+  const isBusinessOnly = state.profile.workMode === 'business';
+  const isSalaryAndBusiness = state.profile.workMode === 'both';
+
+  const effectiveStreamScope: StreamScope = isSalaryOnly ? 'salary' : isBusinessOnly ? 'business' : streamScope;
 
   useEffect(() => {
     if (rawTab && TAB_OPTIONS.some(t => t.id === rawTab) && rawTab !== tab) {
@@ -186,8 +190,8 @@ function FinancialContent() {
         actions={<DateRangePicker value={range} onChange={setRange} size="sm" />}
       />
 
-      {/* Multi-Stream Intelligence & Scope Switcher for Hybrid & Business Profiles */}
-      {hasBusiness && (
+      {/* Multi-Stream Intelligence & Scope Switcher strictly for Salary + Business Accounts */}
+      {isSalaryAndBusiness && (
         <Card className="p-4 sm:p-5 bg-gradient-to-r from-surface via-surface to-primary-tint/20 border-primary/20 shadow-sm space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <div className="flex items-center gap-2 flex-wrap">
@@ -207,7 +211,7 @@ function FinancialContent() {
                 options={[
                   { id: 'all', label: 'Consolidated' },
                   { id: 'salary', label: 'Salary' },
-                  { id: 'business', label: 'Business Cash' },
+                  { id: 'business', label: 'Business' },
                 ]}
                 value={streamScope}
                 onChange={handleStreamChange}
@@ -264,6 +268,27 @@ function FinancialContent() {
         </Card>
       )}
 
+      {/* Enterprise Filter for Business-only Accounts */}
+      {isBusinessOnly && state.companies.length > 0 && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-surface border border-border">
+          <div className="flex items-center gap-2">
+            <Icon name="briefcase" size={16} className="text-primary-text" />
+            <span className="text-xs font-semibold text-text">Business Workspace:</span>
+          </div>
+          <div className="w-56">
+            <Select
+              value={selectedCompanyId}
+              onChange={e => setSelectedCompanyId(e.target.value)}
+            >
+              <option value="all">All Enterprises ({state.companies.length})</option>
+              {state.companies.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </Select>
+          </div>
+        </div>
+      )}
+
       {/* Main Ledger Tabs */}
       <SegmentedTabs
         options={TAB_OPTIONS}
@@ -272,13 +297,13 @@ function FinancialContent() {
         size="md"
       />
 
-      {tab === 'accounts' && <AccountsTab />}
+      {tab === 'accounts' && <AccountsTab streamScope={effectiveStreamScope} companyId={selectedCompanyId} />}
       {tab === 'transactions' && <TransactionsHistoryTab range={range} />}
-      {tab === 'expenses' && <ExpensesTab range={range} month={month} streamScope={streamScope} companyId={selectedCompanyId} />}
-      {tab === 'income' && <IncomeTab range={range} streamScope={streamScope} companyId={selectedCompanyId} />}
-      {tab === 'finance' && <FinanceTab streamScope={streamScope} companyId={selectedCompanyId} />}
-      {tab === 'loans' && <LoansTab streamScope={streamScope} companyId={selectedCompanyId} />}
-      {tab === 'pawned' && <PawnedTab streamScope={streamScope} companyId={selectedCompanyId} />}
+      {tab === 'expenses' && <ExpensesTab range={range} month={month} streamScope={effectiveStreamScope} companyId={selectedCompanyId} />}
+      {tab === 'income' && <IncomeTab range={range} streamScope={effectiveStreamScope} companyId={selectedCompanyId} />}
+      {tab === 'finance' && <FinanceTab streamScope={effectiveStreamScope} companyId={selectedCompanyId} />}
+      {tab === 'loans' && <LoansTab streamScope={effectiveStreamScope} companyId={selectedCompanyId} />}
+      {tab === 'pawned' && <PawnedTab streamScope={effectiveStreamScope} companyId={selectedCompanyId} />}
     </PageContainer>
   );
 }

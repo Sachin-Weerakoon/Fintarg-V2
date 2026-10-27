@@ -421,6 +421,7 @@ export async function getRecord(kind: RecordKind, userId: string, id: string) {
       balance: ((record as any).balanceCents || 0) / 100,
       openingBalance: ((record as any).openingBalanceCents || 0) / 100,
       openingBalanceCents: (record as any).openingBalanceCents || 0,
+      companyId: (record as any).companyId ? (record as any).companyId.toString() : undefined,
     };
   }
   if (kind === 'cards') {
@@ -435,6 +436,7 @@ export async function getRecord(kind: RecordKind, userId: string, id: string) {
       lastFourDigits: card.last4 || '0000',
       currentBalance: (card.balanceCents || 0) / 100,
       creditLimit: (card.creditLimitCents || 0) / 100,
+      companyId: card.companyId ? card.companyId.toString() : undefined,
     };
   }
   if (kind === 'businessBranches') {
@@ -459,6 +461,7 @@ export async function listRecords(kind: RecordKind, userId: string) {
       balance: (acc.balanceCents || 0) / 100,
       openingBalance: (acc.openingBalanceCents || 0) / 100,
       openingBalanceCents: acc.openingBalanceCents || 0,
+      companyId: acc.companyId ? acc.companyId.toString() : undefined,
     }));
   }
   if (kind === 'cards') {
@@ -473,6 +476,7 @@ export async function listRecords(kind: RecordKind, userId: string) {
         lastFourDigits: card.last4 || '0000',
         currentBalance: (card.balanceCents || 0) / 100,
         creditLimit: (card.creditLimitCents || 0) / 100,
+        companyId: card.companyId ? card.companyId.toString() : undefined,
       };
     });
   }
@@ -491,7 +495,7 @@ export async function createRecord(kind: RecordKind, userId: string, input: Reco
   if (kind === 'loans' && input.dueDate && input.startDate && String(input.dueDate) < String(input.startDate)) {
     throw new HttpError(400, 'Due date cannot be before start date');
   }
-  if (input.companyId && (kind === 'businessBranches' || kind === 'ownerDraws' || kind === 'expenses' || kind === 'loans' || kind === 'pawnedItems' || kind === 'financePayments')) {
+  if (input.companyId && (kind === 'businessBranches' || kind === 'ownerDraws' || kind === 'expenses' || kind === 'loans' || kind === 'pawnedItems' || kind === 'financePayments' || kind === 'bankAccounts' || kind === 'cards')) {
     if (!mongoose.isValidObjectId(input.companyId)) throw new HttpError(400, 'Invalid company id');
     if (!await CompanyModel.exists({ _id: input.companyId, userId })) throw new HttpError(404, 'Company not found');
   }
@@ -601,7 +605,7 @@ export async function createRecord(kind: RecordKind, userId: string, input: Reco
 
 export async function updateRecord(kind: RecordKind, userId: string, id: string, input: Record<string, unknown>) {
   if (!mongoose.isValidObjectId(id)) throw new HttpError(400, 'Invalid record id');
-  if (input.companyId && (kind === 'businessBranches' || kind === 'ownerDraws' || kind === 'expenses' || kind === 'loans' || kind === 'pawnedItems' || kind === 'financePayments')) {
+  if (input.companyId && (kind === 'businessBranches' || kind === 'ownerDraws' || kind === 'expenses' || kind === 'loans' || kind === 'pawnedItems' || kind === 'financePayments' || kind === 'bankAccounts' || kind === 'cards')) {
     if (!mongoose.isValidObjectId(input.companyId)) throw new HttpError(400, 'Invalid company id');
     if (!await CompanyModel.exists({ _id: input.companyId, userId })) throw new HttpError(404, 'Company not found');
   }

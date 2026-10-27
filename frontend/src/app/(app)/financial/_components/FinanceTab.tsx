@@ -40,13 +40,12 @@ export function FinanceTab({
   const confirm = useConfirm();
   const toast = useToast();
 
-  const hasBusiness = state.profile.workMode === 'both' || state.profile.workMode === 'business' || (state.companies && state.companies.length > 0);
+  const isSalaryAndBusiness = state.profile.workMode === 'both';
+  const isBusinessOnly = state.profile.workMode === 'business';
   const defaultSourceType: 'salary' | 'business' =
-    streamScope === 'business'
+    isBusinessOnly
       ? 'business'
-      : streamScope === 'salary'
-      ? 'salary'
-      : state.profile.workMode === 'business'
+      : streamScope === 'business'
       ? 'business'
       : 'salary';
 
@@ -149,8 +148,8 @@ export function FinanceTab({
       frequency: kind === 'cheque' ? 'one-time' : kind === 'standing_order' ? form.frequency : 'monthly',
       bankAccountId: form.bankAccountId || undefined,
       status: form.status,
-      sourceType: form.sourceType,
-      companyId: form.sourceType === 'business' ? (form.companyId || undefined) : undefined,
+      sourceType: isBusinessOnly ? 'business' : (!isSalaryAndBusiness ? 'salary' : form.sourceType),
+      companyId: (form.sourceType === 'business' || isBusinessOnly) ? (form.companyId || undefined) : undefined,
       payments: existing?.payments || [],
     };
 
@@ -292,9 +291,16 @@ export function FinanceTab({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-sm text-text truncate">{label}</span>
-                        <Badge tone={fp.sourceType === 'business' ? 'warning' : 'neutral'} size="sm" className="text-[10px]">
-                          {fp.sourceType === 'business' ? (linkedCompany ? linkedCompany.name : 'Business') : 'Salary'}
-                        </Badge>
+                        {isSalaryAndBusiness && (
+                          <Badge tone={fp.sourceType === 'business' ? 'warning' : 'neutral'} size="sm" className="text-[10px]">
+                            {fp.sourceType === 'business' ? (linkedCompany ? linkedCompany.name : 'Business') : 'Salary'}
+                          </Badge>
+                        )}
+                        {isBusinessOnly && linkedCompany && (
+                          <Badge tone="warning" size="sm" className="text-[10px]">
+                            {linkedCompany.name}
+                          </Badge>
+                        )}
                         <Badge tone={kind === 'cheque' ? 'warning' : kind === 'standing_order' ? 'primary' : 'neutral'} size="sm" className="capitalize text-[10px]">
                           {kind.replace('_', ' ')}
                         </Badge>
@@ -422,32 +428,48 @@ export function FinanceTab({
         }
         className="h-fit sticky top-4"
       >
-        {hasBusiness && (
+        {isSalaryAndBusiness && (
           <div className="p-3.5 rounded-xl bg-surface-hover/60 border border-border space-y-3 mb-2">
             <Field id="fp-source-type" label="Payment Source / Obligation For">
               <SegmentedTabs
                 size="sm"
                 options={[
                   { id: 'salary', label: 'Salary / Personal' },
-                  { id: 'business', label: 'Business Money' },
+                  { id: 'business', label: 'Business' },
                 ]}
                 value={form.sourceType}
                 onChange={v => updateForm({ sourceType: v as 'salary' | 'business', companyId: '' })}
               />
             </Field>
-            {form.sourceType === 'business' && (
-              <Field id="fp-company" label="Business Enterprise">
+            {form.sourceType === 'business' && state.companies.length > 0 && (
+              <Field id="fp-company" label="Business Enterprise (Optional)">
                 <Select
                   value={form.companyId}
                   onChange={e => updateForm({ companyId: e.target.value })}
                 >
-                  <option value="">{state.companies.length ? 'Select business (optional)' : 'General business'}</option>
+                  <option value="">General Business (Unlinked)</option>
                   {state.companies.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </Select>
               </Field>
             )}
+          </div>
+        )}
+
+        {isBusinessOnly && state.companies.length > 0 && (
+          <div className="p-3.5 rounded-xl bg-surface-hover/60 border border-border space-y-3 mb-2">
+            <Field id="fp-company" label="Business Enterprise (Optional)">
+              <Select
+                value={form.companyId}
+                onChange={e => updateForm({ companyId: e.target.value })}
+              >
+                <option value="">General Business (Unlinked)</option>
+                {state.companies.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </Select>
+            </Field>
           </div>
         )}
         <Field id="fp-kind" label="Payment Type" required>

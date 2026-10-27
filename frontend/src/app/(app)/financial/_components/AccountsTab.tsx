@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp, formatRs } from '@/store';
 import { Card } from '@/components/ui/Card';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
@@ -36,12 +36,25 @@ type CardErrorKey = 'name' | 'cardNumber' | 'expiryDate' | 'cvv' | 'bankAccountI
 
 const isDayOfMonth = (value: string) => /^\d{1,2}$/.test(value) && Number(value) >= 1 && Number(value) <= 31;
 
-export function AccountsTab() {
+export function AccountsTab({
+  streamScope = 'all',
+  companyId,
+}: {
+  streamScope?: 'all' | 'salary' | 'business';
+  companyId?: string;
+} = {}) {
   const { state, save } = useApp();
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
   const [activeSubTab, setActiveSubTab] = useState<'accounts' | 'cards'>('accounts');
+
+  const _isSalaryOnly = state.profile.workMode === 'salary';
+  const isBusinessOnly = state.profile.workMode === 'business';
+  const isSalaryAndBusiness = state.profile.workMode === 'both';
+  const canLinkBusiness = isSalaryAndBusiness || isBusinessOnly;
+
+  const defaultCompId = (companyId && companyId !== 'all') ? companyId : (isBusinessOnly && state.companies[0]?.id ? state.companies[0].id : '');
 
   // Bank Account Form
   const [accountForm, setAccountForm] = useState({
@@ -54,6 +67,7 @@ export function AccountsTab() {
     accountType: 'savings' as BankAccount['accountType'],
     currentBalance: '',
     notes: '',
+    companyId: defaultCompId,
   });
   const [editAccountId, setEditAccountId] = useState<string | null>(null);
   const [accountErrors, setAccountErrors] = useState<Partial<Record<AccountErrorKey, string>>>({});
@@ -73,6 +87,7 @@ export function AccountsTab() {
     currentBalance: '',
     billingDay: '',
     dueDay: '',
+    companyId: defaultCompId,
   });
   const [editCardId, setEditCardId] = useState<string | null>(null);
   const [cardErrors, setCardErrors] = useState<Partial<Record<CardErrorKey, string>>>({});
@@ -284,6 +299,7 @@ export function AccountsTab() {
       currentBalance: balance,
       currency: 'LKR',
       notes: accountForm.notes.trim(),
+      companyId: canLinkBusiness ? (accountForm.companyId || null) : null,
     };
 
     setSaving(true);
@@ -303,6 +319,7 @@ export function AccountsTab() {
       accountType: 'savings',
       currentBalance: '',
       notes: '',
+      companyId: '',
     });
     setAccountErrors({});
   };
@@ -350,6 +367,7 @@ export function AccountsTab() {
       currentBalance: cardForm.currentBalance ? Number(cardForm.currentBalance) : undefined,
       billingDay: cardForm.billingDay ? Number(cardForm.billingDay) : undefined,
       dueDay: cardForm.dueDay ? Number(cardForm.dueDay) : undefined,
+      companyId: canLinkBusiness ? (cardForm.companyId || null) : null,
     };
 
     setSaving(true);
@@ -371,9 +389,39 @@ export function AccountsTab() {
       currentBalance: '',
       billingDay: '',
       dueDay: '',
+      companyId: '',
     });
     setCardErrors({});
   };
+
+  const filteredAccounts = useMemo(() => {
+    return state.bankAccounts.filter(acc => {
+      if (streamScope === 'salary') {
+        if (acc.companyId) return false;
+        if (acc.accountType === 'business') return false;
+      } else if (streamScope === 'business') {
+        if (companyId && companyId !== 'all') {
+          return acc.companyId === companyId;
+        }
+        if (isSalaryAndBusiness && !acc.companyId && acc.accountType !== 'business') return false;
+      }
+      return true;
+    });
+  }, [state.bankAccounts, streamScope, companyId, isSalaryAndBusiness]);
+
+  const filteredCards = useMemo(() => {
+    return state.cards.filter(c => {
+      if (streamScope === 'salary') {
+        if (c.companyId) return false;
+      } else if (streamScope === 'business') {
+        if (companyId && companyId !== 'all') {
+          return c.companyId === companyId;
+        }
+        if (isSalaryAndBusiness && !c.companyId) return false;
+      }
+      return true;
+    });
+  }, [state.cards, streamScope, companyId, isSalaryAndBusiness]);
 
   return (
     <div className="space-y-6">
@@ -429,15 +477,16 @@ export function AccountsTab() {
         <div className="grid md:grid-cols-3 gap-6">
           {/* Bank Accounts List */}
           <div className="md:col-span-2 space-y-3">
-            {state.bankAccounts.length === 0 ? (
+            {filteredAccounts.length === 0 ? (
               <EmptyState
                 icon={<Icon name="bank" size={24} />}
                 title="No bank accounts connected"
-                helper="Add your savings, current, or business accounts with standard banking details."
+                helper={streamScope === 'business' ? 'No business bank accounts recorded for this filter.' : 'Add your savings, current, or business accounts with standard banking details.'}
               />
             ) : (
               <div className="grid sm:grid-cols-2 gap-3.5">
-                {state.bankAccounts.map(acc => {
+                {filteredAccounts.map(acc => {
+                  const linkedCompany = acc.companyId ? state.companies.find(c => c.id === acc.companyId) : null;
                   return (
                     <Card
                       key={acc.id}
@@ -452,7 +501,20 @@ export function AccountsTab() {
                               {acc.bankName} {acc.branch ? `· ${acc.branch}` : ''}
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                            {linkedCompany ? (
+                              <Badge tone="warning" size="sm" className="text-[10px]">
+                                🏢 {linkedCompany.name}
+                              </Badge>
+                            ) : isSalaryAndBusiness ? (
+                              <Badge tone="neutral" size="sm" className="text-[10px]">
+                                Personal
+                              </Badge>
+                            ) : isBusinessOnly ? (
+                              <Badge tone="warning" size="sm" className="text-[10px]">
+                                Business
+                              </Badge>
+                            ) : null}
                             {acc.isArchived && (
                               <Badge tone="neutral" size="sm" className="uppercase text-[10px]">
                                 Archived
@@ -546,6 +608,7 @@ export function AccountsTab() {
                                 accountType: acc.accountType || 'savings',
                                 currentBalance: String(acc.currentBalance),
                                 notes: acc.notes || '',
+                                companyId: acc.companyId || '',
                               });
                             }}
                             aria-label="Edit account"
@@ -587,6 +650,21 @@ export function AccountsTab() {
             </h3>
 
             <div className="space-y-3.5">
+              {canLinkBusiness && (
+                <Field id="acc-company" label="Operating Business / Entity">
+                  <Select
+                    value={accountForm.companyId}
+                    onChange={e => setAccountForm(f => ({ ...f, companyId: e.target.value }))}
+                  >
+                    {isSalaryAndBusiness && <option value="">Personal / Household (Salary)</option>}
+                    {isBusinessOnly && <option value="">General Business Account</option>}
+                    {state.companies.map(c => (
+                      <option key={c.id} value={c.id}>🏢 {c.name}</option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+
               <Field id="acc-name" label="Account Nickname" required error={accountErrors.name}>
                 <Input
                   value={accountForm.name}
@@ -729,6 +807,7 @@ export function AccountsTab() {
                         swiftCode: '',
                         accountType: 'savings',
                         currentBalance: '',
+                        companyId: '',
                         notes: '',
                       });
                       setAccountErrors({});
@@ -745,16 +824,17 @@ export function AccountsTab() {
         <div className="grid md:grid-cols-3 gap-6">
           {/* Payment Cards List */}
           <div className="md:col-span-2 space-y-3">
-            {state.cards.length === 0 ? (
+            {filteredCards.length === 0 ? (
               <EmptyState
                 icon={<Icon name="credit-card" size={24} />}
                 title="No payment cards connected"
-                helper="Add your debit and credit cards using standard bank card specifications."
+                helper={streamScope === 'business' ? 'No business payment cards recorded for this filter.' : 'Add your debit and credit cards using standard bank card specifications.'}
               />
             ) : (
               <div className="grid sm:grid-cols-2 gap-3.5">
-                {state.cards.map(c => {
+                {filteredCards.map(c => {
                   const linkedAcc = state.bankAccounts.find(a => a.id === c.bankAccountId);
+                  const linkedCardCompany = c.companyId ? state.companies.find(comp => comp.id === c.companyId) : null;
                   return (
                     <Card
                       key={c.id}
@@ -774,9 +854,24 @@ export function AccountsTab() {
                               {c.cardNetwork || 'Card'} · {c.cardType}
                             </div>
                           </div>
-                          <Badge tone={c.cardType === 'credit' ? 'warning' : 'primary'} size="sm" className="uppercase text-[10px] shrink-0">
-                            {c.cardType}
-                          </Badge>
+                          <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                            {linkedCardCompany ? (
+                              <Badge tone="warning" size="sm" className="text-[10px]">
+                                🏢 {linkedCardCompany.name}
+                              </Badge>
+                            ) : isSalaryAndBusiness ? (
+                              <Badge tone="neutral" size="sm" className="text-[10px]">
+                                Personal
+                              </Badge>
+                            ) : isBusinessOnly ? (
+                              <Badge tone="warning" size="sm" className="text-[10px]">
+                                Business
+                              </Badge>
+                            ) : null}
+                            <Badge tone={c.cardType === 'credit' ? 'warning' : 'primary'} size="sm" className="uppercase text-[10px] shrink-0">
+                              {c.cardType}
+                            </Badge>
+                          </div>
                         </div>
 
                         {/* Masked Card Number */}
@@ -848,6 +943,7 @@ export function AccountsTab() {
                                 currentBalance: c.currentBalance ? String(c.currentBalance) : '',
                                 billingDay: c.billingDay ? String(c.billingDay) : '',
                                 dueDay: c.dueDay ? String(c.dueDay) : '',
+                                companyId: c.companyId || '',
                               });
                             }}
                             aria-label="Edit card"
@@ -925,6 +1021,21 @@ export function AccountsTab() {
             </div>
 
             <div className="space-y-3.5">
+              {canLinkBusiness && (
+                <Field id="card-company" label="Operating Business / Entity (Optional)">
+                  <Select
+                    value={cardForm.companyId}
+                    onChange={e => setCardForm(f => ({ ...f, companyId: e.target.value }))}
+                  >
+                    {isSalaryAndBusiness && <option value="">Personal Card</option>}
+                    {isBusinessOnly && <option value="">General Business Card</option>}
+                    {state.companies.map(c => (
+                      <option key={c.id} value={c.id}>🏢 {c.name}</option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+
               <Field id="card-name" label="Card Label" required error={cardErrors.name}>
                 <Input
                   value={cardForm.name}
@@ -1033,7 +1144,12 @@ export function AccountsTab() {
                 label="Linked Bank Account"
                 value={cardForm.bankAccountId}
                 onChange={id => {
-                  setCardForm(f => ({ ...f, bankAccountId: id }));
+                  const linkedAcc = state.bankAccounts.find(a => a.id === id);
+                  setCardForm(f => ({
+                    ...f,
+                    bankAccountId: id,
+                    companyId: f.companyId || linkedAcc?.companyId || '',
+                  }));
                   clearCardError('bankAccountId');
                 }}
                 bankAccounts={state.bankAccounts.filter(a => a.accountType !== 'cash')}
@@ -1111,6 +1227,7 @@ export function AccountsTab() {
                         currentBalance: '',
                         billingDay: '',
                         dueDay: '',
+                        companyId: '',
                       });
                       setCardErrors({});
                     }}
@@ -1215,6 +1332,16 @@ export function AccountsTab() {
                   <span className="text-muted block text-[11px]">Account Holder</span>
                   <span className="font-medium text-text">{viewAccountDetails.name}</span>
                 </div>
+                {canLinkBusiness && (
+                  <div>
+                    <span className="text-muted block text-[11px]">Operating Business</span>
+                    <span className="font-medium text-text">
+                      {viewAccountDetails.companyId
+                        ? (state.companies.find(c => c.id === viewAccountDetails.companyId)?.name || 'Linked Business')
+                        : (isSalaryAndBusiness ? 'Personal / Household' : 'General Business Entity')}
+                    </span>
+                  </div>
+                )}
               </div>
               {viewAccountDetails.notes && (
                 <div className="pt-2 border-t border-border/60">
@@ -1284,6 +1411,7 @@ export function AccountsTab() {
                     swiftCode: viewAccountDetails.swiftCode || '',
                     accountType: viewAccountDetails.accountType || 'savings',
                     currentBalance: String(viewAccountDetails.currentBalance),
+                    companyId: viewAccountDetails.companyId || '',
                     notes: viewAccountDetails.notes || '',
                   });
                   setViewAccountDetails(null);
@@ -1400,6 +1528,16 @@ export function AccountsTab() {
                     </div>
                   </>
                 )}
+                {canLinkBusiness && (
+                  <div>
+                    <span className="text-muted block text-[11px]">Operating Business</span>
+                    <span className="font-medium text-text">
+                      {viewCardDetails.companyId
+                        ? (state.companies.find(c => c.id === viewCardDetails.companyId)?.name || 'Linked Business')
+                        : (isSalaryAndBusiness ? 'Personal / Household' : 'General Business Entity')}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1413,6 +1551,7 @@ export function AccountsTab() {
                   setCardForm({
                     name: viewCardDetails.name,
                     bankAccountId: viewCardDetails.bankAccountId || '',
+                    companyId: viewCardDetails.companyId || '',
                     cardType: viewCardDetails.cardType,
                     cardNumber: viewCardDetails.cardNumber || `•••• •••• •••• ${viewCardDetails.lastFourDigits}`,
                     expiryDate: viewCardDetails.expiryDate || '',

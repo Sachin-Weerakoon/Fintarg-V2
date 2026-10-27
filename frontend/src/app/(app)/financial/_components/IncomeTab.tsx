@@ -43,7 +43,11 @@ export function IncomeTab({
     bankAccountId: string;
   };
 
-  const defaultType: 'salary' | 'business' | 'other' = streamScope === 'business' ? 'business' : 'salary';
+  const isSalaryAndBusiness = state.profile.workMode === 'both';
+  const isBusinessOnly = state.profile.workMode === 'business';
+  const isSalaryOnly = !isSalaryAndBusiness && !isBusinessOnly;
+
+  const defaultType: 'salary' | 'business' | 'other' = isBusinessOnly ? 'business' : (streamScope === 'business' ? 'business' : 'salary');
 
   const [form, setForm] = useState<IncomeForm>({
     source: '',
@@ -67,9 +71,10 @@ export function IncomeTab({
         ? 'Select the bank account this is paid into.' : undefined,
     });
     if (!valid) return;
+    const effectiveType = isSalaryOnly && form.type === 'business' ? 'salary' : (isBusinessOnly && form.type === 'salary' ? 'business' : form.type);
     const entry = {
       source: form.source.trim(),
-      type: form.type,
+      type: effectiveType,
       amount: Number(form.amount),
       frequency: form.frequency,
       date: form.date,
@@ -114,11 +119,13 @@ export function IncomeTab({
   const streamFilteredIncome = useMemo(() => {
     return state.income.filter(i => {
       if (i.frequency === 'one-time' && !isInRange(i.date, range)) return false;
+      if (isSalaryOnly) return i.type === 'salary' || i.type === 'other';
+      if (isBusinessOnly) return i.type === 'business' || i.type === 'other';
       if (streamScope === 'salary') return i.type === 'salary' || i.type === 'other';
       if (streamScope === 'business') return i.type === 'business';
       return true;
     });
-  }, [state.income, streamScope, range]);
+  }, [state.income, streamScope, range, isSalaryOnly, isBusinessOnly]);
 
   const rangeTotal = useMemo(
     () => calcIncomeForRange(streamFilteredIncome, range, state.employmentProfiles),
@@ -130,7 +137,7 @@ export function IncomeTab({
       <div>
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold text-sm text-text">
-            {streamScope === 'business' ? 'Business Operating Inflows' : streamScope === 'salary' ? 'Job Salary Inflows' : 'Consolidated Inflow Sources'}
+            {isSalaryOnly ? 'Income & Inflows' : isBusinessOnly ? 'Business Operating Inflows' : (streamScope === 'business' ? 'Business Inflows' : streamScope === 'salary' ? 'Job Salary Inflows' : 'Consolidated Inflow Sources')}
           </div>
           <div className="text-sm text-muted">
             Total: <span className="font-semibold text-text num">{formatRs(rangeTotal)}</span>
@@ -235,16 +242,40 @@ export function IncomeTab({
             placeholder={streamScope === 'business' ? 'e.g. Client retainer, Wholesale sales' : 'e.g. Tech Corp Salary, Freelance'}
           />
         </Field>
-        <Field id="income-type" label="Stream Type" required>
-          <Select
-            value={form.type}
-            onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))}
-          >
-            <option value="salary">Job Salary</option>
-            <option value="business">Business Inflow</option>
-            <option value="other">Other Inflow</option>
-          </Select>
-        </Field>
+        {isSalaryAndBusiness && (
+          <Field id="income-type" label="Stream Type" required>
+            <Select
+              value={form.type}
+              onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))}
+            >
+              <option value="salary">Job Salary</option>
+              <option value="business">Business Inflow</option>
+              <option value="other">Other Inflow</option>
+            </Select>
+          </Field>
+        )}
+        {isBusinessOnly && (
+          <Field id="income-type" label="Stream Type" required>
+            <Select
+              value={form.type === 'salary' ? 'business' : form.type}
+              onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))}
+            >
+              <option value="business">Business Inflow</option>
+              <option value="other">Other Inflow</option>
+            </Select>
+          </Field>
+        )}
+        {isSalaryOnly && (
+          <Field id="income-type" label="Stream Type" required>
+            <Select
+              value={form.type === 'business' ? 'salary' : form.type}
+              onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))}
+            >
+              <option value="salary">Job Salary</option>
+              <option value="other">Other Inflow</option>
+            </Select>
+          </Field>
+        )}
         <Field id="income-amount" label="Amount" required error={errors.amount}>
           <MoneyField
             value={form.amount}

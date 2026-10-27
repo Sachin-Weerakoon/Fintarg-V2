@@ -49,6 +49,7 @@ const date = isoDateSchema;
 const optionalText = z.string().trim().max(2000).default('');
 
 const bankAccountSchema = z.object({
+  companyId: z.string().optional().nullable(),
   bankName: z.string().trim().min(1, 'Bank name is required').max(120),
   accountNumber: z.string().trim().min(1, 'Account number is required').max(64),
   accountName: z.string().trim().max(120).optional(),
@@ -68,6 +69,7 @@ const bankAccountSchema = z.object({
 });
 
 const cardSchema = z.object({
+  companyId: z.string().optional().nullable(),
   bankAccountId: z.string().optional().nullable(),
   cardName: z.string().trim().max(120).optional(),
   name: z.string().trim().max(120).optional(),

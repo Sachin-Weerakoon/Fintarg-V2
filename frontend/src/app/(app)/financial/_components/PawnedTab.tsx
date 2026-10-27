@@ -34,8 +34,9 @@ export function PawnedTab({
   const confirm = useConfirm();
   const toast = useToast();
 
-  const hasBusiness = state.profile.workMode === 'both' || state.profile.workMode === 'business' || (state.companies && state.companies.length > 0);
-  const defaultSourceType: 'salary' | 'business' = streamScope === 'business' ? 'business' : 'salary';
+  const isSalaryAndBusiness = state.profile.workMode === 'both';
+  const isBusinessOnly = state.profile.workMode === 'business';
+  const defaultSourceType: 'salary' | 'business' = isBusinessOnly ? 'business' : (streamScope === 'business' ? 'business' : 'salary');
 
   const [form, setForm] = useState({
     description: '',
@@ -110,8 +111,8 @@ export function PawnedTab({
         nextDue,
         redemptionDate,
         status: 'active',
-        sourceType: form.sourceType,
-        companyId: form.sourceType === 'business' ? (form.companyId || undefined) : undefined,
+        sourceType: isBusinessOnly ? 'business' : (!isSalaryAndBusiness ? 'salary' : form.sourceType),
+        companyId: (form.sourceType === 'business' || isBusinessOnly) ? (form.companyId || undefined) : undefined,
         payments: [],
       },
     });
@@ -271,9 +272,16 @@ export function PawnedTab({
                         <Badge tone={statusTone} size="sm">
                           {status.toUpperCase()}
                         </Badge>
-                        <Badge tone={p.sourceType === 'business' ? 'warning' : 'neutral'} size="sm">
-                          {p.sourceType === 'business' ? (linkedCompany ? linkedCompany.name : 'Business') : 'Salary'}
-                        </Badge>
+                        {isSalaryAndBusiness && (
+                          <Badge tone={p.sourceType === 'business' ? 'warning' : 'neutral'} size="sm">
+                            {p.sourceType === 'business' ? (linkedCompany ? linkedCompany.name : 'Business') : 'Salary'}
+                          </Badge>
+                        )}
+                        {isBusinessOnly && linkedCompany && (
+                          <Badge tone="warning" size="sm">
+                            {linkedCompany.name}
+                          </Badge>
+                        )}
                       </div>
                       <div className="text-xs text-muted mt-1 space-x-2">
                         <span>Original: <strong className="num text-text">{formatRs(p.amountReceived)}</strong></span>
@@ -382,33 +390,49 @@ export function PawnedTab({
         title="Add Pawned Item"
         className="h-fit sticky top-4"
       >
-        {hasBusiness && (
+        {isSalaryAndBusiness && (
           <div className="p-3.5 rounded-xl bg-surface-hover/60 border border-border space-y-3 mb-2">
             <Field id="pawn-source-type" label="Funds Source">
               <SegmentedTabs
                 size="sm"
                 options={[
                   { id: 'salary', label: 'Salary / Personal' },
-                  { id: 'business', label: 'Business Money' },
+                  { id: 'business', label: 'Business' },
                 ]}
                 value={form.sourceType}
                 onChange={v => updateForm({ sourceType: v as 'salary' | 'business', companyId: '' })}
               />
             </Field>
 
-            {form.sourceType === 'business' && (
-              <Field id="pawn-company" label="Business Enterprise">
+            {form.sourceType === 'business' && state.companies.length > 0 && (
+              <Field id="pawn-company" label="Business Enterprise (Optional)">
                 <Select
                   value={form.companyId}
                   onChange={e => updateForm({ companyId: e.target.value })}
                 >
-                  <option value="">{state.companies.length ? 'Select business (optional)' : 'General business'}</option>
+                  <option value="">General Business (Unlinked)</option>
                   {state.companies.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </Select>
               </Field>
             )}
+          </div>
+        )}
+
+        {isBusinessOnly && state.companies.length > 0 && (
+          <div className="p-3.5 rounded-xl bg-surface-hover/60 border border-border space-y-3 mb-2">
+            <Field id="pawn-company" label="Business Enterprise (Optional)">
+              <Select
+                value={form.companyId}
+                onChange={e => updateForm({ companyId: e.target.value })}
+              >
+                <option value="">General Business (Unlinked)</option>
+                {state.companies.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </Select>
+            </Field>
           </div>
         )}
         <Field id="pawn-desc" label="Description" required error={errors.description}>

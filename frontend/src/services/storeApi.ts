@@ -263,6 +263,7 @@ export async function loadPersistedData(plan: UserPlan = 'basic'): Promise<Parti
       currency: row.currency || 'LKR',
       notes: row.notes || '',
       isArchived: Boolean(row.isArchived),
+      companyId: row.companyId ? String(row.companyId) : undefined,
     })),
     cards: cards.map(row => ({
       id: row._id,
@@ -280,6 +281,7 @@ export async function loadPersistedData(plan: UserPlan = 'basic'): Promise<Parti
       currentBalance: (row.currentBalanceCents ?? row.balanceCents ?? 0) / 100,
       billingDay: row.billingDay,
       dueDay: row.dueDay,
+      companyId: row.companyId ? String(row.companyId) : undefined,
     })),
     transactions: transactions.map(row => ({
       id: row._id,
@@ -498,6 +500,7 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
         currency: action.entry.currency || 'LKR',
         notes: action.entry.notes || '',
         isDefault: false,
+        companyId: action.entry.companyId || null,
       });
     case 'UPDATE_BANK_ACCOUNT':
       return void (await send(`/api/backend/records/bankAccounts/${id}`, 'PATCH', {
@@ -512,6 +515,7 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
         currency: action.entry.currency || 'LKR',
         notes: action.entry.notes || '',
         ...(action.entry.isArchived !== undefined ? { isArchived: Boolean(action.entry.isArchived) } : {}),
+        ...(action.entry.companyId !== undefined ? { companyId: action.entry.companyId || null } : {}),
       }));
     case 'DELETE_BANK_ACCOUNT':
       return void (await send(`/api/backend/records/bankAccounts/${id}`, 'DELETE'));
@@ -532,6 +536,7 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
         balance: Number(action.entry.currentBalance || 0),
         billingDay: action.entry.billingDay,
         dueDay: action.entry.dueDay,
+        companyId: action.entry.companyId || null,
       });
     case 'UPDATE_CARD':
       return void (await send(`/api/backend/records/cards/${id}`, 'PATCH', {
@@ -549,6 +554,7 @@ export async function persistStoreAction(action: { type: string; [key: string]: 
         balance: Number(action.entry.currentBalance || 0),
         billingDay: action.entry.billingDay,
         dueDay: action.entry.dueDay,
+        ...(action.entry.companyId !== undefined ? { companyId: action.entry.companyId || null } : {}),
       }));
     case 'DELETE_CARD':
       return void (await send(`/api/backend/records/cards/${id}`, 'DELETE'));
