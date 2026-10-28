@@ -18,7 +18,7 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
     return (
       <div className="group relative flex items-center w-full">
         {iconLeft && (
-          <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-muted transition-colors duration-200 group-focus-within:text-primary-600 dark:group-focus-within:text-primary-400 select-none">
+          <div className="absolute inset-y-0 left-3.5 z-10 flex items-center pointer-events-none text-muted transition-colors duration-200 group-focus-within:text-primary-600 dark:group-focus-within:text-primary-400 select-none">
             {iconLeft}
           </div>
         )}

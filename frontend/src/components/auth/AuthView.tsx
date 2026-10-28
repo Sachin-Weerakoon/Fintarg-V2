@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PasswordField } from '@/components/ui/PasswordField';
 import { BrandLogo } from '@/components/ui/BrandLogo';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { PasswordRules } from '@/components/ui/PasswordRules';
 import { passwordProblem } from '@/lib/passwordPolicy';
 import { apiErrorMessage } from '@/services/apiClient';
@@ -22,28 +23,28 @@ const workModes: {
   title: string;
   badge: string;
   description: string;
-  icon: string;
+  icon: IconName;
 }[] = [
   {
     value: 'salary',
     title: 'Salary',
     badge: 'Employment',
     description: 'Track pay slips, deductions & household burn',
-    icon: '💼',
+    icon: 'wallet',
   },
   {
     value: 'business',
     title: 'Business',
     badge: 'Enterprise',
     description: 'Track daily sales, cash register & inventory costs',
-    icon: '🏪',
+    icon: 'bank',
   },
   {
     value: 'both',
     title: 'Both',
     badge: 'Job + Business',
     description: 'Dual income: manage both cashflows seamlessly',
-    icon: '⚡',
+    icon: 'briefcase',
   },
 ];
 
@@ -164,8 +165,8 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
               'Secure document vault & automated legal letter generator',
             ].map(feature => (
               <li key={feature} className="flex items-start gap-3">
-                <span className="mt-0.5 w-5 h-5 rounded-full flex items-center justify-center bg-primary-500/20 border border-primary-400/30 text-primary-300 flex-shrink-0 text-xs font-bold">
-                  ✓
+                <span className="mt-0.5 w-5 h-5 rounded-full flex items-center justify-center bg-primary-500/20 border border-primary-400/30 text-primary-300 flex-shrink-0">
+                  <Icon name="check" size={12} />
                 </span>
                 <span className="leading-snug">{feature}</span>
               </li>
@@ -354,10 +355,17 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
                         }`}
                       >
                         <div className="flex items-center justify-between w-full mb-1">
-                          <span className="text-base">{option.icon}</span>
+                          <span
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                              isSelected ? 'bg-primary-500 text-white' : 'bg-white/5 text-slate-300'
+                            }`}
+                            aria-hidden="true"
+                          >
+                            <Icon name={option.icon} size={15} />
+                          </span>
                           {isSelected && (
-                            <span className="w-3.5 h-3.5 rounded-full bg-primary-500 text-white flex items-center justify-center text-[9px] font-bold">
-                              ✓
+                            <span className="w-4 h-4 rounded-full bg-primary-500 text-white flex items-center justify-center" aria-hidden="true">
+                              <Icon name="check" size={10} />
                             </span>
                           )}
                         </div>
@@ -375,7 +383,7 @@ export function AuthView({ initialMode = 'signin' }: AuthViewProps) {
                 className="p-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs mt-3 flex items-start gap-2.5"
                 role="alert"
               >
-                <span className="text-rose-400 font-bold text-sm leading-none mt-0.5">⚠</span>
+                <Icon name="alert" size={15} className="text-rose-400 flex-shrink-0 mt-px" />
                 <span className="leading-snug">{error}</span>
               </div>
             )}
