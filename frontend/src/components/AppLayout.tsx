@@ -109,6 +109,12 @@ function AppLayoutInner({
                 isActive: pathname === '/advanced' && (currentTab === 'businesses' || currentTab === 'companies'),
                 badge: state.companies?.length > 0 ? `${state.companies.length}` : undefined,
               },
+              {
+                href: '/advanced?tab=agreements',
+                label: 'Commercial Contracts',
+                icon: 'documents' as IconName,
+                isActive: pathname === '/advanced' && currentTab === 'agreements',
+              },
             ]
           : []),
       ],
