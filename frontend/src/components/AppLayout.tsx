@@ -80,7 +80,8 @@ function AppLayoutInner({
   const mobileBottomItems = user.workMode === 'salary' ? salaryBottomItems : businessBottomItems;
   const currentTab = searchParams?.get('tab') || undefined;
 
-  const showSalaryInSidebar = user.workMode === 'salary';
+  // 'both' accounts have a job as well as a business, so they get the salary tools too.
+  const showSalaryInSidebar = user.workMode === 'salary' || user.workMode === 'both';
   const hasBusiness = user.workMode !== 'salary' || state.profile?.plan === 'business' || (state.companies && state.companies.length > 0);
 
   const navSections: { title?: string; items: { href: string; label: string; icon: IconName; isActive: boolean; badge?: string }[] }[] = [

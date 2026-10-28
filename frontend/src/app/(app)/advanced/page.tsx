@@ -57,7 +57,7 @@ function AdvancedContent() {
     router.replace(query ? `?${query}` : '/advanced', { scroll: false });
   };
 
-  const showSalaryTab = state.profile.workMode === 'salary';
+  const showSalaryTab = state.profile.workMode === 'salary' || state.profile.workMode === 'both';
   const tabOptions = [
     { id: 'hub', label: 'Feature Hub', icon: <Icon name="home" size={15} /> },
     ...(hasBusiness
