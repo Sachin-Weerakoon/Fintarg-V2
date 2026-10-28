@@ -109,22 +109,19 @@ function AppLayoutInner({
                 isActive: pathname === '/advanced' && (currentTab === 'businesses' || currentTab === 'companies'),
                 badge: state.companies?.length > 0 ? `${state.companies.length}` : undefined,
               },
-              {
-                href: '/advanced?tab=agreements',
-                label: 'Commercial Contracts',
-                icon: 'documents' as IconName,
-                isActive: pathname === '/advanced' && currentTab === 'agreements',
-              },
             ]
           : []),
       ],
     },
     {
-      title: 'VAULT & TOOLS',
+      title: 'ADVANCED HUB',
       items: [
         { href: '/advanced/medical', label: 'Medical Vault', icon: 'heart', isActive: pathname === '/advanced/medical' },
         { href: '/advanced/letters', label: 'Formal Letters', icon: 'file-text', isActive: pathname === '/advanced/letters' },
-        { href: '/advanced', label: 'Advanced Hub', icon: 'advanced', isActive: pathname === '/advanced' && (!currentTab || currentTab === 'hub') },
+        // The Agreements tab only exists for accounts with a business.
+        ...(hasBusiness
+          ? [{ href: '/advanced?tab=agreements', label: 'Agreement', icon: 'documents' as IconName, isActive: pathname === '/advanced' && currentTab === 'agreements' }]
+          : []),
       ],
     },
     {
