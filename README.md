@@ -50,7 +50,7 @@ frontend/
 
    The Next.js frontend runs at `http://localhost:3000`; Express runs at `http://localhost:5000`.
 
-To run one side only, use `npm run dev:frontend` or `npm run dev:backend`. Verify with `npm run typecheck`, `npm test`, and `npm run build`.
+To run one side only, use `npm --prefix frontend run dev` or `npm --prefix backend run dev`. Verify with `npm --prefix backend run typecheck`, `npm --prefix frontend run typecheck`, `npm test`, and `npm run build` (run from the repository root).
 
 ## Backend environment
 
@@ -60,4 +60,6 @@ Never commit `.env`, `.env.local`, or production credentials. Rotate any databas
 
 ## Deployment
 
-Deploy the Next.js frontend and Express backend as separate services. Set `BACKEND_API_URL` in the frontend to the backend's private or HTTPS URL. Configure MongoDB and JWT/file-encryption secrets on the backend host, then set the frontend origin on both services. MongoDB Atlas must allow the backend host's network egress address.
+The frontend (Next.js) is deployed on Netlify and the backend (Express) on Vercel, as separate services. Set `BACKEND_API_URL` in the frontend to the backend's HTTPS URL, keep MongoDB, JWT, file-encryption and cron secrets on the backend host only, and set the frontend origin (`FRONTEND_ORIGIN`, `APP_ORIGIN`) on the backend. MongoDB Atlas must allow the backend host's network egress.
+
+See [docs/DEPLOY.md](docs/DEPLOY.md) for the step-by-step guide, environment variable tables, scheduled jobs, the validation checklist and troubleshooting.
