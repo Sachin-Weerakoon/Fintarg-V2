@@ -262,3 +262,40 @@ Netlify team sites can be **private** (visitor password / team login). Plain
 
 Logs: **Vercel → Project → Logs** (backend, includes the error digest) and
 **Netlify → Logs → Functions** (Next.js server).
+
+---
+
+## 8) Automatic deploys (GitHub Actions)
+
+`.github/workflows/deploy-staging.yml` deploys staging automatically:
+
+```text
+merge to main → CI passes → Deploy backend (Vercel) → health check → Deploy frontend (Netlify)
+```
+
+- It runs only after the **CI** workflow succeeds on `main`. If CI fails, nothing is deployed.
+- It can also be started by hand: **Actions → Deploy staging → Run workflow**.
+- Only one deploy runs at a time (`concurrency: deploy-staging`).
+- The backend is deployed before the frontend, so the frontend never calls an older API.
+
+### One-time setup (repo admin)
+
+**Settings → Secrets and variables → Actions**
+
+| Type | Name | Where to get it |
+|---|---|---|
+| Secret | `VERCEL_TOKEN` | Vercel → Account Settings → Tokens (scope it to the backend project, set an expiry) |
+| Secret | `VERCEL_ORG_ID` | `.vercel/project.json` after `vercel link` (`orgId`) |
+| Secret | `VERCEL_PROJECT_ID` | `.vercel/project.json` after `vercel link` (`projectId`) |
+| Secret | `NETLIFY_AUTH_TOKEN` | Netlify → User settings → Applications → Personal access tokens (set an expiry) |
+| Secret | `NETLIFY_SITE_ID` | Netlify → Project configuration → Project ID |
+| Variable | `BACKEND_URL` | `https://<backend>.vercel.app` (used for the health check; optional) |
+
+App environment variables (MongoDB, JWT and so on) stay in Vercel and Netlify, not in GitHub.
+
+### Notes
+
+- Tokens expire. When a deploy fails with an authentication error, create a new token and update the secret.
+- If both the Vercel/Netlify Git integration and this workflow deploy the same project, each merge deploys twice. Use one of them.
+- Roll back from the platform dashboards: Vercel **Instant Rollback**, Netlify **Publish deploy** on an older deploy. Then fix main with `git revert`.
+- Tested on a fork: merge → CI (1m 18s) → Deploy staging (3m 42s), with both platforms updated to the same commit.
